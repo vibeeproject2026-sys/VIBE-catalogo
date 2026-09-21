@@ -1,10 +1,10 @@
 const img={
- cleanser:"https://images.pexels.com/photos/14836428/pexels-photo-14836428.jpeg?auto=compress&cs=tinysrgb&w=900",
- serum:"https://images.pexels.com/photos/9496260/pexels-photo-9496260.jpeg?auto=compress&cs=tinysrgb&w=900",
- lip:"https://images.pexels.com/photos/1213558/pexels-photo-1213558.jpeg?auto=compress&cs=tinysrgb&w=900",
- mask:"https://images.pexels.com/photos/10612343/pexels-photo-10612343.jpeg?auto=compress&cs=tinysrgb&w=900",
- mist:"https://calmedi.id/wp-content/uploads/2021/08/Hydra-Face-Mist-70-mllll.png",
- brush:"https://images.pexels.com/photos/15898031/pexels-photo-15898031.jpeg?auto=compress&cs=tinysrgb&w=900"
+ cleanser:"assets/products/cleanser.svg",
+ serum:"assets/products/serum.svg",
+ lip:"assets/products/lip.svg",
+ mask:"assets/products/mask.svg",
+ mist:"assets/products/mist.svg",
+ brush:"assets/products/brush.svg"
 };
 export const products=[
 {id:"cleanser",name:"Daily Glow Cleanser",category:"Skincare",price:58900,shortDescription:"Limpieza suave para comenzar tu ritual.",description:"Producto demo para validar la experiencia.",benefits:["Limpieza diaria","Sensación fresca"],ingredients:"Información pendiente del producto real.",usage:"Aplicar sobre piel húmeda, masajear y retirar.",presentation:"150 ml",variants:[{id:"150ml",name:"150 ml",price:58900,sku:"DEMO-CL-150"}],image:img.cleanser,imageLabel:"DEMO"},
