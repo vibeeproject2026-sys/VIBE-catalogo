@@ -1,12 +1,325 @@
-import{products,categories}from"./products.js";import{getCart,addToCart,changeQuantity,removeFromCart,clearCart,getCartCount,getCartTotal}from"./cart.js";
-const WHATSAPP_NUMBER="57XXXXXXXXXX";const state={category:"Todos",search:"",product:null,variant:null};const $=s=>document.querySelector(s);const money=n=>new Intl.NumberFormat("es-CO",{style:"currency",currency:"COP",maximumFractionDigits:0}).format(n);const esc=s=>String(s??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;");
-function renderCats(){$("#categoryTabs").innerHTML=categories.map(c=>"<button class=\"tab "+(state.category===c?"active":"")+"\" data-category=\""+esc(c)+"\">"+esc(c)+"</button>").join("")}
-function productImage(p,cls="product-photo"){return p.image?"<img class=\""+cls+"\" src=\""+p.image+"\" alt=\""+esc(p.name)+"\" loading=\"lazy\">":"<span>"+esc(p.imageLabel)+"</span>"}
-function renderProducts(){const q=state.search.toLowerCase();const list=products.filter(p=>(state.category==="Todos"||p.category===state.category)&&(!q||(p.name+" "+p.category+" "+p.shortDescription).toLowerCase().includes(q)));$("#productGrid").innerHTML=list.map(p=>"<article class=\"card\"><button class=\"card-img\" data-product=\""+p.id+"\">"+productImage(p)+"</button><div class=\"card-body\"><p class=\"product-category\">"+esc(p.category)+"</p><h3>"+esc(p.name)+"</h3><p class=\"desc\">"+esc(p.shortDescription)+"</p><span class=\"price\">"+money(p.price)+"</span>"+(p.oldPrice?"<span class=\"old\">"+money(p.oldPrice)+"</span>":"")+"<button class=\"button dark\" data-product=\""+p.id+"\">Ver producto</button></div></article>").join("");$("#emptyState").classList.toggle("hidden",!!list.length)}
-function renderCart(){$("#cartCount").textContent=getCartCount();$("#cartTotal").textContent=money(getCartTotal());const items=getCart();$("#checkoutButton").disabled=!items.length;$("#checkoutButton").style.opacity=items.length?"1":".45";$("#cartItems").innerHTML=items.length?items.map(i=>"<div class=\"cart-item\"><div class=\"thumb\">VIBE</div><div><h3>"+esc(i.name)+"</h3><div class=\"meta\">"+esc(i.variantName)+"</div><div class=\"qty\"><button data-a=\"dec\" data-p=\""+i.productId+"\" data-v=\""+i.variantId+"\">−</button><span>"+i.quantity+"</span><button data-a=\"inc\" data-p=\""+i.productId+"\" data-v=\""+i.variantId+"\">+</button></div><button class=\"remove\" data-a=\"del\" data-p=\""+i.productId+"\" data-v=\""+i.variantId+"\">Eliminar</button></div><div class=\"cart-price\">"+money(i.price*i.quantity)+"</div></div>").join(""):"<p class=\"empty\">Tu carrito está vacío.</p>"}
-function openCart(){$("#cartDrawer").classList.add("open");$("#cartDrawer").setAttribute("aria-hidden","false");$("#overlay").classList.remove("hidden");renderCart()}function closeCart(){$("#cartDrawer").classList.remove("open");$("#cartDrawer").setAttribute("aria-hidden","true");$("#overlay").classList.add("hidden")}
-function openProduct(id){const p=products.find(x=>x.id===id);if(!p)return;state.product=p;state.variant=p.variants[0].id;$("#productDetail").innerHTML="<div class=\"detail-img\">"+productImage(p,"detail-photo")+"</div><div class=\"detail-copy\"><p class=\"eyebrow\">"+esc(p.category)+"</p><h2>"+esc(p.name)+"</h2><p class=\"description\">"+esc(p.description)+"</p><strong class=\"price\" id=\"detailPrice\">"+money(p.variants[0].price)+"</strong><div class=\"variants\">"+p.variants.map(v=>"<button class=\"variant "+(v.id===state.variant?"selected":"")+"\" data-variant=\""+v.id+"\">"+esc(v.name)+"</button>").join("")+"</div><div class=\"section\"><h3>Beneficios</h3><p>"+p.benefits.map(esc).join(" · ")+"</p></div>"+(p.ingredients?"<div class=\"section\"><h3>Ingredientes</h3><p>"+esc(p.ingredients)+"</p></div>":"")+"<div class=\"section\"><h3>Modo de uso</h3><p>"+esc(p.usage)+"</p></div><div class=\"section\"><h3>Presentación</h3><p>"+esc(p.presentation)+"</p></div><div class=\"detail-actions\"><div class=\"quantity\"><button data-q=\"-1\">−</button><input id=\"detailQty\" type=\"number\" min=\"1\" value=\"1\"><button data-q=\"1\">+</button></div><button id=\"addButton\" class=\"button dark\">Agregar al carrito</button></div></div>";$("#productDialog").showModal()}
-function selected(){return state.product.variants.find(v=>v.id===state.variant)||state.product.variants[0]}
-$("#categoryTabs").addEventListener("click",e=>{const b=e.target.closest("[data-category]");if(!b)return;state.category=b.dataset.category;renderCats();renderProducts()});$("#searchInput").addEventListener("input",e=>{state.search=e.target.value;renderProducts()});$("#productGrid").addEventListener("click",e=>{const b=e.target.closest("[data-product]");if(b)openProduct(b.dataset.product)});$("#cartButton").onclick=openCart;$("#closeCart").onclick=closeCart;$("#overlay").onclick=closeCart;$("#closeProduct").onclick=()=>$("#productDialog").close();$("#checkoutButton").onclick=()=>{if(getCart().length){closeCart();$("#checkoutDialog").showModal()}};$("#closeCheckout").onclick=()=>$("#checkoutDialog").close();
-$("#cartItems").addEventListener("click",e=>{const b=e.target.closest("[data-a]");if(!b)return;const d=b.dataset.a;if(d==="inc")changeQuantity(b.dataset.p,b.dataset.v,1);if(d==="dec")changeQuantity(b.dataset.p,b.dataset.v,-1);if(d==="del")removeFromCart(b.dataset.p,b.dataset.v);renderCart()});$("#productDialog").addEventListener("click",e=>{const v=e.target.closest("[data-variant]");if(v){state.variant=v.dataset.variant;document.querySelectorAll(".variant").forEach(x=>x.classList.toggle("selected",x.dataset.variant===state.variant));$("#detailPrice").textContent=money(selected().price)}const q=e.target.closest("[data-q]");if(q){const i=$("#detailQty");i.value=Math.max(1,(Number(i.value)||1)+Number(q.dataset.q))}if(e.target.id==="addButton"){addToCart(state.product,selected(),Math.max(1,Number($("#detailQty").value)||1));$("#productDialog").close();openCart()}});
-$("#checkoutForm").addEventListener("submit",e=>{e.preventDefault();if(WHATSAPP_NUMBER.includes("X")){alert("Configura el número de WhatsApp de VIBE en js/app.js antes de publicar.");return}const d=Object.fromEntries(new FormData(e.currentTarget));let m="Hola VIBE 👋\n\nQuiero realizar el siguiente pedido:\n\n";getCart().forEach(i=>{m+="• "+i.name+"\n  Cantidad: "+i.quantity+"\n  Opción: "+i.variantName+"\n  Precio: "+money(i.price)+"\n  Subtotal: "+money(i.price*i.quantity)+"\n\n"});m+="TOTAL: "+money(getCartTotal())+"\n\nNombre: "+d.name+"\nCiudad: "+d.city+"\nDirección: "+d.address+"\nInformación adicional: "+(d.notes||"N/A");window.open("https://wa.me/"+WHATSAPP_NUMBER+"?text="+encodeURIComponent(m),"_blank");clearCart();renderCart();e.currentTarget.reset();$("#checkoutDialog").close()});renderCats();renderProducts();renderCart();
+import { getProducts } from "./data-source.js";
+import { getCart, addToCart, changeQuantity, removeFromCart, clearCart, getCartCount, getCartTotal } from "./cart.js";
+import { getGroups, getCategoriesInGroup, getSubcategories, filterProducts, breadcrumbLabel } from "./taxonomy.js";
+import { readStateFromSearch, buildUrl } from "./url-state.js";
+
+const WHATSAPP_NUMBER = "57XXXXXXXXXX";
+const state = { group: "Todos", category: "Todos", subcategory: "Todos", search: "", product: null, variant: null, products: [] };
+const $ = s => document.querySelector(s);
+const money = n => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(n);
+const esc = s => String(s ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+
+// Reflects the current selection in the URL (shareable/bookmarkable,
+// survives refresh) via replaceState — deliberately not pushState, so a
+// filter click doesn't pile up browser-history entries a visitor would
+// have to click "back" through one at a time. See docs/fase8-navigation.md.
+function syncUrl() {
+  try {
+    window.history.replaceState(null, "", buildUrl(window.location.pathname, state));
+  } catch {
+    // history/URL APIs unavailable — non-fatal, navigation still works.
+  }
+}
+
+function tabButton(label, active, dataAttr) {
+  return `<button class="tab ${active ? "active" : ""}" data-${dataAttr}="${esc(label)}">${esc(label)}</button>`;
+}
+
+function renderNav() {
+  const groups = ["Todos", ...getGroups(state.products)];
+  $("#groupTabs").innerHTML = groups.map(g => tabButton(g, state.group === g, "group")).join("");
+
+  const categoriesHere = getCategoriesInGroup(state.products, state.group);
+  const showCategoryRow = state.group !== "Todos" && categoriesHere.length > 1;
+  $("#categoryTabs").classList.toggle("hidden", !showCategoryRow);
+  if (showCategoryRow) {
+    const options = ["Todos", ...categoriesHere];
+    $("#categoryTabs").innerHTML = options.map(c => tabButton(c, state.category === c, "category")).join("");
+  }
+
+  const effectiveCategory = state.category !== "Todos" ? state.category : (categoriesHere.length === 1 ? categoriesHere[0] : "Todos");
+  const subcategoriesHere = getSubcategories(state.products, state.group, effectiveCategory);
+  const showSubcategoryRow = subcategoriesHere.length > 1;
+  $("#subcategoryTabs").classList.toggle("hidden", !showSubcategoryRow);
+  if (showSubcategoryRow) {
+    const options = ["Todos", ...subcategoriesHere];
+    $("#subcategoryTabs").innerHTML = options.map(s => tabButton(s, state.subcategory === s, "subcategory")).join("");
+  }
+}
+
+function productImage(p, cls = "product-photo") {
+  return p.image ? `<img class="${cls}" src="${p.image}" alt="${esc(p.name)}" loading="lazy">` : `<span>${esc(p.imageLabel)}</span>`;
+}
+
+function productCard(p) {
+  return `<article class="card">
+    <button class="card-img" data-product="${p.id}">${productImage(p)}</button>
+    <div class="card-body">
+      <p class="product-category">${esc(p.category)}</p>
+      <h3>${esc(p.name)}</h3>
+      <p class="desc">${esc(p.shortDescription)}</p>
+      <span class="price">${money(p.price)}</span>
+      ${p.oldPrice ? `<span class="old">${money(p.oldPrice)}</span>` : ""}
+      ${p.available === false ? `<span class="availability-badge">Agotado</span>` : ""}
+      <button class="button dark" data-product="${p.id}">Ver producto</button>
+    </div>
+  </article>`;
+}
+
+function renderProducts() {
+  const list = filterProducts(state.products, state);
+  $("#productGrid").innerHTML = list.map(productCard).join("");
+  $("#emptyState").classList.toggle("hidden", !!list.length);
+}
+
+function renderFeatured() {
+  $("#featuredGrid").innerHTML = state.products.slice(0, 4).map(productCard).join("");
+}
+
+function renderCategoryShowcase() {
+  const groups = getGroups(state.products);
+  $("#categoryShowcase").innerHTML = groups.map(g => {
+    const count = state.products.filter(p => (p.categoryGroup || p.category) === g).length;
+    return `<button class="category-card" data-group="${esc(g)}">
+      <span>${count} producto${count === 1 ? "" : "s"}</span>
+      <h3>${esc(g)}</h3>
+      <span class="arrow">→</span>
+    </button>`;
+  }).join("");
+}
+
+function renderCart() {
+  $("#cartCount").textContent = getCartCount();
+  $("#cartTotal").textContent = money(getCartTotal());
+  const items = getCart();
+  $("#checkoutButton").disabled = !items.length;
+  $("#checkoutButton").style.opacity = items.length ? "1" : ".45";
+  $("#cartItems").innerHTML = items.length ? items.map(i => `<div class="cart-item">
+    <div class="thumb">${i.image ? `<img src="${i.image}" alt="${esc(i.name)}">` : "VIBE"}</div>
+    <div>
+      <h3>${esc(i.name)}</h3>
+      <div class="meta">${esc(i.variantName)}</div>
+      <div class="qty">
+        <button data-a="dec" data-p="${i.productId}" data-v="${i.variantId}">−</button>
+        <span>${i.quantity}</span>
+        <button data-a="inc" data-p="${i.productId}" data-v="${i.variantId}">+</button>
+      </div>
+      <button class="remove" data-a="del" data-p="${i.productId}" data-v="${i.variantId}">Eliminar</button>
+    </div>
+    <div class="cart-price">${money(i.price * i.quantity)}</div>
+  </div>`).join("") : `<p class="empty">Tu carrito está vacío.</p>`;
+}
+
+function openCart() {
+  $("#cartDrawer").classList.add("open");
+  $("#cartDrawer").setAttribute("aria-hidden", "false");
+  $("#overlay").classList.remove("hidden");
+  renderCart();
+}
+function closeCart() {
+  $("#cartDrawer").classList.remove("open");
+  $("#cartDrawer").setAttribute("aria-hidden", "true");
+  $("#overlay").classList.add("hidden");
+}
+
+function openProduct(id) {
+  const p = state.products.find(x => x.id === id);
+  if (!p) return;
+  state.product = p;
+  state.variant = p.variants[0].id;
+  const unavailable = p.available === false;
+  $("#productDetail").innerHTML = `<div class="detail-img">${productImage(p, "detail-photo")}</div>
+  <div class="detail-copy">
+    <p class="eyebrow">${esc(breadcrumbLabel(p))}</p>
+    <h2>${esc(p.name)}</h2>
+    <p class="description">${esc(p.description)}</p>
+    <strong class="price" id="detailPrice">${money(p.variants[0].price)}</strong>
+    ${unavailable ? `<span class="availability-badge">Agotado</span>` : ""}
+    <div class="variants">${p.variants.map(v => `<button class="variant ${v.id === state.variant ? "selected" : ""}" data-variant="${v.id}">${esc(v.name)}</button>`).join("")}</div>
+    <div class="section"><h3>Beneficios</h3><p>${p.benefits.map(esc).join(" · ")}</p></div>
+    ${p.ingredients ? `<div class="section"><h3>Ingredientes</h3><p>${esc(p.ingredients)}</p></div>` : ""}
+    <div class="section"><h3>Modo de uso</h3><p>${esc(p.usage)}</p></div>
+    <div class="section"><h3>Presentación</h3><p>${esc(p.presentation)}</p></div>
+    <div class="detail-actions">
+      <div class="quantity"><button data-q="-1">−</button><input id="detailQty" type="number" min="1" value="1"><button data-q="1">+</button></div>
+      <button id="addButton" class="button dark" ${unavailable ? "disabled" : ""}>${unavailable ? "Agotado" : "Agregar al carrito"}</button>
+    </div>
+  </div>`;
+  $("#productDialog").showModal();
+}
+
+function selected() {
+  return state.product.variants.find(v => v.id === state.variant) || state.product.variants[0];
+}
+
+function bindProductGrid(id) {
+  $(id).addEventListener("click", e => {
+    const b = e.target.closest("[data-product]");
+    if (b) openProduct(b.dataset.product);
+  });
+}
+
+$("#groupTabs").addEventListener("click", e => {
+  const b = e.target.closest("[data-group]");
+  if (!b) return;
+  state.group = b.dataset.group;
+  state.category = "Todos";
+  state.subcategory = "Todos";
+  renderNav();
+  renderProducts();
+  syncUrl();
+});
+
+$("#categoryTabs").addEventListener("click", e => {
+  const b = e.target.closest("[data-category]");
+  if (!b) return;
+  state.category = b.dataset.category;
+  state.subcategory = "Todos";
+  renderNav();
+  renderProducts();
+  syncUrl();
+});
+
+$("#subcategoryTabs").addEventListener("click", e => {
+  const b = e.target.closest("[data-subcategory]");
+  if (!b) return;
+  state.subcategory = b.dataset.subcategory;
+  renderNav();
+  renderProducts();
+  syncUrl();
+});
+
+$("#categoryShowcase").addEventListener("click", e => {
+  const b = e.target.closest("[data-group]");
+  if (!b) return;
+  state.group = b.dataset.group;
+  state.category = "Todos";
+  state.subcategory = "Todos";
+  renderNav();
+  renderProducts();
+  syncUrl();
+  $("#catalogo").scrollIntoView({ behavior: "smooth" });
+});
+
+$("#searchInput").addEventListener("input", e => {
+  state.search = e.target.value;
+  renderProducts();
+  syncUrl();
+});
+
+bindProductGrid("#productGrid");
+bindProductGrid("#featuredGrid");
+
+$("#cartButton").onclick = openCart;
+$("#closeCart").onclick = closeCart;
+$("#overlay").onclick = closeCart;
+$("#closeProduct").onclick = () => $("#productDialog").close();
+$("#checkoutButton").onclick = () => {
+  if (getCart().length) {
+    closeCart();
+    $("#checkoutDialog").showModal();
+  }
+};
+$("#closeCheckout").onclick = () => $("#checkoutDialog").close();
+
+$("#cartItems").addEventListener("click", e => {
+  const b = e.target.closest("[data-a]");
+  if (!b) return;
+  const d = b.dataset.a;
+  if (d === "inc") changeQuantity(b.dataset.p, b.dataset.v, 1);
+  if (d === "dec") changeQuantity(b.dataset.p, b.dataset.v, -1);
+  if (d === "del") removeFromCart(b.dataset.p, b.dataset.v);
+  renderCart();
+});
+
+$("#productDialog").addEventListener("click", e => {
+  const v = e.target.closest("[data-variant]");
+  if (v) {
+    state.variant = v.dataset.variant;
+    document.querySelectorAll(".variant").forEach(x => x.classList.toggle("selected", x.dataset.variant === state.variant));
+    $("#detailPrice").textContent = money(selected().price);
+  }
+  const q = e.target.closest("[data-q]");
+  if (q) {
+    const i = $("#detailQty");
+    i.value = Math.max(1, (Number(i.value) || 1) + Number(q.dataset.q));
+  }
+  if (e.target.id === "addButton" && state.product.available !== false) {
+    addToCart(state.product, selected(), Math.max(1, Number($("#detailQty").value) || 1));
+    $("#productDialog").close();
+    openCart();
+  }
+});
+
+$("#checkoutForm").addEventListener("submit", e => {
+  e.preventDefault();
+  if (WHATSAPP_NUMBER.includes("X")) {
+    alert("Configura el número de WhatsApp de VIBE en js/app.js antes de publicar.");
+    return;
+  }
+  const d = Object.fromEntries(new FormData(e.currentTarget));
+  let m = "Hola VIBE 👋\n\nQuiero realizar el siguiente pedido:\n\n";
+  getCart().forEach(i => {
+    m += "• " + i.name + "\n  Cantidad: " + i.quantity + "\n  Opción: " + i.variantName + "\n  Precio: " + money(i.price) + "\n  Subtotal: " + money(i.price * i.quantity) + "\n\n";
+  });
+  m += "TOTAL: " + money(getCartTotal()) + "\n\nNombre: " + d.name + "\nCiudad: " + d.city + "\nDirección: " + d.address + "\nInformación adicional: " + (d.notes || "N/A");
+  window.open("https://wa.me/" + WHATSAPP_NUMBER + "?text=" + encodeURIComponent(m), "_blank");
+  clearCart();
+  renderCart();
+  e.currentTarget.reset();
+  $("#checkoutDialog").close();
+});
+
+$("#menuToggle").addEventListener("click", () => {
+  const open = $("#mobileNav").classList.toggle("open");
+  $("#menuToggle").setAttribute("aria-expanded", open ? "true" : "false");
+});
+$("#mobileNav").addEventListener("click", e => {
+  if (e.target.closest("a")) {
+    $("#mobileNav").classList.remove("open");
+    $("#menuToggle").setAttribute("aria-expanded", "false");
+  }
+});
+$("#mobileSearchLink").addEventListener("click", () => {
+  setTimeout(() => $("#searchInput").focus(), 450);
+});
+
+const headerEl = document.querySelector("header");
+const onScroll = () => headerEl.classList.toggle("scrolled", window.scrollY > 10);
+window.addEventListener("scroll", onScroll, { passive: true });
+onScroll();
+
+// Cart rendering only needs localStorage (already loaded), never the
+// catalog data — no reason to make it wait on the network.
+renderCart();
+
+async function loadCatalog() {
+  const urlState = readStateFromSearch(window.location.search);
+  state.group = urlState.group;
+  state.category = urlState.category;
+  state.subcategory = urlState.subcategory;
+  state.search = urlState.search;
+  $("#searchInput").value = state.search;
+
+  $("#productGrid").innerHTML = `<p class="empty">Cargando catálogo...</p>`;
+  $("#featuredGrid").innerHTML = `<p class="empty">Cargando selección...</p>`;
+  $("#categoryShowcase").innerHTML = `<p class="empty">Cargando categorías...</p>`;
+
+  try {
+    state.products = await getProducts();
+  } catch (e) {
+    console.error("[VIBE] No se pudo inicializar el catálogo.", e);
+    const message = `<p class="empty">No pudimos cargar el catálogo en este momento. Intenta de nuevo más tarde.</p>`;
+    $("#productGrid").innerHTML = message;
+    $("#featuredGrid").innerHTML = message;
+    $("#categoryShowcase").innerHTML = message;
+    return;
+  }
+
+  renderNav();
+  renderProducts();
+  renderFeatured();
+  renderCategoryShowcase();
+}
+
+loadCatalog();
