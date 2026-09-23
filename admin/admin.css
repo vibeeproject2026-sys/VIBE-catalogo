@@ -1,0 +1,81 @@
+/* VIBE — Panel editorial. Utilitarian, not a landing page: reuses the
+   brand's color tokens (same values as css/styles.css) but prioritizes
+   density, legibility and low friction over the marketing look. This
+   file is intentionally separate from css/styles.css — the public
+   catalog's stylesheet is not imported or modified. */
+
+:root{--bg:#0b0b0b;--surface:#141414;--line:#292929;--text:#fff;--muted:#9a9a9a;--pink:#FF007A;--pink2:#FF4FA3;--radius:12px}
+*{box-sizing:border-box}
+body{margin:0;background:#f5f5f5;color:#111;font-family:"Inter",system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:14px}
+button,input,select,textarea{font:inherit}
+.hidden{display:none!important}
+.eyebrow{font-size:11px;letter-spacing:.18em;font-weight:800;color:var(--pink);margin:0 0 10px;text-transform:uppercase}
+
+.button{border:1px solid var(--pink);border-radius:999px;min-height:40px;padding:0 18px;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;cursor:pointer;background:transparent;color:var(--pink)}
+.button.dark{background:var(--pink);color:#fff}
+.button.dark:hover{background:var(--pink2)}
+.button.full{width:100%}
+.outline-admin{border:1px solid #333;background:transparent;color:#ccc;border-radius:999px;min-height:36px;padding:0 16px;font-size:12px;cursor:pointer}
+
+/* Login gate */
+.login-gate{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:20px;z-index:50}
+.login-box{width:min(380px,100%);background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:32px;color:#fff}
+.login-box h1{margin:0 0 10px;font-size:24px}
+.login-box .hint{color:var(--muted);font-size:12px;line-height:1.5;margin:0 0 20px}
+.login-box label{display:block;font-size:12px;font-weight:700;margin-bottom:18px}
+.login-box input{width:100%;margin-top:6px;border:1px solid #333;border-radius:10px;padding:10px 12px;background:#0c0c0c;color:#fff;outline:0}
+.login-error{color:#ff6b6b;font-size:12px;margin-top:14px}
+
+/* Header */
+.admin-header{position:sticky;top:0;z-index:10;background:var(--bg);color:#fff;display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-bottom:1px solid var(--line)}
+.admin-brand{font-weight:800;letter-spacing:.02em}
+.admin-brand span{color:var(--muted);font-weight:500}
+
+/* Main */
+.admin-main{max-width:1280px;margin:0 auto;padding:24px}
+.toolbar{display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap}
+.toolbar input[type="search"]{flex:1;min-width:220px;border:1px solid #ddd;border-radius:8px;padding:9px 12px;background:#fff}
+.toolbar select{border:1px solid #ddd;border-radius:8px;padding:9px 12px;background:#fff}
+.result-count{color:#777;font-size:12px;margin-left:auto}
+
+.table-wrap{background:#fff;border:1px solid #e2e2e2;border-radius:var(--radius);overflow:auto}
+.admin-table{width:100%;border-collapse:collapse;min-width:900px}
+.admin-table th{text-align:left;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#888;padding:12px 14px;border-bottom:1px solid #eee;background:#fafafa;position:sticky;top:0}
+.admin-table td{padding:11px 14px;border-bottom:1px solid #f0f0f0;vertical-align:middle}
+.admin-table tr:hover td{background:#fdf5f9}
+.prod-name{font-weight:700}
+.prod-id{color:#999;font-size:11px;margin-left:6px}
+
+.pill{display:inline-block;border-radius:999px;padding:3px 10px;font-size:11px;font-weight:700}
+.pill-ok{background:#e6f8ee;color:#1a7f4c}
+.pill-warn{background:#fff0e0;color:#a15c00}
+.pill-muted{background:#f0f0f0;color:#777}
+.pill-pink{background:#ffe3f0;color:#c30063}
+
+.edit-link{border:0;background:none;color:var(--pink);font-weight:700;cursor:pointer;font-size:13px}
+
+/* Edit dialog */
+dialog{border:0;border-radius:16px;padding:0;width:min(720px,calc(100% - 32px));max-height:calc(100dvh - 40px);overflow:auto}
+dialog::backdrop{background:#000a}
+.x{position:absolute;right:14px;top:14px;border:0;background:transparent;font-size:24px;line-height:1;cursor:pointer;color:#666}
+.edit-pos{background:#f7f7f7;padding:20px 28px;border-bottom:1px solid #eee}
+.edit-pos h2{margin:0 0 12px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#888}
+.edit-pos-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;font-size:13px}
+.edit-pos-grid div span{display:block;color:#999;font-size:10px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px}
+.edit-form{padding:24px 28px;display:grid;gap:16px}
+.edit-form h2{margin:0 0 4px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--pink)}
+.edit-form label{display:grid;gap:6px;font-size:12px;font-weight:700;color:#333}
+.edit-form input,.edit-form textarea{border:1px solid #ddd;border-radius:8px;padding:9px 11px;font-size:13px;color:#111}
+.edit-form textarea{min-height:64px;resize:vertical}
+.edit-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.edit-row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+.checkbox-field{display:flex;align-items:center;gap:8px;flex-direction:row}
+.checkbox-field input{width:16px;height:16px}
+.image-hint{font-size:11px;color:#999;font-weight:400}
+.save-row{display:flex;justify-content:flex-end;gap:10px;padding-top:6px;border-top:1px solid #eee}
+.save-status{font-size:12px;color:#777;align-self:center}
+
+@media(max-width:720px){
+  .edit-pos-grid{grid-template-columns:repeat(2,1fr)}
+  .edit-row,.edit-row-3{grid-template-columns:1fr}
+}

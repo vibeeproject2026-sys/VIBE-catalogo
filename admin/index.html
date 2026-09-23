@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>VIBE — Panel editorial</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+<div id="loginGate" class="login-gate">
+  <div class="login-box">
+    <p class="eyebrow">VIBE · Panel editorial</p>
+    <h1>Acceso administrativo</h1>
+    <p class="hint">Herramienta interna para gestionar la información editorial del catálogo. No modifica precios, stock ni datos del POS.</p>
+    <label>Token de administración
+      <input id="tokenInput" type="password" placeholder="Pega tu token" autocomplete="off">
+    </label>
+    <button id="tokenSubmit" class="button dark full">Entrar</button>
+    <p id="loginError" class="login-error hidden"></p>
+  </div>
+</div>
+
+<header class="admin-header hidden" id="adminHeader">
+  <div class="admin-brand">VIBE <span>· Panel editorial</span></div>
+  <button id="logoutButton" class="button outline-admin">Salir</button>
+</header>
+
+<main id="app" class="admin-main hidden">
+  <section class="toolbar">
+    <input id="searchInput" type="search" placeholder="Buscar por id, nombre o categoría...">
+    <select id="filterStatus">
+      <option value="all">Todos</option>
+      <option value="published">Publicados</option>
+      <option value="unpublished">No publicados</option>
+      <option value="available">Disponibles</option>
+      <option value="unavailable">Agotados</option>
+    </select>
+    <select id="filterCategory">
+      <option value="all">Todas las categorías</option>
+    </select>
+    <span id="resultCount" class="result-count"></span>
+  </section>
+
+  <p id="loadError" class="login-error hidden"></p>
+
+  <div class="table-wrap">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>Producto</th>
+          <th>Categoría POS</th>
+          <th>Precio</th>
+          <th>Disponibilidad</th>
+          <th>Metadata</th>
+          <th>Publicado</th>
+          <th>Destacado</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="productRows"></tbody>
+    </table>
+  </div>
+</main>
+
+<dialog id="editDialog">
+  <button id="closeEdit" class="x">×</button>
+  <div id="editContent"></div>
+</dialog>
+
+<script type="module" src="admin.js"></script>
+</body>
+</html>
