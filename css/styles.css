@@ -62,22 +62,24 @@ header.scrolled .logo-image{width:126px;height:50px}
    ver abajo) se usa object-fit:contain — la pieza creativa completa es
    la prioridad, nunca recortarla.
 
-   Formato editorial definido (Fase 1.1): 1080x1920px, proporción 9:16
-   — es el que deben usar las piezas reales para el Hero mobile. Con ese
-   formato, el letterboxing en "contain" queda mínimo o nulo en la
-   mayoría de los teléfonos (su viewport es parecido a 9:16, aunque casi
-   ningún modelo lo iguala exactamente).
+   Formato editorial oficial (Fase 1.2): 1080x1350px, proporción 4:5,
+   WebP preferido (PNG/JPG aceptables como fuente) — es el que deben
+   usar las piezas reales para el Hero mobile. 9:16 (usado brevemente en
+   la Fase 1.1) queda reservado para Stories/Reels, no para este Hero.
+   El contenedor mobile (.hero-carousel) usa aspect-ratio:4/5 sobre el
+   ancho completo, así que con una pieza real en 4:5 "contain" no genera
+   letterboxing perceptible.
 
    Recomendación general si llega una pieza en otro formato (no
    implementado como sistema, solo documentado aquí):
-     - verticales (ej. 4:5, más "cuadrada" que 9:16): algo de
-       letterboxing arriba/abajo, menor que una horizontal.
+     - verticales más alargadas (ej. 9:16): sobran arriba/abajo dentro
+       del contenedor 4:5 — se ven completas pero no llenan todo el
+       alto.
      - horizontales (paisaje, ej. 16:9): letterboxing notorio
-       arriba/abajo en el hero mobile, porque el contenedor es mucho más
-       alto que ancho — la imagen se ve completa, sin recorte, pero no
-       llena todo el alto disponible.
-     - cuadradas (1:1): letterboxing intermedio, mayor que 9:16 pero
-       menor que una horizontal. */
+       arriba/abajo — la imagen se ve completa, sin recorte, pero ocupa
+       poco alto dentro del contenedor 4:5.
+     - cuadradas (1:1): letterboxing moderado, menor que una
+       horizontal. */
 .hero-slide img{width:100%;height:100%;object-fit:cover;display:block}
 
 @media(prefers-reduced-motion:reduce){
@@ -229,46 +231,44 @@ footer small{letter-spacing:.25em;font-size:7px}
   .menu-btn{display:flex}
   .mobile-nav{display:flex}
   /* Fase Diseño Mobile-First 1 — el Hero mobile deja de ser
-     texto+imagen y pasa a ser un escaparate de pieza creativa a
-     pantalla casi completa. El copy actual (eyebrow/H1/lead/CTA) se
-     oculta solo aquí — sigue intacto en el código y en desktop, no se
-     eliminó (no se reutiliza en ningún otro lugar del sitio, se
-     verificó antes de tocar nada). */
+     texto+imagen y pasa a ser un banner editorial protagonista (NO
+     pantalla completa). El copy actual (eyebrow/H1/lead/CTA) se oculta
+     solo aquí — sigue intacto en el código y en desktop, no se eliminó
+     (no se reutiliza en ningún otro lugar del sitio, se verificó antes
+     de tocar nada). */
   .hero{padding:0}
   .hero-copy{display:none}
   .hero-grid{gap:0}
 
-  /* "Gran escaparate": el carrusel rompe el gutter de .wrap (14px por
-     lado en este breakpoint) para llegar borde a borde, y ocupa
-     prácticamente todo el alto disponible bajo el header (78px fijo en
-     este breakpoint).
-
-     Fase 1.1 — se usa 100svh (small viewport height), NO 100dvh. dvh
-     cambia en vivo mientras el usuario hace scroll (crece cuando el
-     navegador oculta su barra de direcciones), lo que generaba un
-     reflow grande del Hero exactamente durante el gesto de scroll —
-     esto competía visualmente con la animación de encogido del header
-     (78px→64px) y la volvía imperceptible. svh usa el valor más
-     pequeño/estable (barra de navegador siempre expandida), así el
-     alto del Hero queda fijo desde el primer render y no vuelve a
-     recalcularse mientras se hace scroll. */
+  /* Fase 1.2 — el alto del Hero YA NO depende del viewport (se
+     abandonó height:calc(100svh - ...), que en la Fase 1.1 hacía el
+     Hero casi de pantalla completa: demasiado grande según la
+     visualización real). Ahora el alto se deriva de la proporción real
+     de la creatividad (aspect-ratio:4/5, el formato editorial oficial
+     de estas piezas — 1080x1350px), sobre el ancho completo del
+     viewport (el carrusel sigue rompiendo el gutter de .wrap para
+     llegar borde a borde). En ~390px de ancho esto da ~488px de alto:
+     un banner protagonista, no la pantalla entera — y como no depende
+     de ninguna unidad de viewport, tampoco puede sufrir el problema de
+     reflow-durante-scroll que sí tenía 100dvh. */
   .hero-carousel{
-    height:calc(100svh - 78px);
+    aspect-ratio:4/5;
+    height:auto;
+    min-height:0;
     margin-left:-14px;
     margin-right:-14px;
     width:calc(100% + 28px);
     border-radius:0;
   }
   /* La pieza creativa se ve completa, nunca recortada — ver nota junto
-     a .hero-slide img más arriba. Los placeholders ahora son 9:16
-     (1080x1920, el formato editorial real definido por VIBE), así que
-     con un contenedor mobile también vertical el letterboxing de
-     "contain" queda mínimo o nulo en la mayoría de los teléfonos. */
+     a .hero-slide img más arriba. Los placeholders ahora son 4:5
+     (1080x1350), el formato editorial oficial de estas piezas — con el
+     contenedor en la misma proporción, "contain" no genera
+     letterboxing perceptible. */
   .hero-slide img{object-fit:contain}
   .hero-arrow{width:34px;height:34px;font-size:17px}
   .hero-arrow-prev{left:8px}
   .hero-arrow-next{right:8px}
-  .hero-dots{padding-bottom:env(safe-area-inset-bottom,0px)}
   .values{padding:28px 0}
   .values-grid{grid-template-columns:1fr 1fr;gap:18px}
   .explore{padding:52px 0 10px}

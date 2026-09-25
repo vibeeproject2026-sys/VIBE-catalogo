@@ -1,16 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1920">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1350">
   <defs>
-    <radialGradient id="g1" cx="70%" cy="30%" r="80%">
+    <radialGradient id="g1" cx="70%" cy="28%" r="80%">
       <stop offset="0%" stop-color="#430020"/>
       <stop offset="55%" stop-color="#0a0a0a"/>
       <stop offset="100%" stop-color="#050505"/>
     </radialGradient>
   </defs>
-  <rect width="1080" height="1920" fill="url(#g1)"/>
-  <circle cx="880" cy="380" r="300" fill="#FF007A" opacity=".14"/>
-  <circle cx="160" cy="1500" r="220" fill="#FF4FA3" opacity=".10"/>
-  <text x="90" y="760" font-family="Arial,Helvetica,sans-serif" font-size="28" letter-spacing="8" fill="#FF4FA3" font-weight="700">NUEVA COLECCIÓN</text>
-  <text x="86" y="880" font-family="Arial,Helvetica,sans-serif" font-size="96" letter-spacing="-3" fill="#ffffff" font-weight="800">Piel que</text>
-  <text x="86" y="990" font-family="Arial,Helvetica,sans-serif" font-size="96" letter-spacing="-3" fill="#FF007A" font-weight="800">habla por ti</text>
-  <text x="90" y="1050" font-family="Arial,Helvetica,sans-serif" font-size="24" fill="#cfcfcf">Placeholder 9:16 — pieza gráfica final a cargo del equipo creativo VIBE</text>
+  <rect width="1080" height="1350" fill="url(#g1)"/>
+  <circle cx="880" cy="260" r="220" fill="#FF007A" opacity=".14"/>
+  <circle cx="150" cy="1080" r="170" fill="#FF4FA3" opacity=".10"/>
+  <text x="90" y="540" font-family="Arial,Helvetica,sans-serif" font-size="26" letter-spacing="7" fill="#FF4FA3" font-weight="700">NUEVA COLECCIÓN</text>
+  <text x="86" y="650" font-family="Arial,Helvetica,sans-serif" font-size="82" letter-spacing="-2" fill="#ffffff" font-weight="800">Piel que</text>
+  <text x="86" y="748" font-family="Arial,Helvetica,sans-serif" font-size="82" letter-spacing="-2" fill="#FF007A" font-weight="800">habla por ti</text>
+  <text x="90" y="805" font-family="Arial,Helvetica,sans-serif" font-size="22" fill="#cfcfcf">Placeholder 4:5 — pieza gráfica final a cargo del equipo creativo VIBE</text>
 </svg>

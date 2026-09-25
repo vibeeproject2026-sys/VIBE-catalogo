@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1920">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1350">
   <defs>
     <linearGradient id="g4" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#FF007A"/>
@@ -6,10 +6,10 @@
       <stop offset="100%" stop-color="#050505"/>
     </linearGradient>
   </defs>
-  <rect width="1080" height="1920" fill="url(#g4)"/>
-  <circle cx="900" cy="300" r="220" fill="#ffffff" opacity=".06"/>
-  <text x="90" y="760" font-family="Arial,Helvetica,sans-serif" font-size="26" letter-spacing="8" fill="#ffffff" font-weight="700">VIBRANT ICONIC BEAUTY</text>
-  <text x="86" y="880" font-family="Arial,Helvetica,sans-serif" font-size="96" letter-spacing="-3" fill="#ffffff" font-weight="800">Tu ritual.</text>
-  <text x="86" y="990" font-family="Arial,Helvetica,sans-serif" font-size="96" letter-spacing="-3" fill="#ffffff" font-weight="800">Tu VIBE.</text>
-  <text x="90" y="1050" font-family="Arial,Helvetica,sans-serif" font-size="24" fill="#ffe3f0">Placeholder 9:16 — pieza gráfica final a cargo del equipo creativo VIBE</text>
+  <rect width="1080" height="1350" fill="url(#g4)"/>
+  <circle cx="900" cy="210" r="170" fill="#ffffff" opacity=".06"/>
+  <text x="90" y="540" font-family="Arial,Helvetica,sans-serif" font-size="24" letter-spacing="7" fill="#ffffff" font-weight="700">VIBRANT ICONIC BEAUTY</text>
+  <text x="86" y="648" font-family="Arial,Helvetica,sans-serif" font-size="82" letter-spacing="-2" fill="#ffffff" font-weight="800">Tu ritual.</text>
+  <text x="86" y="746" font-family="Arial,Helvetica,sans-serif" font-size="82" letter-spacing="-2" fill="#ffffff" font-weight="800">Tu VIBE.</text>
+  <text x="90" y="802" font-family="Arial,Helvetica,sans-serif" font-size="22" fill="#ffe3f0">Placeholder 4:5 — pieza gráfica final a cargo del equipo creativo VIBE</text>
 </svg>
