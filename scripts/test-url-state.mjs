@@ -23,7 +23,7 @@ function test(name, fn) {
   }
 }
 
-const DEFAULTS = { group: "Todos", category: "Todos", subcategory: "Todos", search: "", available: false, promo: false, featuredOnly: false, newOnly: false, sort: "relevance", product: null };
+const DEFAULTS = { group: "Todos", category: "Todos", subcategory: "Todos", search: "", available: false, promo: false, featuredOnly: false, newOnly: false, sort: "relevance", product: null, article: null };
 
 console.log("readStateFromSearch (simula un refresh / link compartido)");
 test("querystring vacío -> todo en su default", () => {
@@ -59,6 +59,14 @@ test("lee product cuando está presente en la URL", () => {
 test("sin product en la URL, cae a null (no a undefined ni string vacío)", () => {
   assert.equal(readStateFromSearch("").product, null);
   assert.equal(readStateFromSearch("?group=Skincare").product, null);
+});
+
+console.log("readStateFromSearch — artículo (Fase 30, Discover)");
+test("lee article cuando está presente en la URL", () => {
+  assert.equal(readStateFromSearch("?article=ritual-skincare-basico").article, "ritual-skincare-basico");
+});
+test("sin article en la URL, cae a null", () => {
+  assert.equal(readStateFromSearch("").article, null);
 });
 
 console.log("buildUrl");
@@ -98,6 +106,16 @@ test("sin producto abierto, no aparece product en la URL", () => {
   assert.equal(url, "/#catalogo");
 });
 
+console.log("buildUrl — artículo (Fase 30, Discover)");
+test("agrega article a la URL y cambia el hash a #discover", () => {
+  const url = buildUrl("/", { ...DEFAULTS, article: "ritual-skincare-basico" });
+  assert.equal(url, "/?article=ritual-skincare-basico#discover");
+});
+test("sin artículo abierto, el hash sigue siendo #catalogo (compatibilidad con la PLP)", () => {
+  const url = buildUrl("/", DEFAULTS);
+  assert.equal(url, "/#catalogo");
+});
+
 console.log("round-trip (lo que pasa en un refresh real)");
 test("buildUrl -> readStateFromSearch reproduce el mismo estado de filtros clásicos", () => {
   const original = { ...DEFAULTS, group: "Skincare", subcategory: "Hidratación", search: "mist" };
@@ -115,6 +133,13 @@ test("round-trip también con los filtros/orden nuevos de Fase 27 combinados", (
 });
 test("round-trip de un link de producto compartido (Fase 28)", () => {
   const original = { ...DEFAULTS, group: "Maquillaje", product: "56" };
+  const url = buildUrl("/", original);
+  const queryPart = url.split("#")[0].split("?")[1] || "";
+  const roundTripped = readStateFromSearch("?" + queryPart);
+  assert.deepEqual(roundTripped, original);
+});
+test("round-trip de un link de artículo compartido (Fase 30)", () => {
+  const original = { ...DEFAULTS, article: "ritual-skincare-basico" };
   const url = buildUrl("/", original);
   const queryPart = url.split("#")[0].split("?")[1] || "";
   const roundTripped = readStateFromSearch("?" + queryPart);

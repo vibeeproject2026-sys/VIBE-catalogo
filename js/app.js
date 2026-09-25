@@ -23,6 +23,14 @@ import {
 } from "./taxonomy.js";
 import { readStateFromSearch, buildUrl } from "./url-state.js";
 import { computeOrderSummary, validateCheckoutForm, buildWhatsAppMessage, buildWhatsAppUrl } from "./checkout.js";
+import {
+  getPublishedArticles,
+  getArticleBySlug,
+  getCategoriesWithContent,
+  resolveRelatedProducts,
+  breadcrumbForArticle,
+} from "./editorial.js";
+import { articles as editorialArticles } from "./editorial-content.js";
 
 // Fase 29.1 — número oficial de WhatsApp de VIBE (provisto por Ana:
 // +57 314 349 0825), normalizado al formato que exige wa.me: solo
@@ -42,7 +50,7 @@ const DEFAULT_FILTERS = {
   brand: null,
   sort: "relevance",
 };
-const state = { ...DEFAULT_FILTERS, product: null, variant: null, products: [] };
+const state = { ...DEFAULT_FILTERS, product: null, variant: null, products: [], article: null };
 const $ = s => document.querySelector(s);
 const money = n => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(n);
 const esc = s => String(s ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
@@ -277,6 +285,175 @@ function renderCategoryShowcase() {
   }).join("");
 }
 
+// ==========================================================================
+// Fase 30 — Discover / Editorial VIBE. editorialArticles es estático (ver
+// js/editorial-content.js) y no depende de ninguna carga de red, así que
+// esta sección se renderiza de inmediato, sin esperar a loadCatalog() —
+// igual que renderCart() más abajo, que tampoco necesita el catálogo.
+// ==========================================================================
+
+function formatArticleDate(iso) {
+  try {
+    return new Intl.DateTimeFormat("es-CO", { day: "numeric", month: "long", year: "numeric" }).format(new Date(iso));
+  } catch {
+    return "";
+  }
+}
+
+// Sección 13 — sin imagen real, nunca se inventa una ni se usa un emoji:
+// mismo estado visual "premium" ya usado en el PDP (Fase 28) para el
+// mismo caso, reutilizado aquí con su propia clase.
+function articleImage(a, cls = "article-photo") {
+  return a.image
+    ? `<img class="${cls}" src="${esc(a.image)}" alt="${esc(a.title)}" loading="lazy">`
+    : `<div class="article-no-image" aria-hidden="true"><span>VIBE</span></div>`;
+}
+
+// Sección 8 — card editorial: imagen, categoría, título, excerpt, fecha
+// si existe, CTA. Nunca muestra un campo que el artículo no tenga.
+function articleCard(a) {
+  return `<article class="article-card">
+    <button type="button" class="article-card-img" data-article="${esc(a.slug)}">${articleImage(a)}</button>
+    <div class="article-card-body">
+      ${a.category ? `<p class="article-category">${esc(a.category)}</p>` : ""}
+      <h3>${esc(a.title)}</h3>
+      <p class="article-excerpt">${esc(a.excerpt)}</p>
+      ${a.date ? `<p class="article-date">${formatArticleDate(a.date)}</p>` : ""}
+      <button type="button" class="article-cta" data-article="${esc(a.slug)}">Leer más</button>
+    </div>
+  </article>`;
+}
+
+// Sección 4/18.A/B — la franja de Home sigue exactamente el mismo
+// principio ya establecido por Novedades/Promociones (Fase 26): sin
+// contenido publicado, ausencia total (nunca "Próximamente" ni un
+// artículo inventado).
+function renderDiscoverHome() {
+  const list = getPublishedArticles(editorialArticles).slice(0, 3);
+  const hasContent = list.length > 0;
+  $("#discoverHome").classList.toggle("hidden", !hasContent);
+  if (hasContent) $("#discoverHomeGrid").innerHTML = list.map(articleCard).join("");
+}
+
+// Sección 6/18 — la landing SÍ es siempre alcanzable (a diferencia de la
+// franja de Home): un link "Discover" en el header apunta a una sección
+// real con identidad propia (copy editorial fijo), no a un filtro vacío
+// como Novedades/Promociones. Con 0 artículos publicados se degrada con
+// elegancia — nunca rellena con contenido ficticio ni promete fechas
+// ("Próximamente").
+function renderDiscoverLanding() {
+  const published = getPublishedArticles(editorialArticles);
+  const categories = getCategoriesWithContent(editorialArticles);
+
+  const hero = `<div class="discover-hero">
+    <p class="eyebrow">DISCOVER</p>
+    <h2>Historias, rituales e inspiración VIBE</h2>
+    <p class="discover-intro">Belleza real, contada a tu manera — sin fórmulas mágicas ni promesas vacías.</p>
+  </div>`;
+  const backLink = `<a class="button outline" href="#catalogo">Volver al catálogo</a>`;
+
+  if (!published.length) {
+    $("#discoverContent").innerHTML = hero + backLink;
+    return;
+  }
+
+  const categoriesHtml = categories.length
+    ? `<div class="discover-categories">${categories.map((c) => `<span class="discover-category-pill">${esc(c)}</span>`).join("")}</div>`
+    : "";
+
+  const [featured, ...rest] = published;
+  const featuredHtml = `<div class="discover-featured">${articleCard(featured)}</div>`;
+  const gridHtml = rest.length ? `<div class="grid">${rest.map(articleCard).join("")}</div>` : "";
+
+  $("#discoverContent").innerHTML = hero + categoriesHtml + featuredHtml + gridHtml + backLink;
+}
+
+// Sección 17 — SEO ligero: solo lo que un SPA cliente puede hacer sin
+// infraestructura adicional (título de pestaña + meta description).
+// Canonical/Open Graph reales requerirían server-side rendering o
+// prerenderizado — fuera de alcance de esta fase (ver entregable final).
+const DEFAULT_DOCUMENT_TITLE = document.title;
+const DEFAULT_META_DESCRIPTION = document.querySelector('meta[name="description"]')?.getAttribute("content") || "";
+function updateArticleMeta(a) {
+  document.title = `${a.title} — VIBE Discover`;
+  document.querySelector('meta[name="description"]')?.setAttribute("content", a.excerpt || DEFAULT_META_DESCRIPTION);
+}
+function resetArticleMeta() {
+  document.title = DEFAULT_DOCUMENT_TITLE;
+  document.querySelector('meta[name="description"]')?.setAttribute("content", DEFAULT_META_DESCRIPTION);
+}
+
+// Sección 10/11 — productos relacionados dentro del artículo: reutiliza
+// productCard() tal cual (nunca una segunda card de producto) y solo
+// muestra la sección si resolveRelatedProducts() encontró al menos uno
+// real y disponible.
+function renderArticleDetail(a) {
+  const related = resolveRelatedProducts(a, state.products);
+  const contentHtml = Array.isArray(a.content) ? a.content.map((p) => `<p>${esc(p)}</p>`).join("") : "";
+  $("#articleDetail").innerHTML = `<div class="article-detail-hero">${articleImage(a, "article-detail-photo")}</div>
+  <div class="article-detail-body">
+    <p class="breadcrumb">${esc(breadcrumbForArticle(a).join(" / "))}</p>
+    ${a.category ? `<p class="article-category">${esc(a.category)}</p>` : ""}
+    <h2>${esc(a.title)}</h2>
+    ${a.date ? `<p class="article-date">${formatArticleDate(a.date)}</p>` : ""}
+    ${a.excerpt ? `<p class="article-detail-excerpt">${esc(a.excerpt)}</p>` : ""}
+    <div class="article-content">${contentHtml}</div>
+    ${
+      related.length
+        ? `<div class="article-related"><h3>Productos de este artículo</h3><div class="grid">${related.map(productCard).join("")}</div></div>`
+        : ""
+    }
+  </div>`;
+  $("#articleDetail").scrollTop = 0;
+  updateArticleMeta(a);
+}
+
+// Sección 18.D — un slug inexistente y uno de un artículo unpublished se
+// ven exactamente igual (getArticleBySlug ya resuelve ambos a null):
+// nunca se expone contenido no publicado.
+function renderArticleNotFound() {
+  $("#articleDetail").innerHTML = `<div class="pdp-not-found">
+    <p class="eyebrow">VIBE</p>
+    <h2>Artículo no encontrado</h2>
+    <p>Es posible que ya no esté disponible o que el enlace no sea correcto.</p>
+    <button type="button" class="button dark" id="articleBackToDiscover">Ver Discover</button>
+  </div>`;
+}
+
+// Mismo patrón de URL/historial que openProduct (Fase 28): compartible,
+// refresh-safe, back/forward — reutilizando exactamente el mismo
+// mecanismo de query params, esta vez con ?article=<slug>. Solo un
+// diálogo (producto o artículo) permanece abierto a la vez.
+function openArticle(slug, { pushHistory = true } = {}) {
+  if ($("#productDialog").open) $("#productDialog").close();
+  const a = getArticleBySlug(editorialArticles, slug);
+  if (!a) {
+    state.article = null;
+    renderArticleNotFound();
+    if (!$("#articleDialog").open) $("#articleDialog").showModal();
+    return;
+  }
+  state.article = a;
+  renderArticleDetail(a);
+  if (pushHistory) {
+    try {
+      window.history.pushState({ vibeArticle: a.slug }, "", buildUrl(window.location.pathname, { ...state, article: a.slug }));
+    } catch {
+      // history/URL APIs unavailable — no bloquea la apertura del artículo.
+    }
+  }
+  if (!$("#articleDialog").open) $("#articleDialog").showModal();
+}
+
+function bindArticleGrid(id) {
+  const el = $(id);
+  if (!el) return;
+  el.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-article]");
+    if (b) openArticle(b.dataset.article);
+  });
+}
+
 // Fase 29, sección 2 — una línea del carrito: imagen, marca (si existe),
 // nombre, precio unitario (con el promocional tachando el original
 // cuando aplica — originalPrice solo llega no-null si cart.js lo guardó
@@ -449,6 +626,10 @@ function renderProductNotFound() {
 // inicial de un link compartido, o navegación con back/forward) — en esos
 // casos la URL ya es la correcta y no debe empujarse una entrada nueva.
 function openProduct(id, { pushHistory = true } = {}) {
+  // Fase 30 — solo un diálogo (producto o artículo) permanece abierto a
+  // la vez: un producto relacionado dentro de un artículo cierra el
+  // artículo antes de abrir el PDP.
+  if ($("#articleDialog").open) $("#articleDialog").close();
   const p = findProduct(state.products, id);
   if (!p) {
     state.product = null;
@@ -599,11 +780,15 @@ bindProductGrid("#featuredGrid");
 // clic en una tarjeta de Novedades o Promociones en Home no abría nada.
 bindProductGrid("#novedadesGrid");
 bindProductGrid("#promocionesGrid");
+// Fase 30 — Discover.
+bindArticleGrid("#discoverHomeGrid");
+bindArticleGrid("#discoverContent");
 
 $("#cartButton").onclick = openCart;
 $("#closeCart").onclick = closeCart;
 $("#overlay").onclick = closeCart;
 $("#closeProduct").onclick = () => $("#productDialog").close();
+$("#closeArticle").onclick = () => $("#articleDialog").close();
 $("#checkoutButton").onclick = () => {
   if (!getCart().length) return;
   closeCart();
@@ -740,6 +925,40 @@ $("#productDialog").addEventListener("close", () => {
       window.history.back();
     } else {
       window.history.replaceState(null, "", buildUrl(window.location.pathname, { ...state, product: null }));
+    }
+  } catch {
+    // history/URL APIs unavailable — el diálogo ya se cerró de todos modos.
+  }
+});
+
+// Fase 30 — mismo mecanismo de URL/historial que el PDP, aplicado al
+// artículo abierto. Un producto relacionado dentro del artículo reutiliza
+// el mismo data-product que cualquier tarjeta del catálogo.
+$("#articleDialog").addEventListener("click", (e) => {
+  if (e.target.id === "articleBackToDiscover") {
+    $("#articleDialog").close();
+    $("#discover").scrollIntoView({ behavior: "smooth" });
+    return;
+  }
+  const productBtn = e.target.closest("[data-product]");
+  if (productBtn) {
+    openProduct(productBtn.dataset.product); // ya cierra #articleDialog si está abierto
+  }
+});
+
+let suppressArticleHistoryOnClose = false;
+$("#articleDialog").addEventListener("close", () => {
+  state.article = null;
+  resetArticleMeta();
+  if (suppressArticleHistoryOnClose) {
+    suppressArticleHistoryOnClose = false;
+    return;
+  }
+  try {
+    if (window.history.state && window.history.state.vibeArticle) {
+      window.history.back();
+    } else {
+      window.history.replaceState(null, "", buildUrl(window.location.pathname, { ...state, article: null }));
     }
   } catch {
     // history/URL APIs unavailable — el diálogo ya se cerró de todos modos.
@@ -966,6 +1185,11 @@ onScroll();
 // catalog data — no reason to make it wait on the network.
 renderCart();
 
+// Fase 30 — Discover: editorialArticles es un módulo estático (sin
+// fetch), así que se renderiza de inmediato, igual que el carrito.
+renderDiscoverHome();
+renderDiscoverLanding();
+
 // Compartida entre la carga inicial y popstate (back/forward): vuelca los
 // campos de filtro/orden de la URL al estado en memoria. No toca
 // state.product — eso lo maneja cada llamador según corresponda.
@@ -1000,6 +1224,15 @@ window.addEventListener("popstate", () => {
   } else if ($("#productDialog").open) {
     suppressHistoryOnClose = true;
     $("#productDialog").close();
+  }
+
+  if (urlState.article) {
+    if (!state.article || state.article.slug !== urlState.article) {
+      openArticle(urlState.article, { pushHistory: false });
+    }
+  } else if ($("#articleDialog").open) {
+    suppressArticleHistoryOnClose = true;
+    $("#articleDialog").close();
   }
 });
 
@@ -1036,6 +1269,13 @@ async function loadCatalog() {
   // el estado "producto no encontrado" en vez de fallar en silencio.
   if (urlState.product) {
     openProduct(urlState.product, { pushHistory: false });
+  }
+
+  // Fase 30 — mismo tratamiento que el producto: solo se llega aquí una
+  // vez que state.products ya está listo, necesario para resolver
+  // relatedProducts del artículo compartido.
+  if (urlState.article) {
+    openArticle(urlState.article, { pushHistory: false });
   }
 }
 

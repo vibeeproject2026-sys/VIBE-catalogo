@@ -26,6 +26,10 @@ export function readStateFromSearch(search) {
     // (o null) porque viene de un query param — ver findProduct() en
     // taxonomy.js para la comparación robusta contra ids numéricos reales.
     product: params.get("product") || null,
+    // Fase 30 — Discover: slug del artículo abierto, si lo hay. Mismo
+    // mecanismo que product, nunca coexisten en la práctica (abrir uno
+    // cierra el otro, ver js/app.js).
+    article: params.get("article") || null,
   };
 }
 
@@ -48,6 +52,10 @@ export function buildUrl(pathname, state) {
   // buildUrl nunca dependa de cuál de los dos le llegó.
   const productId = state.product && typeof state.product === "object" ? state.product.id : state.product;
   if (productId) params.set("product", productId);
+  // Fase 30 — mismo patrón que product, pero el slug siempre es un
+  // string plano (nunca se pasa el objeto artículo completo).
+  if (state.article) params.set("article", state.article);
   const qs = params.toString();
-  return `${pathname}${qs ? "?" + qs : ""}#catalogo`;
+  const hash = state.article ? "discover" : "catalogo";
+  return `${pathname}${qs ? "?" + qs : ""}#${hash}`;
 }

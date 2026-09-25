@@ -167,6 +167,35 @@ header.scrolled .logo-image{width:126px;height:50px}
 .card .button{width:100%;margin-top:13px;min-height:42px;font-size:13px}
 .empty{text-align:center;padding:60px;color:#777}
 
+/* Fase 30 — Discover / Editorial VIBE. Misma familia visual que .card
+   (grid/aspect-ratio/radius), pero con su propia identidad: sin precio,
+   con excerpt y fecha, y un CTA de texto en vez de un botón sólido —
+   deliberadamente distinta de una product card y de una tarjeta de blog
+   genérica. */
+.discover-landing{background:#fff;color:#111;padding:64px 0 90px}
+.discover-hero{max-width:620px;margin:0 0 40px}
+.discover-hero .eyebrow{color:var(--pink)}
+.discover-hero h2{font-size:44px;letter-spacing:-.03em;margin:0 0 14px}
+.discover-intro{color:#666;font-size:15px;line-height:1.6;margin:0}
+.discover-categories{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:36px}
+.discover-category-pill{display:inline-flex;align-items:center;border:1px solid #eee;background:#fafafa;border-radius:999px;padding:8px 16px;font-size:12px;color:#333}
+.discover-featured{margin-bottom:36px}
+.discover-featured .article-card{display:grid;grid-template-columns:1.1fr 1fr;gap:32px;align-items:center}
+.discover-featured .article-card-img{aspect-ratio:16/11}
+
+.article-card{min-width:0}
+.article-card-img{display:block;width:100%;aspect-ratio:4/5;border:0;border-radius:var(--radius);background:#f2f2f2;overflow:hidden;padding:0;position:relative}
+.article-photo{width:100%;height:100%;object-fit:cover;display:block;transition:transform .35s ease}
+.article-card-img:hover .article-photo{transform:scale(1.035)}
+.article-no-image{width:100%;height:100%;display:grid;place-items:center;background:linear-gradient(150deg,#fff,#fdf3f8);color:var(--pink);font-weight:800;letter-spacing:.16em;font-size:13px}
+.article-card-body{padding:15px 3px}
+.article-category{font-size:9px;color:var(--pink);letter-spacing:.18em;text-transform:uppercase;font-weight:800;margin:0 0 6px}
+.article-card h3{margin:0 0 6px;font-size:18px;line-height:1.25}
+.article-excerpt{font-size:13px;color:#777;margin:0 0 8px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.article-date{font-size:11px;color:#999;margin:0 0 10px}
+.article-cta{border:0;background:none;padding:0;color:#111;font-weight:800;font-size:12px;letter-spacing:.02em;text-decoration:underline;text-underline-offset:3px}
+.article-cta:hover{color:var(--pink)}
+
 .editorial{background:var(--bg);padding:110px 0;position:relative;overflow:hidden}
 .editorial:after{content:"";position:absolute;width:360px;height:360px;border-radius:50%;background:#FF007A22;filter:blur(90px);left:50%;top:50%;transform:translate(-50%,-50%)}
 .editorial-quote{position:relative;text-align:center;margin:0;font-size:clamp(32px,5vw,56px);line-height:1.15;letter-spacing:-.03em;font-weight:800;color:#f2f2f2}
@@ -251,6 +280,24 @@ dialog::backdrop{background:#000d}
 .pdp-not-found .eyebrow{color:var(--pink)}
 .pdp-not-found h2{font-size:26px;margin:8px 0 10px}
 .pdp-not-found p{color:#aaa;margin:0 0 22px}
+
+/* Fase 30 — detalle de artículo dentro de #articleDialog: mismo tema
+   oscuro y misma estructura de dos columnas que el PDP (#productDetail),
+   reutilizada tal cual con sus propias clases. */
+#articleDetail{display:grid;grid-template-columns:1fr 1fr}
+.article-detail-hero{min-height:520px;background:#111;overflow:hidden}
+.article-detail-photo{width:100%;height:100%;min-height:520px;object-fit:cover;display:block}
+.article-detail-body{padding:45px 38px}
+.article-detail-body h2{font-size:32px;line-height:1.1;margin:6px 0 14px}
+.article-detail-excerpt{color:#ccc;font-size:15px;margin:0 0 18px}
+.article-content{color:#ccc;font-size:14px;line-height:1.75}
+.article-content p{margin:0 0 16px}
+.article-related{margin-top:32px;border-top:1px solid #292929;padding-top:24px}
+.article-related h3{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--pink);margin:0 0 16px}
+.article-related .grid{grid-template-columns:repeat(2,1fr);gap:14px}
+dialog .article-no-image{width:100%;height:100%;min-height:520px;display:grid;place-items:center;background:linear-gradient(160deg,#151515,#0b0b0b);color:var(--pink);font-weight:800;letter-spacing:.16em;font-size:14px}
+dialog .article-category{color:var(--pink)}
+dialog .article-date{color:#999}
 
 #checkoutDialog{width:min(560px,calc(100% - 28px))}
 #checkoutForm{padding:28px;display:grid;gap:16px}
@@ -392,5 +439,13 @@ footer small{letter-spacing:.25em;font-size:7px}
   .checkout-confirmation{padding:32px 20px 26px}
   .checkout-confirmation-actions{flex-direction:column}
   .checkout-confirmation-actions .button{width:100%}
+  .discover-landing{padding:44px 0 70px}
+  .discover-hero h2{font-size:32px}
+  .discover-featured .article-card{grid-template-columns:1fr}
+  .article-detail-body{padding:30px 24px}
+  #articleDetail{grid-template-columns:1fr}
+  .article-detail-hero,.article-detail-photo{min-height:330px}
+  dialog .article-no-image{min-height:330px}
+  .article-related .grid{grid-template-columns:1fr 1fr;gap:12px}
   footer .wrap{flex-direction:column;align-items:flex-start;gap:16px}
 }

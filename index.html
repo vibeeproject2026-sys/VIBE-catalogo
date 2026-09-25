@@ -23,6 +23,7 @@
       <a href="#catalogo" data-group="Accesorios">Accesorios</a>
       <a href="#catalogo" id="navNovedades">Novedades</a>
       <a href="#catalogo" id="navPromociones" class="hidden">Promociones</a>
+      <a href="#discover" id="navDiscover">Discover</a>
     </nav>
     <div class="nav-actions">
       <button id="cartButton" class="cart-btn">Carrito <b id="cartCount">0</b></button>
@@ -37,6 +38,7 @@
     <a href="#catalogo" data-group="Accesorios">Accesorios</a>
     <a href="#catalogo" id="mobileNavNovedades">Novedades</a>
     <a href="#catalogo" id="mobileNavPromociones" class="hidden">Promociones</a>
+    <a href="#discover" id="mobileNavDiscover">Discover</a>
     <a href="#catalogo" id="mobileSearchLink">Buscar</a>
   </nav>
 </header>
@@ -135,6 +137,23 @@
   </div>
 </section>
 
+<section id="discoverHome" class="featured hidden">
+  <div class="wrap">
+    <div class="heading">
+      <div><p class="eyebrow">DISCOVER</p><h2>Vive tu VIBE</h2></div>
+      <p>Historias, rituales e inspiración para tu ritual de belleza.</p>
+    </div>
+    <div id="discoverHomeGrid" class="grid"></div>
+    <a class="button outline" href="#discover">Ver Discover completo</a>
+  </div>
+</section>
+
+<section id="discover" class="discover-landing">
+  <div class="wrap">
+    <div id="discoverContent"></div>
+  </div>
+</section>
+
 <section class="editorial">
   <div class="wrap">
     <p class="editorial-quote">No sigas tendencias.<br><span>Crea las propias.</span></p>
@@ -203,6 +222,10 @@
     <button id="closeCheckout" class="x" aria-label="Cerrar">×</button>
   </div>
   <div id="checkoutBody"></div>
+</dialog>
+<dialog id="articleDialog">
+  <button id="closeArticle" class="x dialog-x" aria-label="Cerrar">×</button>
+  <div id="articleDetail"></div>
 </dialog>
 
 <footer>
