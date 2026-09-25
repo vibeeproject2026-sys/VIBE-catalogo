@@ -256,6 +256,42 @@ dialog::backdrop{background:#000d}
 #checkoutForm{padding:28px;display:grid;gap:16px}
 #checkoutForm label{display:grid;gap:7px;font-size:12px;font-weight:700}
 #checkoutForm input,#checkoutForm textarea{width:100%;border:1px solid #333;border-radius:12px;padding:12px;background:#151515;color:#fff;outline:0}
+#checkoutForm input[aria-invalid="true"]{border-color:#e0527a}
+#checkoutForm .field-error{color:#ff6b93;font-size:11px;font-weight:600;min-height:14px}
+#checkoutSubmit:disabled{opacity:.45;cursor:not-allowed}
+
+/* Fase 29 — carrito: marca (opcional) y precio unitario con el
+   promocional tachado cuando aplica, encima del stepper de cantidad. */
+.cart-item-brand{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#aaa;margin:0 0 2px}
+.cart-item-unit-price{display:flex;gap:8px;align-items:baseline;font-size:12px;color:#ccc;margin-bottom:8px}
+
+/* Fase 29, sección 11 — estado vacío del carrito, con CTA real de
+   regreso al catálogo (reutilizado tal cual dentro del checkout cuando
+   el carrito llega vacío ahí, ver checkoutSummaryHtml). */
+.cart-empty{padding:50px 10px;text-align:center}
+.cart-empty p{margin:0 0 6px}
+.cart-empty-sub{color:#999;font-size:12px;margin-bottom:20px}
+
+/* Fase 29 — resumen del pedido dentro del diálogo de checkout. Reutiliza
+   .thumb/.cart-price/.remove/.total ya definidos arriba para el carrito,
+   y agrega solo lo que es propio del resumen (línea marcada como no
+   disponible, con su aviso). */
+.checkout-summary{padding:24px 28px 0}
+.checkout-summary-title{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--pink);margin:0 0 16px}
+.checkout-line{display:grid;grid-template-columns:56px 1fr auto;gap:12px;padding-bottom:16px;margin-bottom:16px;border-bottom:1px solid #292929;align-items:start}
+.checkout-line .thumb{width:56px}
+.checkout-line-info h3{font-size:13px;margin:0 0 4px}
+.checkout-line-warning{color:#ff6b93;font-size:11px;font-weight:700;margin:4px 0 0}
+.checkout-line.unavailable{opacity:.85}
+.checkout-line-right{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.checkout-summary .total{padding-top:4px}
+
+/* Fase 29, sección 12 — confirmación: nunca afirma compra/pago, solo que
+   el pedido está listo para continuarse por WhatsApp. */
+.checkout-confirmation{padding:40px 28px 32px;text-align:center}
+.checkout-confirmation h3{font-size:22px;margin:6px 0 12px}
+.checkout-confirmation p{color:#aaa;font-size:13px}
+.checkout-confirmation-actions{display:flex;gap:10px;justify-content:center;margin-top:22px;flex-wrap:wrap}
 
 footer{padding:40px 0;border-top:1px solid #292929;color:#aaa;font-size:11px;background:var(--bg)}
 footer .wrap{display:flex;justify-content:space-between;align-items:end;gap:20px;flex-wrap:wrap}
@@ -347,5 +383,14 @@ footer small{letter-spacing:.25em;font-size:7px}
   .pdp-no-image{min-height:330px}
   .pdp-price strong{font-size:24px}
   .pdp-related .grid{grid-template-columns:1fr 1fr;gap:12px}
+  .checkout-summary{padding:20px 20px 0}
+  .checkout-line{grid-template-columns:48px 1fr;grid-template-areas:"thumb info" "right right"}
+  .checkout-line .thumb{grid-area:thumb;width:48px}
+  .checkout-line-info{grid-area:info}
+  .checkout-line-right{grid-area:right;flex-direction:row;justify-content:space-between;align-items:center;margin-top:10px}
+  #checkoutForm{padding:20px}
+  .checkout-confirmation{padding:32px 20px 26px}
+  .checkout-confirmation-actions{flex-direction:column}
+  .checkout-confirmation-actions .button{width:100%}
   footer .wrap{flex-direction:column;align-items:flex-start;gap:16px}
 }

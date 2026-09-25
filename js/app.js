@@ -22,6 +22,7 @@ import {
   clampQuantity,
 } from "./taxonomy.js";
 import { readStateFromSearch, buildUrl } from "./url-state.js";
+import { computeOrderSummary, validateCheckoutForm, buildWhatsAppMessage, buildWhatsAppUrl } from "./checkout.js";
 
 const WHATSAPP_NUMBER = "57XXXXXXXXXX";
 // Fase 27: se agregan los filtros/orden de la PLP. Todos arrancan
@@ -273,17 +274,24 @@ function renderCategoryShowcase() {
   }).join("");
 }
 
-function renderCart() {
-  $("#cartCount").textContent = getCartCount();
-  $("#cartTotal").textContent = money(getCartTotal());
-  const items = getCart();
-  $("#checkoutButton").disabled = !items.length;
-  $("#checkoutButton").style.opacity = items.length ? "1" : ".45";
-  $("#cartItems").innerHTML = items.length ? items.map(i => `<div class="cart-item">
+// Fase 29, sección 2 — una línea del carrito: imagen, marca (si existe),
+// nombre, precio unitario (con el promocional tachando el original
+// cuando aplica — originalPrice solo llega no-null si cart.js lo guardó
+// con una promoción real, ver openProduct/addToCart), cantidad,
+// subtotal de la línea y eliminar. Nunca stock ni costos: cart.js nunca
+// los tuvo en primer lugar.
+function cartItemHtml(i) {
+  const showPromo = i.originalPrice != null && i.originalPrice > i.price;
+  return `<div class="cart-item">
     <div class="thumb">${i.image ? `<img src="${i.image}" alt="${esc(i.name)}">` : "VIBE"}</div>
     <div>
+      ${i.brand ? `<p class="cart-item-brand">${esc(i.brand)}</p>` : ""}
       <h3>${esc(i.name)}</h3>
       <div class="meta">${esc(i.variantName)}</div>
+      <div class="cart-item-unit-price">
+        <span>${money(i.price)}</span>
+        ${showPromo ? `<span class="old">${money(i.originalPrice)}</span>` : ""}
+      </div>
       <div class="qty">
         <button data-a="dec" data-p="${i.productId}" data-v="${i.variantId}">−</button>
         <span>${i.quantity}</span>
@@ -292,7 +300,26 @@ function renderCart() {
       <button class="remove" data-a="del" data-p="${i.productId}" data-v="${i.variantId}">Eliminar</button>
     </div>
     <div class="cart-price">${money(i.price * i.quantity)}</div>
-  </div>`).join("") : `<p class="empty">Tu carrito está vacío.</p>`;
+  </div>`;
+}
+
+// Fase 29, sección 11 — estado vacío VIBE: nunca contenido ficticio, solo
+// invitación real a volver al catálogo.
+function cartEmptyHtml() {
+  return `<div class="cart-empty">
+    <p>Tu carrito está vacío.</p>
+    <p class="cart-empty-sub">Descubre la selección VIBE y arma tu ritual.</p>
+    <a href="#catalogo" class="button dark" id="cartEmptyCta">Ver catálogo</a>
+  </div>`;
+}
+
+function renderCart() {
+  $("#cartCount").textContent = getCartCount();
+  $("#cartTotal").textContent = money(getCartTotal());
+  const items = getCart();
+  $("#checkoutButton").disabled = !items.length;
+  $("#checkoutButton").style.opacity = items.length ? "1" : ".45";
+  $("#cartItems").innerHTML = items.length ? items.map(cartItemHtml).join("") : cartEmptyHtml();
 }
 
 function openCart() {
@@ -575,14 +602,19 @@ $("#closeCart").onclick = closeCart;
 $("#overlay").onclick = closeCart;
 $("#closeProduct").onclick = () => $("#productDialog").close();
 $("#checkoutButton").onclick = () => {
-  if (getCart().length) {
-    closeCart();
-    $("#checkoutDialog").showModal();
-  }
+  if (!getCart().length) return;
+  closeCart();
+  openCheckout();
 };
 $("#closeCheckout").onclick = () => $("#checkoutDialog").close();
 
 $("#cartItems").addEventListener("click", e => {
+  if (e.target.id === "cartEmptyCta") {
+    e.preventDefault();
+    closeCart();
+    $("#catalogo").scrollIntoView({ behavior: "smooth" });
+    return;
+  }
   const b = e.target.closest("[data-a]");
   if (!b) return;
   const d = b.dataset.a;
@@ -634,8 +666,12 @@ $("#productDialog").addEventListener("click", e => {
     const variant = selected();
     const qty = Math.max(1, Number($("#detailQty").value) || 1);
     // Respeta el precio efectivo (promocional cuando aplica), nunca el
-    // precio original de la variante — ver currentEffectivePrice().
-    addToCart(state.product, { ...variant, price: currentEffectivePrice() }, qty);
+    // precio original de la variante — ver currentEffectivePrice(). Se
+    // pasa originalPrice solo cuando hay una promoción real resuelta
+    // server-side (Fase 29 — el carrito lo usa para mostrar el precio
+    // tachado; ver pdpPriceInfo/cart.js).
+    const priceInfo = pdpPriceInfo(state.product);
+    addToCart(state.product, { ...variant, price: currentEffectivePrice(), originalPrice: priceInfo.originalPrice }, qty);
     $("#productDialog").close();
     openCart();
   }
@@ -707,24 +743,202 @@ $("#productDialog").addEventListener("close", () => {
   }
 });
 
-$("#checkoutForm").addEventListener("submit", e => {
+// Fase 29 — Checkout. Cruza el carrito real (cart.js) con el estado más
+// fresco posible de disponibilidad (ver refreshAvailability): una línea
+// "unavailable" es un producto que, según la API pública, ya no existe o
+// ya no tiene stock — nunca se decide localmente sin haber preguntado.
+function cartLinesWithAvailability() {
+  return getCart().map((item) => {
+    const product = findProduct(state.products, item.productId);
+    return { ...item, unavailable: !product || product.available === false };
+  });
+}
+
+// Sección 3 — no hay backend de pedidos ni de inventario nuevo: se
+// reutiliza el mismo endpoint público de solo lectura que ya alimenta el
+// catálogo (getProducts()), pidiéndolo de nuevo justo al abrir el
+// checkout en vez de confiar en el estado cargado al entrar a la página.
+// Si la red falla, no se bloquea el checkout — se documenta el hueco
+// (availabilityStale) y se sigue con el último estado conocido; cerrar
+// por completo esa ventana requeriría una reserva/lock real del lado del
+// servidor, fuera de alcance de esta fase (regla 6/15).
+async function refreshAvailability() {
+  try {
+    const fresh = await getProducts();
+    fresh.forEach((fp) => {
+      const idx = state.products.findIndex((p) => String(p.id) === String(fp.id));
+      if (idx !== -1) state.products[idx] = { ...state.products[idx], available: fp.available };
+    });
+    return true;
+  } catch (e) {
+    console.error("[VIBE] No se pudo revalidar disponibilidad en tiempo real antes del checkout; se usa el último estado conocido.", e);
+    return false;
+  }
+}
+
+function checkoutSummaryHtml(availabilityStale) {
+  const summary = computeOrderSummary(cartLinesWithAvailability());
+  if (!summary.lines.length) {
+    return `<div class="checkout-summary">${cartEmptyHtml()}</div>`;
+  }
+  const rows = summary.lines
+    .map(
+      (l) => `<div class="checkout-line${l.unavailable ? " unavailable" : ""}">
+        <div class="thumb">${l.image ? `<img src="${esc(l.image)}" alt="${esc(l.name)}">` : "VIBE"}</div>
+        <div class="checkout-line-info">
+          ${l.brand ? `<p class="cart-item-brand">${esc(l.brand)}</p>` : ""}
+          <h3>${esc(l.name)}</h3>
+          <div class="meta">${esc(l.variantName)} · Cantidad: ${l.quantity}</div>
+          ${l.unavailable ? `<p class="checkout-line-warning">Ya no está disponible — quítalo para continuar.</p>` : ""}
+        </div>
+        <div class="checkout-line-right">
+          <span class="cart-price">${money(l.lineSubtotal)}</span>
+          <button type="button" class="remove" data-remove-line data-p="${l.productId}" data-v="${l.variantId}">Quitar</button>
+        </div>
+      </div>`
+    )
+    .join("");
+  return `<div class="checkout-summary">
+    <h3 class="checkout-summary-title">Resumen de tu pedido</h3>
+    ${rows}
+    <div class="total"><span>Total</span><strong>${money(summary.total)}</strong></div>
+    ${availabilityStale ? `<p class="notice">No pudimos revalidar la disponibilidad justo ahora — se muestra la última conocida.</p>` : ""}
+  </div>`;
+}
+
+function checkoutFormHtml() {
+  return `<form id="checkoutForm" novalidate>
+    <label>Nombre completo
+      <input name="name" autocomplete="name" aria-describedby="err-name">
+      <span class="field-error" id="err-name" role="alert"></span>
+    </label>
+    <label>WhatsApp
+      <input name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="Ej. 300 123 4567" aria-describedby="err-phone">
+      <span class="field-error" id="err-phone" role="alert"></span>
+    </label>
+    <label>Ciudad
+      <input name="city" autocomplete="address-level2" aria-describedby="err-city">
+      <span class="field-error" id="err-city" role="alert"></span>
+    </label>
+    <label>Dirección de entrega
+      <input name="address" autocomplete="street-address" aria-describedby="err-address">
+      <span class="field-error" id="err-address" role="alert"></span>
+    </label>
+    <label>Observaciones (opcional)<textarea name="notes" rows="3"></textarea></label>
+    <button type="submit" id="checkoutSubmit" class="button dark full">Enviar pedido por WhatsApp</button>
+    <small>Tu pedido se envía por WhatsApp — nada se cobra ni se confirma desde el catálogo.</small>
+  </form>`;
+}
+
+// Sección 12 — nunca afirma pedido/pago confirmado: WhatsApp es donde
+// continúa la coordinación real. Sección 13 — no toca el carrito;
+// vaciarlo queda como acción manual y explícita de la clienta.
+function checkoutConfirmationHtml() {
+  return `<div class="checkout-confirmation">
+    <p class="eyebrow">VIBE</p>
+    <h3>Tu pedido está listo para enviar por WhatsApp</h3>
+    <p>Se abrió WhatsApp con tu pedido armado. Continúa la conversación allí para coordinar el pago y la entrega.</p>
+    <div class="checkout-confirmation-actions">
+      <button type="button" class="button outline" id="checkoutClearCart">Vaciar carrito</button>
+      <button type="button" class="button dark" id="checkoutKeepShopping">Seguir explorando</button>
+    </div>
+  </div>`;
+}
+
+function renderCheckoutForm({ availabilityStale = false } = {}) {
+  const lines = cartLinesWithAvailability();
+  if (!lines.length) {
+    $("#checkoutBody").innerHTML = checkoutSummaryHtml(availabilityStale);
+    return;
+  }
+  $("#checkoutBody").innerHTML = checkoutSummaryHtml(availabilityStale) + checkoutFormHtml();
+  const hasUnavailable = lines.some((l) => l.unavailable);
+  const submitBtn = $("#checkoutSubmit");
+  if (submitBtn) {
+    submitBtn.disabled = hasUnavailable;
+    if (hasUnavailable) submitBtn.textContent = "Quita los productos agotados para continuar";
+  }
+}
+
+async function openCheckout() {
+  renderCheckoutForm();
+  $("#checkoutDialog").showModal();
+  const ok = await refreshAvailability();
+  // Si mientras esperábamos la red la clienta ya cerró el diálogo (o
+  // vació el carrito desde la confirmación), no pisar lo que ya se ve.
+  if ($("#checkoutDialog").open) renderCheckoutForm({ availabilityStale: !ok });
+}
+
+$("#checkoutDialog").addEventListener("click", (e) => {
+  if (e.target.id === "cartEmptyCta") {
+    e.preventDefault();
+    $("#checkoutDialog").close();
+    $("#catalogo").scrollIntoView({ behavior: "smooth" });
+    return;
+  }
+  const removeBtn = e.target.closest("[data-remove-line]");
+  if (removeBtn) {
+    removeFromCart(removeBtn.dataset.p, removeBtn.dataset.v);
+    renderCart();
+    renderCheckoutForm();
+    return;
+  }
+  if (e.target.id === "checkoutClearCart") {
+    clearCart();
+    renderCart();
+    $("#checkoutDialog").close();
+    return;
+  }
+  if (e.target.id === "checkoutKeepShopping") {
+    $("#checkoutDialog").close();
+  }
+});
+
+$("#checkoutDialog").addEventListener("submit", (e) => {
+  if (!e.target.closest("#checkoutForm")) return;
   e.preventDefault();
+
+  const form = e.target;
+  const data = Object.fromEntries(new FormData(form));
+  const { valid, errors } = validateCheckoutForm(data);
+
+  form.querySelectorAll(".field-error").forEach((el) => (el.textContent = ""));
+  form.querySelectorAll("[aria-invalid]").forEach((el) => el.removeAttribute("aria-invalid"));
+
+  if (!valid) {
+    let firstInput = null;
+    Object.entries(errors).forEach(([field, message]) => {
+      const errEl = document.getElementById(`err-${field}`);
+      if (errEl) errEl.textContent = message;
+      const input = form.querySelector(`[name="${field}"]`);
+      if (input) {
+        input.setAttribute("aria-invalid", "true");
+        if (!firstInput) firstInput = input;
+      }
+    });
+    if (firstInput) firstInput.focus();
+    return;
+  }
+
   if (WHATSAPP_NUMBER.includes("X")) {
     alert("Configura el número de WhatsApp de VIBE en js/app.js antes de publicar.");
     return;
   }
-  const d = Object.fromEntries(new FormData(e.currentTarget));
-  let m = "Hola VIBE 👋\n\nQuiero realizar el siguiente pedido:\n\n";
-  getCart().forEach(i => {
-    m += "• " + i.name + "\n  Cantidad: " + i.quantity + "\n  Opción: " + i.variantName + "\n  Precio: " + money(i.price) + "\n  Subtotal: " + money(i.price * i.quantity) + "\n\n";
-  });
-  m += "TOTAL: " + money(getCartTotal()) + "\n\nNombre: " + d.name + "\nCiudad: " + d.city + "\nDirección: " + d.address + "\nInformación adicional: " + (d.notes || "N/A");
-  window.open("https://wa.me/" + WHATSAPP_NUMBER + "?text=" + encodeURIComponent(m), "_blank");
-  clearCart();
-  renderCart();
-  e.currentTarget.reset();
-  $("#checkoutDialog").close();
+
+  const lines = cartLinesWithAvailability();
+  if (lines.some((l) => l.unavailable)) return; // el botón ya está deshabilitado en este caso — guarda extra.
+
+  const summary = computeOrderSummary(lines);
+  const message = buildWhatsAppMessage(summary, data);
+  const url = buildWhatsAppUrl(WHATSAPP_NUMBER, message);
+  window.open(url, "_blank");
+
+  renderCheckoutConfirmation();
 });
+
+function renderCheckoutConfirmation() {
+  $("#checkoutBody").innerHTML = checkoutConfirmationHtml();
+}
 
 $("#menuToggle").addEventListener("click", () => {
   const open = $("#mobileNav").classList.toggle("open");

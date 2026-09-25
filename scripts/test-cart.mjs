@@ -109,5 +109,35 @@ await test("un producto demo (id ya string) sigue funcionando exactamente igual"
   assert.equal(getCart()[0].quantity, 2);
 });
 
+console.log("addToCart / brand + originalPrice (Fase 29 — el carrito necesita mostrarlos)");
+await test("guarda brand cuando el producto lo tiene", async () => {
+  const { addToCart, getCart } = await freshCart();
+  const product = { id: 90, name: "Labial VIBE", brand: "VIBE Beauty", image: null };
+  const variant = { id: "default", name: "Único", price: 30000, sku: null };
+  addToCart(product, variant, 1);
+  assert.equal(getCart()[0].brand, "VIBE Beauty");
+});
+await test("sin brand en el producto, guarda null (nunca inventa una marca)", async () => {
+  const { addToCart, getCart } = await freshCart();
+  const product = { id: 56, name: "Producto real", image: null };
+  const variant = { id: "default", name: "Único", price: 18000, sku: null };
+  addToCart(product, variant, 1);
+  assert.equal(getCart()[0].brand, null);
+});
+await test("guarda originalPrice cuando la variante lo trae (promoción real)", async () => {
+  const { addToCart, getCart } = await freshCart();
+  const product = { id: 56, name: "Producto real", image: null };
+  const variant = { id: "default", name: "Único", price: 15000, sku: null, originalPrice: 18000 };
+  addToCart(product, variant, 1);
+  assert.equal(getCart()[0].originalPrice, 18000);
+});
+await test("sin promoción, originalPrice queda en null (no se inventa un tachado)", async () => {
+  const { addToCart, getCart } = await freshCart();
+  const product = { id: 56, name: "Producto real", image: null };
+  const variant = { id: "default", name: "Único", price: 18000, sku: null };
+  addToCart(product, variant, 1);
+  assert.equal(getCart()[0].originalPrice, null);
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);
