@@ -61,17 +61,45 @@ export function filterProducts(products, { group, category, subcategory, search 
 // de la API pública (api/catalog/_lib/merge.js). No asigna featured a
 // nadie ni inventa un orden — si no hay ningún producto featured, la
 // lista simplemente queda vacía.
+function byEditorialOrderThenName(a, b) {
+  const ao = a.editorialOrder ?? null;
+  const bo = b.editorialOrder ?? null;
+  if (ao !== null && bo !== null && ao !== bo) return ao - bo;
+  if (ao !== null && bo === null) return -1;
+  if (ao === null && bo !== null) return 1;
+  return a.name.localeCompare(b.name, "es");
+}
+
+// Las tres secciones de merchandising curado (Destacados/Novedades/
+// Promociones) además exigen disponibilidad real (available !== false)
+// — a diferencia del catálogo completo, que sí muestra productos
+// agotados con su badge. Una vitrina curada que invita a comprar ahora
+// no debe destacar algo que no se puede comprar.
+function isAvailable(p) {
+  return p.available !== false;
+}
+
 export function selectFeatured(products) {
-  return products
-    .filter((p) => p.featured === true)
-    .sort((a, b) => {
-      const ao = a.editorialOrder ?? null;
-      const bo = b.editorialOrder ?? null;
-      if (ao !== null && bo !== null && ao !== bo) return ao - bo;
-      if (ao !== null && bo === null) return -1;
-      if (ao === null && bo !== null) return 1;
-      return a.name.localeCompare(b.name, "es");
-    });
+  return products.filter((p) => p.featured === true && isAvailable(p)).sort(byEditorialOrderThenName);
+}
+
+// Fase 26 — "Novedades": el ÚNICO criterio es el badge editorial exacto
+// "Nuevo", asignado manualmente por Ana desde /admin. Deliberadamente NO
+// usa created_at, id, orden del POS ni ninguna fecha — una fila reciente
+// en la base de datos no significa "recién llegado a la tienda" (pudo
+// existir en el POS hace meses y curarse editorialmente hoy). Si no hay
+// ningún producto con ese badge, la lista queda vacía — nunca se inventa
+// una novedad.
+export function selectNew(products) {
+  return products.filter((p) => p.badge === "Nuevo" && isAvailable(p)).sort(byEditorialOrderThenName);
+}
+
+// Fase 26 — "Promociones": único criterio, promoActive === true, ya
+// resuelto server-side (incluye la ventana de fechas, ver
+// api/catalog/_lib/merge.js) — esta función nunca vuelve a evaluar
+// fechas ni ningún otro campo.
+export function selectPromotions(products) {
+  return products.filter((p) => p.promoActive === true && isAvailable(p)).sort(byEditorialOrderThenName);
 }
 
 // A discreet editorial path for the product detail view, e.g.

@@ -18,8 +18,11 @@
       <small>VIBRANT ICONIC BEAUTY ESSENTIALS</small>
     </a>
     <nav class="nav-links">
-      <a href="#inicio">Inicio</a>
-      <a href="#catalogo">Catálogo</a>
+      <a href="#catalogo" data-group="Maquillaje">Maquillaje</a>
+      <a href="#catalogo" data-group="Skincare">Skincare</a>
+      <a href="#catalogo" data-group="Accesorios">Accesorios</a>
+      <a href="#novedades">Novedades</a>
+      <a href="#promociones" id="navPromociones" class="hidden">Promociones</a>
     </nav>
     <div class="nav-actions">
       <button id="cartButton" class="cart-btn">Carrito <b id="cartCount">0</b></button>
@@ -29,8 +32,11 @@
     </div>
   </div>
   <nav id="mobileNav" class="mobile-nav" aria-label="Menú móvil">
-    <a href="#inicio">Inicio</a>
-    <a href="#catalogo">Catálogo</a>
+    <a href="#catalogo" data-group="Maquillaje">Maquillaje</a>
+    <a href="#catalogo" data-group="Skincare">Skincare</a>
+    <a href="#catalogo" data-group="Accesorios">Accesorios</a>
+    <a href="#novedades">Novedades</a>
+    <a href="#promociones" id="mobileNavPromociones" class="hidden">Promociones</a>
     <a href="#catalogo" id="mobileSearchLink">Buscar</a>
   </nav>
 </header>
@@ -72,13 +78,35 @@
   </div>
 </section>
 
+<section id="novedades" class="featured hidden">
+  <div class="wrap">
+    <div class="heading">
+      <div><p class="eyebrow">RECIÉN LLEGADO</p><h2>Novedades</h2></div>
+      <p>Lo último en sumarse a tu ritual VIBE.</p>
+    </div>
+    <div id="novedadesGrid" class="grid"></div>
+    <a class="button outline" href="#catalogo">Ver catálogo completo</a>
+  </div>
+</section>
+
 <section class="featured">
   <div class="wrap">
     <div class="heading">
-      <div><p class="eyebrow">SELECCIÓN</p><h2>Descubre</h2></div>
-      <p>Una selección para comenzar tu ritual.</p>
+      <div><p class="eyebrow">SELECCIÓN</p><h2>Destacados VIBE</h2></div>
+      <p>Lo que el equipo VIBE elige para ti.</p>
     </div>
     <div id="featuredGrid" class="grid"></div>
+    <a class="button outline" href="#catalogo">Ver catálogo completo</a>
+  </div>
+</section>
+
+<section id="promociones" class="featured hidden">
+  <div class="wrap">
+    <div class="heading">
+      <div><p class="eyebrow">POR TIEMPO LIMITADO</p><h2>Promociones</h2></div>
+      <p>Aprovecha antes de que termine.</p>
+    </div>
+    <div id="promocionesGrid" class="grid"></div>
     <a class="button outline" href="#catalogo">Ver catálogo completo</a>
   </div>
 </section>

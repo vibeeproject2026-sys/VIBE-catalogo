@@ -15,14 +15,35 @@ function joinCatalog(products, metadataRows) {
     .filter((row) => Boolean(row.metadata)); // metadataRows is expected to already be published=true only
 }
 
+// Fase 26 — resuelve la promoción del producto server-side: promo_active
+// por sí solo no basta, también debe estar dentro de la ventana de fecha
+// si promo_start/promo_end están definidos. Las fechas crudas nunca
+// salen de esta función — el cliente solo recibe el booleano ya
+// resuelto, igual que `available` ya resuelve `stock` a un booleano sin
+// exponer el número.
+function resolvePromoActive(product, now = new Date()) {
+  if (!product.promo_active) return false;
+  if (product.promo_start && now < new Date(product.promo_start)) return false;
+  if (product.promo_end && now > new Date(product.promo_end)) return false;
+  return true;
+}
+
 function shapeProduct(product, metadata, resolveCategoryGroup) {
   return {
     id: product.id,
     name: product.name,
     price: Number(product.price),
     available: Number(product.stock) > 0,
+    promoActive: resolvePromoActive(product),
+    promoPrice: product.promo_price === null || product.promo_price === undefined ? null : Number(product.promo_price),
+    promoText: product.promo_text ?? null,
     category: product.category,
     categoryGroup: resolveCategoryGroup(product.category),
+    // Manually assigned by the admin (Fase 22B) — distinct from
+    // `category` (POS) and `categoryGroup` (static fallback derived from
+    // POS category). Additive field: null until an admin sets it, never
+    // inferred or defaulted from the other two.
+    editorialCategory: metadata.category ?? null,
     subcategory: metadata.subcategory ?? null,
     image: metadata.image ?? null,
     images: Array.isArray(metadata.images) ? metadata.images : [],

@@ -67,6 +67,10 @@ function normalizeDemoProduct(p) {
     // catalog_metadata row yet.
     editorialCategory: null,
     editorialOrder: p.editorialOrder ?? null,
+    // Los productos demo nunca tienen una promoción real del POS detrás.
+    promoActive: false,
+    promoPrice: null,
+    promoText: null,
     variants: normalizeVariants(p),
   };
 }
@@ -101,6 +105,11 @@ function normalizeApiProduct(p) {
     badge: p.badge ?? null,
     featured: Boolean(p.featured),
     editorialOrder: p.editorialOrder ?? null,
+    // Fase 26 — ya resuelto server-side (ver api/catalog/_lib/merge.js):
+    // nunca se recalcula ni se infiere aquí, solo se pasa tal cual.
+    promoActive: Boolean(p.promoActive),
+    promoPrice: p.promoPrice ?? null,
+    promoText: p.promoText ?? null,
     variants: normalizeVariants(p),
   };
 }

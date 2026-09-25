@@ -46,7 +46,18 @@ async function main() {
   });
 
   console.log("shapeProduct");
-  const sampleProduct = { id: 7, name: "Daily Glow Cleanser", price: "58900", stock: 5, category: "Skincare" };
+  const sampleProduct = {
+    id: 7,
+    name: "Daily Glow Cleanser",
+    price: "58900",
+    stock: 5,
+    category: "Skincare",
+    promo_active: false,
+    promo_price: null,
+    promo_start: null,
+    promo_end: null,
+    promo_text: null,
+  };
   const sampleMetadata = {
     product_id: 7,
     subcategory: "Limpieza",
@@ -71,7 +82,7 @@ async function main() {
   await test("output never contains internal/operational fields", () => {
     const shaped = shapeProduct(sampleProduct, sampleMetadata, resolveCategoryGroup);
     const keys = Object.keys(shaped);
-    for (const forbidden of ["stock", "min_stock", "cost_base", "cost_pack", "sales", "published"]) {
+    for (const forbidden of ["stock", "min_stock", "cost_base", "cost_pack", "sales", "published", "promo_start", "promo_end", "promo_active"]) {
       assert.ok(!keys.includes(forbidden), `leaked forbidden field: ${forbidden}`);
     }
     assert.deepEqual(
@@ -84,6 +95,7 @@ async function main() {
         "category",
         "categoryGroup",
         "description",
+        "editorialCategory",
         "editorialOrder",
         "featured",
         "id",
@@ -93,11 +105,48 @@ async function main() {
         "name",
         "presentation",
         "price",
+        "promoActive",
+        "promoPrice",
+        "promoText",
         "shortDescription",
         "subcategory",
         "usage",
       ].sort()
     );
+  });
+
+  console.log("shapeProduct — promociones (Fase 26)");
+  await test("promo_active=true sin fechas -> promoActive true, precio y texto expuestos", () => {
+    const shaped = shapeProduct(
+      { ...sampleProduct, promo_active: true, promo_price: 45000, promo_text: "-20%" },
+      sampleMetadata,
+      resolveCategoryGroup
+    );
+    assert.equal(shaped.promoActive, true);
+    assert.equal(shaped.promoPrice, 45000);
+    assert.equal(shaped.promoText, "-20%");
+  });
+  await test("promo_active=true pero fuera de la ventana de fechas -> promoActive false (nunca se expone la fecha cruda)", () => {
+    const shaped = shapeProduct(
+      { ...sampleProduct, promo_active: true, promo_price: 45000, promo_start: "2099-01-01", promo_end: "2099-01-31" },
+      sampleMetadata,
+      resolveCategoryGroup
+    );
+    assert.equal(shaped.promoActive, false);
+    assert.equal("promo_start" in shaped, false);
+    assert.equal("promo_end" in shaped, false);
+  });
+  await test("promo_active=true dentro de la ventana de fechas -> promoActive true", () => {
+    const shaped = shapeProduct(
+      { ...sampleProduct, promo_active: true, promo_price: 45000, promo_start: "2000-01-01", promo_end: "2099-01-01" },
+      sampleMetadata,
+      resolveCategoryGroup
+    );
+    assert.equal(shaped.promoActive, true);
+  });
+  await test("promo_active=false -> promoActive siempre false, sin importar promo_price", () => {
+    const shaped = shapeProduct({ ...sampleProduct, promo_active: false, promo_price: 45000 }, sampleMetadata, resolveCategoryGroup);
+    assert.equal(shaped.promoActive, false);
   });
 
   await test("available is derived from stock, never a raw stock number", () => {

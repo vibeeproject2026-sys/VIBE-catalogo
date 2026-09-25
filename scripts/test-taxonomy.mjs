@@ -11,9 +11,8 @@ const src = (await import("node:fs")).readFileSync(
   new URL("../js/taxonomy.js", import.meta.url),
   "utf8"
 );
-const { getGroups, getCategoriesInGroup, getSubcategories, filterProducts, breadcrumbLabel, selectFeatured } = await import(
-  "data:text/javascript," + encodeURIComponent(src)
-);
+const { getGroups, getCategoriesInGroup, getSubcategories, filterProducts, breadcrumbLabel, selectFeatured, selectNew, selectPromotions } =
+  await import("data:text/javascript," + encodeURIComponent(src));
 
 let passed = 0;
 let failed = 0;
@@ -186,6 +185,52 @@ test("los destacados sin editorial_order van al final, ordenados alfabéticament
 });
 test("sin ningún producto featured, devuelve lista vacía (no inventa una selección)", () => {
   assert.deepEqual(selectFeatured([{ id: 1, name: "X", featured: false }]), []);
+});
+test("un producto featured pero sin disponibilidad NO aparece en Destacados (Fase 26, TEST 8)", () => {
+  const r = selectFeatured([
+    { id: 1, name: "A", featured: true, available: true },
+    { id: 2, name: "B", featured: true, available: false },
+  ]);
+  assert.deepEqual(r.map((p) => p.id), [1]);
+});
+
+console.log("selectNew (Fase 26 — TEST 3/4: solo badge==='Nuevo', nunca fechas)");
+test("solo incluye productos con badge exactamente 'Nuevo'", () => {
+  const r = selectNew([
+    { id: 1, name: "A", badge: "Nuevo", available: true },
+    { id: 2, name: "B", badge: "VIBE PICK", available: true },
+    { id: 3, name: "C", badge: null, available: true },
+  ]);
+  assert.deepEqual(r.map((p) => p.id), [1]);
+});
+test("ignora por completo created_at/fecha — un producto reciente sin el badge no aparece, uno antiguo con el badge sí", () => {
+  const r = selectNew([
+    { id: 1, name: "Antiguo pero curado hoy", badge: "Nuevo", created_at: "2020-01-01", available: true },
+    { id: 2, name: "Reciente sin curar", badge: null, created_at: "2026-09-25", available: true },
+  ]);
+  assert.deepEqual(r.map((p) => p.id), [1]);
+});
+test("un producto con badge='Nuevo' pero sin disponibilidad NO aparece en Novedades", () => {
+  const r = selectNew([{ id: 1, name: "A", badge: "Nuevo", available: false }]);
+  assert.deepEqual(r, []);
+});
+test("sin ningún producto con badge='Nuevo', lista vacía", () => {
+  assert.deepEqual(selectNew([{ id: 1, name: "X", badge: null }]), []);
+});
+
+console.log("selectPromotions (Fase 26 — TEST 1/2: solo promoActive===true, ya resuelto server-side)");
+test("solo incluye productos con promoActive === true", () => {
+  const r = selectPromotions([
+    { id: 1, name: "A", promoActive: true, available: true },
+    { id: 2, name: "B", promoActive: false, available: true },
+  ]);
+  assert.deepEqual(r.map((p) => p.id), [1]);
+});
+test("sin ningún promoActive=true, lista vacía (Promociones no debe mostrarse)", () => {
+  assert.deepEqual(selectPromotions([{ id: 1, name: "X", promoActive: false }]), []);
+});
+test("un producto en promoción pero sin disponibilidad NO aparece en Promociones", () => {
+  assert.deepEqual(selectPromotions([{ id: 1, name: "A", promoActive: true, available: false }]), []);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

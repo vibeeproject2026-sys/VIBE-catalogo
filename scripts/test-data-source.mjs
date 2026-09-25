@@ -130,6 +130,25 @@ async function main() {
     assert.ok(demo.every((p) => p.editorialCategory === null));
   });
 
+  console.log("Fase 26 — promoActive/promoPrice/promoText llegan tal cual desde la API (ya resueltos server-side)");
+  await test("normalizeApiProduct conserva promoActive/promoPrice/promoText cuando la API los envía", () => {
+    const shaped = __internal.normalizeApiProduct({ id: 1, name: "X", price: 100, promoActive: true, promoPrice: 80, promoText: "-20%" });
+    assert.equal(shaped.promoActive, true);
+    assert.equal(shaped.promoPrice, 80);
+    assert.equal(shaped.promoText, "-20%");
+  });
+  await test("un producto sin promoción real llega con promoActive=false y promoPrice/promoText null", () => {
+    const shaped = __internal.normalizeApiProduct({ id: 1, name: "X", price: 100 });
+    assert.equal(shaped.promoActive, false);
+    assert.equal(shaped.promoPrice, null);
+    assert.equal(shaped.promoText, null);
+  });
+  await test("productos demo nunca tienen una promoción real (no hay POS detrás)", () => {
+    __internal.setMode("demo");
+    const demo = __internal.getDemoProducts();
+    assert.ok(demo.every((p) => p.promoActive === false && p.promoPrice === null));
+  });
+
   console.log("TEST 7 — un producto sin metadata editorial completa no se presenta como si la tuviera");
   await test("campos editoriales ausentes llegan vacíos/null, nunca con un valor inventado", () => {
     const shaped = __internal.normalizeApiProduct({ id: 5, name: "Sin ficha completa", price: 1000 });

@@ -1,6 +1,6 @@
 import { getProducts } from "./data-source.js";
 import { getCart, addToCart, changeQuantity, removeFromCart, clearCart, getCartCount, getCartTotal } from "./cart.js";
-import { getGroups, getCategoriesInGroup, getSubcategories, filterProducts, breadcrumbLabel, selectFeatured } from "./taxonomy.js";
+import { getGroups, getCategoriesInGroup, getSubcategories, filterProducts, breadcrumbLabel, selectFeatured, selectNew, selectPromotions } from "./taxonomy.js";
 import { readStateFromSearch, buildUrl } from "./url-state.js";
 
 const WHATSAPP_NUMBER = "57XXXXXXXXXX";
@@ -52,14 +52,25 @@ function productImage(p, cls = "product-photo") {
 }
 
 function productCard(p) {
+  // Fase 26: precio promocional solo si promoActive viene resuelto por el
+  // servidor (nunca calculado aquí) y hay un promoPrice real. El badge
+  // visible prioriza el badge editorial (ej. "Nuevo") sobre el de
+  // promoción — el precio tachado ya comunica la promoción por sí solo,
+  // así que solo se usa promoText/"Promo" como badge cuando no hay
+  // ningún badge editorial asignado.
+  const showPromo = p.promoActive === true && p.promoPrice != null;
+  const badgeText = p.badge || (showPromo ? p.promoText || "Promo" : null);
   return `<article class="card">
-    <button class="card-img" data-product="${p.id}">${productImage(p)}</button>
+    <button class="card-img" data-product="${p.id}">
+      ${badgeText ? `<span class="card-badge">${esc(badgeText)}</span>` : ""}
+      ${productImage(p)}
+    </button>
     <div class="card-body">
       <p class="product-category">${esc(p.category)}</p>
       <h3>${esc(p.name)}</h3>
       <p class="desc">${esc(p.shortDescription)}</p>
-      <span class="price">${money(p.price)}</span>
-      ${p.oldPrice ? `<span class="old">${money(p.oldPrice)}</span>` : ""}
+      <span class="price">${money(showPromo ? p.promoPrice : p.price)}</span>
+      ${showPromo ? `<span class="old">${money(p.price)}</span>` : p.oldPrice ? `<span class="old">${money(p.oldPrice)}</span>` : ""}
       ${p.available === false ? `<span class="availability-badge">Agotado</span>` : ""}
       <button class="button dark" data-product="${p.id}">Ver producto</button>
     </div>
@@ -76,11 +87,47 @@ function renderFeatured() {
   // Fase 24: destacados reales — solo featured === true, nunca "los
   // primeros N" del listado. Si todavía no hay ningún producto marcado
   // como destacado (curaduría en progreso), se muestra un estado vacío
-  // en vez de inventar una selección.
+  // en vez de inventar una selección. A diferencia de Novedades/
+  // Promociones, esta sección permanece siempre visible (Fase 25/26):
+  // el vacío es una invitación editorial a curar, no un error.
   const list = selectFeatured(state.products);
   $("#featuredGrid").innerHTML = list.length
     ? list.map(productCard).join("")
     : `<p class="empty">Estamos preparando la selección VIBE.</p>`;
+}
+
+// Fase 26 — Novedades: única fuente, badge === "Nuevo". Si no hay
+// ninguna, la sección completa queda oculta (ausencia total, no un
+// estado vacío visible) — así lo definió el blueprint v1.0.
+function renderNovedades() {
+  const list = selectNew(state.products);
+  const section = $("#novedades");
+  section.classList.toggle("hidden", list.length === 0);
+  if (list.length) $("#novedadesGrid").innerHTML = list.map(productCard).join("");
+}
+
+// Fase 26 — Promociones: única fuente, promoActive === true (ya resuelto
+// server-side). Sin datos reales, tanto la sección de Home como la
+// entrada de navegación (desktop + mobile) quedan completamente
+// ausentes — nunca un enlace vacío.
+function renderPromociones() {
+  const list = selectPromotions(state.products);
+  const hasPromotions = list.length > 0;
+  $("#promociones").classList.toggle("hidden", !hasPromotions);
+  document.querySelectorAll("#navPromociones, #mobileNavPromociones").forEach((el) => el.classList.toggle("hidden", !hasPromotions));
+  if (hasPromotions) $("#promocionesGrid").innerHTML = list.map(productCard).join("");
+}
+
+// Filtro compartido por Shop by World (tarjetas de categoría) y por los
+// enlaces de mundo del header — misma lógica, un solo lugar.
+function goToGroup(group) {
+  state.group = group;
+  state.category = "Todos";
+  state.subcategory = "Todos";
+  renderNav();
+  renderProducts();
+  syncUrl();
+  $("#catalogo").scrollIntoView({ behavior: "smooth" });
 }
 
 function renderCategoryShowcase() {
@@ -199,14 +246,21 @@ $("#subcategoryTabs").addEventListener("click", e => {
 $("#categoryShowcase").addEventListener("click", e => {
   const b = e.target.closest("[data-group]");
   if (!b) return;
-  state.group = b.dataset.group;
-  state.category = "Todos";
-  state.subcategory = "Todos";
-  renderNav();
-  renderProducts();
-  syncUrl();
-  $("#catalogo").scrollIntoView({ behavior: "smooth" });
+  goToGroup(b.dataset.group);
 });
+
+function bindWorldNav(selector) {
+  const el = document.querySelector(selector);
+  if (!el) return;
+  el.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-group]");
+    if (!b) return;
+    e.preventDefault();
+    goToGroup(b.dataset.group);
+  });
+}
+bindWorldNav(".nav-links");
+bindWorldNav("#mobileNav");
 
 $("#searchInput").addEventListener("input", e => {
   state.search = e.target.value;
@@ -326,6 +380,8 @@ async function loadCatalog() {
   renderNav();
   renderProducts();
   renderFeatured();
+  renderNovedades();
+  renderPromociones();
   renderCategoryShowcase();
 }
 

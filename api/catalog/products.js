@@ -16,9 +16,20 @@ const { sendJson, sendError, methodNotAllowed } = require("./_lib/http");
 // Explicit column whitelists — never `select=*`. This is what actually
 // keeps cost_base, cost_pack, min_stock, etc. out of reach, independent
 // of whatever RLS policy Supabase may or may not have configured.
-const PRODUCT_COLUMNS = "id,name,price,stock,category";
+//
+// Fase 26: promo_active/promo_price/promo_start/promo_end/promo_text are
+// added here — read-only, same as the rest of this list. This endpoint
+// never writes to `products` under any circumstance; adding columns to a
+// SELECT does not change that. The raw dates (promo_start/promo_end)
+// never leave this file — shapeProduct() resolves them into a single
+// computed `promoActive` boolean server-side (see _lib/merge.js), so the
+// public API surface stays as narrow as everything else it returns.
+const PRODUCT_COLUMNS = "id,name,price,stock,category,promo_active,promo_price,promo_start,promo_end,promo_text";
+// additional_info is deliberately NOT selected here — it stays
+// admin-only (internal notes/provider info), never exposed publicly.
+// See docs/fase22b-ficha-editorial-manual.md.
 const METADATA_COLUMNS =
-  "product_id,subcategory,image,images,short_description,description,benefits,ingredients,usage,presentation,brand,badge,featured,editorial_order,published";
+  "product_id,category,subcategory,image,images,short_description,description,benefits,ingredients,usage,presentation,brand,badge,featured,editorial_order,published";
 
 module.exports = async function handler(req, res) {
   applyCors(req, res);
