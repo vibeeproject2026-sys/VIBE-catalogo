@@ -50,6 +50,15 @@ async function main() {
     assert.equal(typeof getCategories, "function");
   });
 
+  console.log("TEST 1 — fuente configurada para producción");
+  await test("CONFIGURED_MODE por defecto es 'api', no 'demo' (Fase 24)", () => {
+    // getMode() refleja el valor real de CONFIGURED_MODE tal como quedó
+    // definido en el archivo fuente, antes de que cualquier test lo
+    // cambie con setMode() — se verifica aquí, primero, antes de que el
+    // resto de la suite empiece a llamar setMode("demo")/setMode("api").
+    assert.equal(__internal.getMode(), "api");
+  });
+
   console.log("modo demo (real, sin red)");
   await test("getProducts() en modo demo devuelve los 6 productos demo normalizados", async () => {
     __internal.setMode("demo");
@@ -100,6 +109,38 @@ async function main() {
     assert.equal(Array.isArray(shaped.variants), true);
     assert.equal(shaped.variants.length, 1);
     assert.equal(shaped.variants[0].price, 50000);
+  });
+
+  console.log("TEST 5 — editorialCategory/editorialOrder llegan hasta la capa de presentación");
+  await test("normalizeApiProduct conserva editorialCategory tal cual la envía la API (nunca la inventa)", () => {
+    const shaped = __internal.normalizeApiProduct({ id: 1, name: "X", price: 1, editorialCategory: "Rostro" });
+    assert.equal(shaped.editorialCategory, "Rostro");
+  });
+  await test("un producto sin editorialCategory todavía (sin curaduría) llega como null, nunca inventada", () => {
+    const shaped = __internal.normalizeApiProduct({ id: 1, name: "X", price: 1 });
+    assert.equal(shaped.editorialCategory, null);
+  });
+  await test("normalizeApiProduct conserva editorialOrder tal cual", () => {
+    const shaped = __internal.normalizeApiProduct({ id: 1, name: "X", price: 1, editorialOrder: 3 });
+    assert.equal(shaped.editorialOrder, 3);
+  });
+  await test("productos demo también exponen editorialCategory=null (nunca inventan curaduría real)", () => {
+    __internal.setMode("demo");
+    const demo = __internal.getDemoProducts();
+    assert.ok(demo.every((p) => p.editorialCategory === null));
+  });
+
+  console.log("TEST 7 — un producto sin metadata editorial completa no se presenta como si la tuviera");
+  await test("campos editoriales ausentes llegan vacíos/null, nunca con un valor inventado", () => {
+    const shaped = __internal.normalizeApiProduct({ id: 5, name: "Sin ficha completa", price: 1000 });
+    assert.equal(shaped.shortDescription, "");
+    assert.equal(shaped.description, "");
+    assert.deepEqual(shaped.benefits, []);
+    assert.equal(shaped.ingredients, null);
+    assert.equal(shaped.badge, null);
+    assert.equal(shaped.subcategory, null);
+    assert.equal(shaped.editorialCategory, null);
+    assert.equal(shaped.featured, false);
   });
 
   console.log("ausencia de variants no rompe el producto");
@@ -157,24 +198,24 @@ async function main() {
     assert.deepEqual(cats, ["Todos", "Skincare"]);
   });
 
-  console.log("error de API es manejado + fallback a demo (sin romper la app)");
-  await test("getProducts() cae a demo si la API responde con error, y lo deja claro en consola", async () => {
+  console.log("TEST 8 — el fallback a demo solo ocurre por una falla real, y nunca queda oculto");
+  await test("getProducts() cae a demo si la API responde con error, y lo reporta como error (no warn) — una falla de producción no debe pasar desapercibida", async () => {
     __internal.setMode("api");
     const originalFetch = globalThis.fetch;
-    const originalWarn = console.warn;
-    let warned = false;
-    console.warn = (...args) => {
-      warned = true;
-      originalWarn.call(console, ...args);
+    const originalError = console.error;
+    let errored = false;
+    console.error = (...args) => {
+      errored = true;
+      originalError.call(console, ...args);
     };
     globalThis.fetch = async () => ({ ok: false, status: 503, json: async () => ({ error: "no disponible" }) });
     try {
       const products = await getProducts();
-      assert.equal(products.length, 6); // volvió a los datos demo
-      assert.equal(warned, true);
+      assert.equal(products.length, 6); // volvió a los datos demo — la Home no se cae
+      assert.equal(errored, true); // pero la falla real quedó registrada con severidad de error, no oculta
     } finally {
       globalThis.fetch = originalFetch;
-      console.warn = originalWarn;
+      console.error = originalError;
       __internal.setMode("demo");
     }
   });
@@ -192,6 +233,7 @@ async function main() {
       __internal.setMode("demo");
     }
   });
+  console.log("TEST 2 — si la API responde correctamente, no se usa demo");
   await test("modo API exitoso NO cae a demo (confirma que el fallback solo ocurre cuando corresponde)", async () => {
     __internal.setMode("api");
     const originalFetch = globalThis.fetch;

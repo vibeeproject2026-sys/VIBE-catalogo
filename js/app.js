@@ -1,6 +1,6 @@
 import { getProducts } from "./data-source.js";
 import { getCart, addToCart, changeQuantity, removeFromCart, clearCart, getCartCount, getCartTotal } from "./cart.js";
-import { getGroups, getCategoriesInGroup, getSubcategories, filterProducts, breadcrumbLabel } from "./taxonomy.js";
+import { getGroups, getCategoriesInGroup, getSubcategories, filterProducts, breadcrumbLabel, selectFeatured } from "./taxonomy.js";
 import { readStateFromSearch, buildUrl } from "./url-state.js";
 
 const WHATSAPP_NUMBER = "57XXXXXXXXXX";
@@ -73,7 +73,14 @@ function renderProducts() {
 }
 
 function renderFeatured() {
-  $("#featuredGrid").innerHTML = state.products.slice(0, 4).map(productCard).join("");
+  // Fase 24: destacados reales — solo featured === true, nunca "los
+  // primeros N" del listado. Si todavía no hay ningún producto marcado
+  // como destacado (curaduría en progreso), se muestra un estado vacío
+  // en vez de inventar una selección.
+  const list = selectFeatured(state.products);
+  $("#featuredGrid").innerHTML = list.length
+    ? list.map(productCard).join("")
+    : `<p class="empty">Estamos preparando la selección VIBE.</p>`;
 }
 
 function renderCategoryShowcase() {

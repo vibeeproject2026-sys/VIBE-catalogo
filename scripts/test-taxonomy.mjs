@@ -11,7 +11,7 @@ const src = (await import("node:fs")).readFileSync(
   new URL("../js/taxonomy.js", import.meta.url),
   "utf8"
 );
-const { getGroups, getCategoriesInGroup, getSubcategories, filterProducts, breadcrumbLabel } = await import(
+const { getGroups, getCategoriesInGroup, getSubcategories, filterProducts, breadcrumbLabel, selectFeatured } = await import(
   "data:text/javascript," + encodeURIComponent(src)
 );
 
@@ -134,6 +134,58 @@ test("muestra los 3 niveles cuando group y category difieren (API real)", () => 
 });
 test("se degrada con elegancia si no hay subcategoría", () => {
   assert.equal(breadcrumbLabel({ categoryGroup: "Skincare", category: "Skincare" }), "Skincare");
+});
+
+// Fase 24 — fixture mezclando productos curados editorialmente (Mascarilla
+// Facial: el POS dice "Labios" pero Ana ya la reclasificó a "Skincare" desde
+// /admin) con productos todavía sin curar (mismo POS, sin editorialCategory).
+const curatedMix = [
+  { id: 89, name: "Mascarilla Facial", categoryGroup: "Maquillaje", category: "Labios", editorialCategory: "Skincare", subcategory: "Mascarillas" },
+  { id: 65, name: "VIBE Lover Lips", categoryGroup: "Maquillaje", category: "Labios", editorialCategory: null, subcategory: null },
+];
+
+console.log("categoryOf (Fase 24 — editorialCategory)");
+test("getCategoriesInGroup prefiere editorialCategory sobre la categoría POS cuando existe", () => {
+  assert.deepEqual(getCategoriesInGroup(curatedMix, "Todos").sort(), ["Labios", "Skincare"]);
+});
+test("un producto sin editorialCategory sigue usando su categoría POS tal cual (no se reclasifica nada)", () => {
+  const r = filterProducts(curatedMix, { category: "Labios" });
+  assert.deepEqual(r.map((p) => p.id), [65]);
+});
+test("un producto curado se filtra por su categoría editorial, no por la del POS", () => {
+  const r = filterProducts(curatedMix, { category: "Skincare" });
+  assert.deepEqual(r.map((p) => p.id), [89]);
+});
+test("breadcrumbLabel usa la categoría editorial cuando existe", () => {
+  assert.equal(breadcrumbLabel(curatedMix[0]), "Maquillaje / Skincare / Mascarillas");
+});
+test("breadcrumbLabel sigue usando la categoría POS si no hay curaduría editorial todavía", () => {
+  assert.equal(breadcrumbLabel(curatedMix[1]), "Maquillaje / Labios");
+});
+
+console.log("selectFeatured (Fase 24 — TEST 3: solo featured === true)");
+const featuredFixture = [
+  { id: 1, name: "A", featured: true, editorialOrder: 2 },
+  { id: 2, name: "B", featured: false, editorialOrder: 1 },
+  { id: 3, name: "C", featured: true, editorialOrder: 1 },
+  { id: 4, name: "D", featured: true, editorialOrder: null },
+  { id: 5, name: "E Zeta", featured: true, editorialOrder: null },
+];
+test("solo incluye productos con featured === true, nunca 'los primeros N'", () => {
+  const r = selectFeatured(featuredFixture);
+  assert.deepEqual(r.map((p) => p.id).sort(), [1, 3, 4, 5]);
+  assert.ok(!r.some((p) => p.id === 2));
+});
+test("ordena por editorial_order ascendente dentro de los destacados", () => {
+  const r = selectFeatured(featuredFixture);
+  assert.deepEqual(r.slice(0, 2).map((p) => p.id), [3, 1]); // orden 1, luego orden 2
+});
+test("los destacados sin editorial_order van al final, ordenados alfabéticamente entre sí", () => {
+  const r = selectFeatured(featuredFixture);
+  assert.deepEqual(r.slice(2).map((p) => p.id), [4, 5]); // D antes que "E Zeta"
+});
+test("sin ningún producto featured, devuelve lista vacía (no inventa una selección)", () => {
+  assert.deepEqual(selectFeatured([{ id: 1, name: "X", featured: false }]), []);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

@@ -8,10 +8,15 @@ import { products as demoProducts, categories as demoCategories } from "./produc
 
 const API_BASE = "/api/catalog";
 
-// Explicit configuration constant, not hostname sniffing. Demo is the
-// default until Supabase/catalog_metadata is confirmed ready (Fase 5
-// pending decision) and this is deliberately flipped in a later fase.
-let CONFIGURED_MODE = "demo"; // "demo" | "api"
+// Explicit configuration constant, not hostname sniffing. Fase 24:
+// Supabase/catalog_metadata has been confirmed ready since Fase 11, and
+// the public Home was still silently showing demo products by default —
+// "api" is now the real production default. "demo" remains fully
+// functional as an explicit, controlled fallback (used automatically if
+// the real API fails, and available on purpose for local development via
+// ?dataSource=demo) — it is no longer what a real visitor sees by
+// default.
+let CONFIGURED_MODE = "api"; // "demo" | "api"
 
 function resolveMode() {
   try {
@@ -25,9 +30,15 @@ function resolveMode() {
   return CONFIGURED_MODE;
 }
 
+// Fase 24: este es el único punto donde el modo "api" real cae de vuelta
+// a demo — y solo se llega aquí desde el catch de un intento real fallido
+// (nunca porque alguien "decidió" usar demo). Se usa console.error, no
+// warn: esto es una falla de producción real (la API/Supabase no
+// respondió), no una advertencia menor, y no debe quedar oculta en la
+// consola entre ruido de nivel "warn".
 function warn(context, error) {
-  console.warn(
-    `[VIBE data-source] ${context} — usando modo demo como respaldo.`,
+  console.error(
+    `[VIBE data-source] ${context} — la API real falló, usando demo como respaldo técnico. Esto NO debería ocurrir en producción con la API sana.`,
     error && error.message ? error.message : error
   );
 }
@@ -51,6 +62,11 @@ function normalizeDemoProduct(p) {
     available: true,
     subcategory: p.subcategory ?? null,
     categoryGroup: p.categoryGroup ?? p.category,
+    // Demo products have no real editorial curation behind them — always
+    // null, never invented, exactly like a real product with no
+    // catalog_metadata row yet.
+    editorialCategory: null,
+    editorialOrder: p.editorialOrder ?? null,
     variants: normalizeVariants(p),
   };
 }
@@ -65,6 +81,11 @@ function normalizeApiProduct(p) {
     name: p.name,
     category: p.category,
     categoryGroup: p.categoryGroup ?? null,
+    // Fase 24: pasado tal cual desde la API — nunca inventado. Solo tiene
+    // valor real una vez que un producto fue curado editorialmente
+    // (catalog_metadata.category); hasta entonces llega null, exactamente
+    // como corresponde a un producto sin curaduría todavía.
+    editorialCategory: p.editorialCategory ?? null,
     subcategory: p.subcategory ?? null,
     price: p.price,
     available: p.available !== false,
@@ -79,6 +100,7 @@ function normalizeApiProduct(p) {
     imageLabel: "VIBE",
     badge: p.badge ?? null,
     featured: Boolean(p.featured),
+    editorialOrder: p.editorialOrder ?? null,
     variants: normalizeVariants(p),
   };
 }

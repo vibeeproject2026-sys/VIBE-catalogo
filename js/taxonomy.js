@@ -13,19 +13,30 @@ function groupOf(p) {
   return p.categoryGroup || p.category;
 }
 
+// Nivel 2 de la taxonomía (Fase 20/22B): prefiere la categoría editorial
+// VIBE (catalog_metadata.category, asignada manualmente por Ana desde
+// /admin) sobre la categoría operativa del POS. Nunca reclasifica nada
+// automáticamente: si un producto todavía no tiene editorialCategory
+// asignada, sigue usando su categoría del POS exactamente como antes —
+// esto solo empieza a tener efecto producto por producto, a medida que
+// Ana los va curando.
+function categoryOf(p) {
+  return p.editorialCategory || p.category;
+}
+
 export function getGroups(products) {
   return [...new Set(products.map(groupOf))].sort(collator);
 }
 
 export function getCategoriesInGroup(products, group) {
   const scoped = group && group !== "Todos" ? products.filter((p) => groupOf(p) === group) : products;
-  return [...new Set(scoped.map((p) => p.category))].sort(collator);
+  return [...new Set(scoped.map(categoryOf))].sort(collator);
 }
 
 export function getSubcategories(products, group, category) {
   let scoped = products;
   if (group && group !== "Todos") scoped = scoped.filter((p) => groupOf(p) === group);
-  if (category && category !== "Todos") scoped = scoped.filter((p) => p.category === category);
+  if (category && category !== "Todos") scoped = scoped.filter((p) => categoryOf(p) === category);
   return [...new Set(scoped.map((p) => p.subcategory).filter(Boolean))].sort(collator);
 }
 
@@ -33,14 +44,34 @@ export function filterProducts(products, { group, category, subcategory, search 
   const q = (search || "").toLowerCase().trim();
   return products.filter((p) => {
     if (group && group !== "Todos" && groupOf(p) !== group) return false;
-    if (category && category !== "Todos" && p.category !== category) return false;
+    if (category && category !== "Todos" && categoryOf(p) !== category) return false;
     if (subcategory && subcategory !== "Todos" && p.subcategory !== subcategory) return false;
     if (q) {
-      const haystack = [p.name, p.category, p.subcategory, p.shortDescription].filter(Boolean).join(" ").toLowerCase();
+      const haystack = [p.name, categoryOf(p), p.subcategory, p.shortDescription].filter(Boolean).join(" ").toLowerCase();
       if (!haystack.includes(q)) return false;
     }
     return true;
   });
+}
+
+// Fase 24: selección real de "Destacados" — únicamente productos con
+// featured === true (nunca los primeros N del listado). Dentro de los
+// destacados, respeta editorial_order (ascendente, los que no tienen
+// orden asignado van al final), igual que ya hace el orden por defecto
+// de la API pública (api/catalog/_lib/merge.js). No asigna featured a
+// nadie ni inventa un orden — si no hay ningún producto featured, la
+// lista simplemente queda vacía.
+export function selectFeatured(products) {
+  return products
+    .filter((p) => p.featured === true)
+    .sort((a, b) => {
+      const ao = a.editorialOrder ?? null;
+      const bo = b.editorialOrder ?? null;
+      if (ao !== null && bo !== null && ao !== bo) return ao - bo;
+      if (ao !== null && bo === null) return -1;
+      if (ao === null && bo !== null) return 1;
+      return a.name.localeCompare(b.name, "es");
+    });
 }
 
 // A discreet editorial path for the product detail view, e.g.
@@ -50,8 +81,9 @@ export function filterProducts(products, { group, category, subcategory, search 
 export function breadcrumbLabel(p) {
   const parts = [];
   const group = groupOf(p);
+  const category = categoryOf(p);
   if (group) parts.push(group);
-  if (p.category && p.category !== group) parts.push(p.category);
+  if (category && category !== group) parts.push(category);
   if (p.subcategory) parts.push(p.subcategory);
   return parts.join(" / ");
 }
