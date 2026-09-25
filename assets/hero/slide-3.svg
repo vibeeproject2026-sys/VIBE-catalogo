@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000">
+  <rect width="1600" height="1000" fill="#0b0b0b"/>
+  <rect x="0" y="0" width="1600" height="1000" fill="none"/>
+  <circle cx="220" cy="220" r="240" fill="#FF4FA3" opacity=".12"/>
+  <circle cx="1400" cy="850" r="280" fill="#FF007A" opacity=".10"/>
+  <rect x="115" y="380" width="230" height="2" fill="#FF007A"/>
+  <text x="130" y="470" font-family="Arial,Helvetica,sans-serif" font-size="34" letter-spacing="10" fill="#FF4FA3" font-weight="700">EDICIÓN LIMITADA</text>
+  <text x="120" y="600" font-family="Arial,Helvetica,sans-serif" font-size="128" letter-spacing="-4" fill="#ffffff" font-weight="800">Kit Esencial</text>
+  <text x="120" y="720" font-family="Arial,Helvetica,sans-serif" font-size="128" letter-spacing="-4" fill="#FF007A" font-weight="800">VIBE</text>
+  <text x="130" y="790" font-family="Arial,Helvetica,sans-serif" font-size="30" fill="#cfcfcf">Placeholder — pieza gráfica final a cargo del equipo creativo VIBE</text>
+</svg>

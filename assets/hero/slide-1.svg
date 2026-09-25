@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000">
+  <defs>
+    <radialGradient id="g1" cx="78%" cy="40%" r="75%">
+      <stop offset="0%" stop-color="#430020"/>
+      <stop offset="55%" stop-color="#0a0a0a"/>
+      <stop offset="100%" stop-color="#050505"/>
+    </radialGradient>
+  </defs>
+  <rect width="1600" height="1000" fill="url(#g1)"/>
+  <circle cx="1250" cy="260" r="260" fill="#FF007A" opacity=".14"/>
+  <circle cx="260" cy="820" r="200" fill="#FF4FA3" opacity=".10"/>
+  <text x="130" y="470" font-family="Arial,Helvetica,sans-serif" font-size="34" letter-spacing="10" fill="#FF4FA3" font-weight="700">NUEVA COLECCIÓN</text>
+  <text x="120" y="600" font-family="Arial,Helvetica,sans-serif" font-size="128" letter-spacing="-4" fill="#ffffff" font-weight="800">Piel que</text>
+  <text x="120" y="720" font-family="Arial,Helvetica,sans-serif" font-size="128" letter-spacing="-4" fill="#FF007A" font-weight="800">habla por ti</text>
+  <text x="130" y="790" font-family="Arial,Helvetica,sans-serif" font-size="30" fill="#cfcfcf">Placeholder — pieza gráfica final a cargo del equipo creativo VIBE</text>
+</svg>

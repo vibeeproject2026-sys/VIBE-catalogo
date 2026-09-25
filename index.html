@@ -44,11 +44,11 @@
       <p class="lead">Una experiencia de belleza multimarca: productos de excelente calidad, seleccionados con cuidado, a precios accesibles.</p>
       <a class="button dark" href="#catalogo">Explorar catálogo</a>
     </div>
-    <div class="hero-img">
-      <div class="hero-glow"></div>
-      <div class="hero-logo"><img src="assets/vibe-logo.svg" alt="VIBE"></div>
-      <strong>VIBE</strong>
-      <span>Beauty essentials · Selección VIBE</span>
+    <div class="hero-carousel" id="heroCarousel">
+      <div class="hero-slides" id="heroSlides"></div>
+      <button type="button" class="hero-arrow hero-arrow-prev" id="heroPrev" aria-label="Pieza anterior">‹</button>
+      <button type="button" class="hero-arrow hero-arrow-next" id="heroNext" aria-label="Pieza siguiente">›</button>
+      <div class="hero-dots" id="heroDots"></div>
     </div>
   </div>
 </section>
@@ -163,5 +163,6 @@
 </footer>
 
 <script type="module" src="js/app.js"></script>
+<script type="module" src="js/hero-carousel.js"></script>
 </body>
 </html>

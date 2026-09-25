@@ -48,14 +48,30 @@ header.scrolled .logo-image{width:126px;height:50px}
 .outline:hover{background:var(--pink);color:#fff}
 .full{width:100%}
 
-.hero-img{min-height:500px;border:1px solid #2a2a2a;border-radius:28px;background:linear-gradient(145deg,#0c0c0c,#151515);display:grid;place-content:center;text-align:center;color:#fff;padding:30px;position:relative;overflow:hidden}
-.hero-img:after{content:"";position:absolute;width:300px;height:300px;border-radius:50%;background:#FF007A33;filter:blur(55px);right:-70px;bottom:-70px}
-.hero-img:before{content:"";position:absolute;width:2px;height:140%;background:linear-gradient(#fff0,#ffffff26,#fff0);left:52%;top:-20%;transform:rotate(18deg)}
-.hero-glow{position:absolute;width:220px;height:220px;border-radius:50%;background:#FF4FA333;filter:blur(60px);left:-60px;top:-40px}
-.hero-logo{width:min(420px,80vw);aspect-ratio:2.232;overflow:hidden;margin-bottom:20px;position:relative}
-.hero-logo img{width:100%;height:100%;object-fit:contain;display:block}
-.hero-img strong{font-size:13px;letter-spacing:.28em;position:relative}
-.hero-img>span{display:block;margin-top:10px;font-size:11px;color:#aaa;position:relative}
+/* Hero banner carousel (Fase Visual 2) — pieza gráfica a pantalla
+   completa, sin composición editorial generada por código: el catálogo
+   solo exhibe la imagen que llegue en cada slide. Mismos breakpoints de
+   altura que el bloque anterior (.hero-img), como punto de partida. */
+.hero-carousel{position:relative;min-height:500px;border-radius:28px;overflow:hidden;background:#0c0c0c}
+
+.hero-slides{position:relative;width:100%;height:100%}
+.hero-slide{position:absolute;inset:0;display:block;opacity:0;transition:opacity 1s ease}
+.hero-slide.active{opacity:1;z-index:1}
+.hero-slide img{width:100%;height:100%;object-fit:cover;display:block}
+
+@media(prefers-reduced-motion:reduce){
+  .hero-slide{transition:none}
+}
+
+.hero-arrow{position:absolute;top:50%;transform:translateY(-50%);z-index:2;width:38px;height:38px;border-radius:50%;border:1px solid #ffffff33;background:#00000055;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);color:#fff;font-size:19px;line-height:1;display:grid;place-items:center;opacity:.65;transition:opacity .2s ease,background .2s ease}
+.hero-arrow:hover{opacity:1;background:#00000088}
+.hero-arrow-prev{left:14px}
+.hero-arrow-next{right:14px}
+
+.hero-dots{position:absolute;left:0;right:0;bottom:16px;z-index:2;display:flex;justify-content:center;gap:2px}
+.hero-dot{width:22px;height:22px;padding:0;border:0;background:transparent;display:grid;place-items:center}
+.hero-dot:before{content:"";width:6px;height:6px;border-radius:50%;background:#ffffff66;transition:background .2s ease,width .2s ease,border-radius .2s ease}
+.hero-dot.active:before{background:#fff;width:16px;border-radius:3px}
 
 .values{background:var(--bg);padding:40px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
 .values-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:22px}
@@ -176,7 +192,7 @@ footer small{letter-spacing:.25em;font-size:7px}
 @media(max-width:900px){
   .grid{grid-template-columns:repeat(2,1fr)}
   .hero-grid{grid-template-columns:1fr}
-  .hero-img{min-height:340px}
+  .hero-carousel{min-height:340px}
   .heading{align-items:flex-start;flex-direction:column}
   .values-grid{grid-template-columns:repeat(2,1fr)}
   .cta-final-inner{flex-direction:column;align-items:flex-start}
@@ -193,8 +209,10 @@ footer small{letter-spacing:.25em;font-size:7px}
   .mobile-nav{display:flex}
   .hero{padding:45px 0 65px}
   .hero h1{font-size:62px}
-  .hero-img{min-height:300px}
-  .hero-logo{width:min(320px,88vw);aspect-ratio:2.232}
+  .hero-carousel{min-height:300px}
+  .hero-arrow{width:34px;height:34px;font-size:17px}
+  .hero-arrow-prev{left:8px}
+  .hero-arrow-next{right:8px}
   .values{padding:28px 0}
   .values-grid{grid-template-columns:1fr 1fr;gap:18px}
   .explore{padding:52px 0 10px}
