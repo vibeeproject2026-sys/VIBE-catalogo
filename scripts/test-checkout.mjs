@@ -164,6 +164,36 @@ test("codifica el mensaje correctamente en la URL", () => {
   assert.ok(url.includes(encodeURIComponent("línea 1\nlínea 2 & más")));
 });
 
+console.log("WHATSAPP_NUMBER configurado (Fase 29.1 — número oficial de VIBE)");
+const OFFICIAL_WHATSAPP_NUMBER = "573143490825"; // +57 314 349 0825 normalizado
+test("app.js ya no contiene el placeholder de la Fase 29", () => {
+  const appSrc = fs.readFileSync(new URL("../js/app.js", import.meta.url), "utf8");
+  assert.ok(!appSrc.includes("57XXXXXXXXXX"), "el placeholder 57XXXXXXXXXX no debería seguir en el código");
+});
+test("WHATSAPP_NUMBER en app.js está normalizado: solo dígitos, sin +/espacios/guiones/paréntesis", () => {
+  const appSrc = fs.readFileSync(new URL("../js/app.js", import.meta.url), "utf8");
+  const m = appSrc.match(/const WHATSAPP_NUMBER = "([^"]*)"/);
+  assert.ok(m, "no se encontró la constante WHATSAPP_NUMBER en app.js");
+  assert.equal(m[1], OFFICIAL_WHATSAPP_NUMBER);
+  assert.match(m[1], /^\d+$/);
+});
+test("la guarda que bloquea WhatsApp sin número configurado sigue presente (sección 10 de la Fase 29.1)", () => {
+  const appSrc = fs.readFileSync(new URL("../js/app.js", import.meta.url), "utf8");
+  assert.ok(appSrc.includes('WHATSAPP_NUMBER.includes("X")'), "la guarda contra el placeholder debe seguir en el código");
+});
+test("el número oficial normalizado genera la URL wa.me correcta", () => {
+  const url = buildWhatsAppUrl(OFFICIAL_WHATSAPP_NUMBER, "hola");
+  assert.equal(url, "https://wa.me/573143490825?text=hola");
+});
+test("el número oficial completo nunca aparece dentro de un console.log/warn/error de app.js (no se loguea innecesariamente)", () => {
+  const appSrc = fs.readFileSync(new URL("../js/app.js", import.meta.url), "utf8");
+  const consoleCalls = appSrc.match(/console\.(log|error|warn|info)\([^;]*?\);/gs) || [];
+  consoleCalls.forEach((call) => {
+    assert.ok(!call.includes("WHATSAPP_NUMBER"), `un console.* no debería referenciar WHATSAPP_NUMBER: ${call}`);
+    assert.ok(!call.includes(OFFICIAL_WHATSAPP_NUMBER), `un console.* no debería imprimir el número completo: ${call}`);
+  });
+});
+
 console.log("sección 19 — abrir WhatsApp nunca afirma una compra/pago confirmado (guarda estático de regresión)");
 test("ni checkout.js ni app.js contienen frases que afirmen pedido/pago confirmado", () => {
   const appSrc = fs.readFileSync(new URL("../js/app.js", import.meta.url), "utf8");

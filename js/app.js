@@ -24,7 +24,10 @@ import {
 import { readStateFromSearch, buildUrl } from "./url-state.js";
 import { computeOrderSummary, validateCheckoutForm, buildWhatsAppMessage, buildWhatsAppUrl } from "./checkout.js";
 
-const WHATSAPP_NUMBER = "57XXXXXXXXXX";
+// Fase 29.1 — número oficial de WhatsApp de VIBE (provisto por Ana:
+// +57 314 349 0825), normalizado al formato que exige wa.me: solo
+// dígitos, con el indicativo de país al frente, sin +/espacios/guiones.
+const WHATSAPP_NUMBER = "573143490825";
 // Fase 27: se agregan los filtros/orden de la PLP. Todos arrancan
 // "apagados" — ningún filtro activo por defecto, igual que antes.
 const DEFAULT_FILTERS = {
