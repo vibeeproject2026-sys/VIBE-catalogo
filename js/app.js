@@ -5,7 +5,6 @@ import {
   getCategoriesInGroup,
   getSubcategories,
   filterProducts,
-  breadcrumbLabel,
   breadcrumbForState,
   selectFeatured,
   selectNew,
@@ -13,6 +12,14 @@ import {
   sortProducts,
   emptyStateCopy,
   activeFilterChips,
+  findProduct,
+  pdpPriceInfo,
+  pdpBadge,
+  pdpGalleryImages,
+  pdpContentSections,
+  breadcrumbForProduct,
+  selectRelated,
+  clampQuantity,
 } from "./taxonomy.js";
 import { readStateFromSearch, buildUrl } from "./url-state.js";
 
@@ -300,34 +307,148 @@ function closeCart() {
   $("#overlay").classList.add("hidden");
 }
 
-function openProduct(id) {
-  const p = state.products.find(x => x.id === id);
-  if (!p) return;
-  state.product = p;
-  state.variant = p.variants[0].id;
+// Fase 28 — PDP. El precio "que paga la clienta ahora": el promocional
+// cuando aplica (nunca calculado aquí, ya viene resuelto server-side en
+// state.product.promoPrice), si no el de la variante seleccionada. Solo
+// los productos demo tienen variantes con precios realmente distintos
+// entre sí (ej. tonos de labial) — y esos nunca tienen promoción real
+// detrás, así que ambos criterios nunca compiten entre sí en la práctica.
+function currentEffectivePrice() {
+  const p = state.product;
+  if (!p) return 0;
+  if (p.promoActive === true && p.promoPrice != null) return p.promoPrice;
+  return selected().price;
+}
+
+function pdpGalleryHtml(p) {
+  const images = pdpGalleryImages(p);
+  if (!images.length) {
+    // Sección 4 de la Fase 28: si no hay imagen real, nunca se inventa
+    // una ni se usa un emoji — un estado visual propio, deliberado.
+    return `<div class="pdp-no-image" aria-hidden="true"><span>VIBE</span></div>`;
+  }
+  const main = `<div class="pdp-gallery-main"><img id="pdpMainImage" class="detail-photo" src="${esc(images[0])}" alt="${esc(p.name)}" loading="eager"></div>`;
+  const thumbs =
+    images.length > 1
+      ? `<div class="pdp-thumbs">${images
+          .map(
+            (img, i) =>
+              `<button type="button" class="pdp-thumb${i === 0 ? " active" : ""}" data-thumb="${i}" aria-label="Imagen ${i + 1} de ${esc(p.name)}"><img src="${esc(img)}" alt="" loading="${i === 0 ? "eager" : "lazy"}"></button>`
+          )
+          .join("")}</div>`
+      : "";
+  return main + thumbs;
+}
+
+function pdpSectionsHtml(p) {
+  const sections = pdpContentSections(p);
+  if (!sections.length) return "";
+  return `<div class="pdp-sections">${sections
+    .map(
+      (s, i) => `<details class="pdp-accordion"${i === 0 ? " open" : ""}>
+      <summary>${esc(s.label)}</summary>
+      <div class="pdp-accordion-body">${s.key === "benefits" ? `<ul>${s.content.map((b) => `<li>${esc(b)}</li>`).join("")}</ul>` : `<p>${esc(s.content)}</p>`}</div>
+    </details>`
+    )
+    .join("")}</div>`;
+}
+
+function pdpRelatedHtml() {
+  const related = selectRelated(state.products, state.product);
+  if (!related.length) return "";
+  return `<div class="pdp-related">
+    <h3>También te puede interesar</h3>
+    <div class="grid">${related.map(productCard).join("")}</div>
+  </div>`;
+}
+
+// Construye la ficha completa asumiendo que state.product/state.variant
+// ya están asignados (ver openProduct). Separada de openProduct para
+// poder re-renderizar en el lugar cuando se abre un producto relacionado
+// sin cerrar/reabrir el diálogo.
+function renderProductDetail(p) {
   const unavailable = p.available === false;
-  $("#productDetail").innerHTML = `<div class="detail-img">${productImage(p, "detail-photo")}</div>
+  const priceInfo = pdpPriceInfo(p);
+  const badgeText = pdpBadge(p);
+  const hasVariants = p.variants.length > 1;
+
+  $("#productDetail").innerHTML = `<div class="detail-img pdp-gallery" data-gallery>${pdpGalleryHtml(p)}</div>
   <div class="detail-copy">
-    <p class="eyebrow">${esc(breadcrumbLabel(p))}</p>
+    <p class="breadcrumb pdp-breadcrumb">${esc(breadcrumbForProduct(p).join(" / "))}</p>
+    ${badgeText ? `<span class="pdp-badge">${esc(badgeText)}</span>` : ""}
+    ${p.brand ? `<p class="pdp-brand">${esc(p.brand)}</p>` : ""}
     <h2>${esc(p.name)}</h2>
-    <p class="description">${esc(p.description)}</p>
-    <strong class="price" id="detailPrice">${money(p.variants[0].price)}</strong>
+    ${p.shortDescription ? `<p class="pdp-short-desc">${esc(p.shortDescription)}</p>` : ""}
+    <div class="pdp-price">
+      <strong id="detailPrice">${money(currentEffectivePrice())}</strong>
+      ${priceInfo.showPromo ? `<span class="old">${money(priceInfo.originalPrice)}</span>` : ""}
+      ${priceInfo.discountPercent ? `<span class="pdp-discount">-${priceInfo.discountPercent}%</span>` : ""}
+    </div>
+    ${priceInfo.showPromo && p.promoText ? `<p class="pdp-promo-text">${esc(p.promoText)}</p>` : ""}
     ${unavailable ? `<span class="availability-badge">Agotado</span>` : ""}
-    <div class="variants">${p.variants.map(v => `<button class="variant ${v.id === state.variant ? "selected" : ""}" data-variant="${v.id}">${esc(v.name)}</button>`).join("")}</div>
-    <div class="section"><h3>Beneficios</h3><p>${p.benefits.map(esc).join(" · ")}</p></div>
-    ${p.ingredients ? `<div class="section"><h3>Ingredientes</h3><p>${esc(p.ingredients)}</p></div>` : ""}
-    <div class="section"><h3>Modo de uso</h3><p>${esc(p.usage)}</p></div>
-    <div class="section"><h3>Presentación</h3><p>${esc(p.presentation)}</p></div>
+    ${hasVariants ? `<div class="variants">${p.variants.map((v) => `<button type="button" class="variant ${v.id === state.variant ? "selected" : ""}" data-variant="${v.id}">${esc(v.name)}</button>`).join("")}</div>` : ""}
     <div class="detail-actions">
-      <div class="quantity"><button data-q="-1">−</button><input id="detailQty" type="number" min="1" value="1"><button data-q="1">+</button></div>
+      <div class="quantity">
+        <button type="button" data-q="-1" ${unavailable ? "disabled" : ""}>−</button>
+        <input id="detailQty" type="number" min="1" value="1" aria-label="Cantidad" ${unavailable ? "disabled" : ""}>
+        <button type="button" data-q="1" ${unavailable ? "disabled" : ""}>+</button>
+      </div>
       <button id="addButton" class="button dark" ${unavailable ? "disabled" : ""}>${unavailable ? "Agotado" : "Agregar al carrito"}</button>
     </div>
+    ${pdpSectionsHtml(p)}
+    ${pdpRelatedHtml()}
   </div>`;
-  $("#productDialog").showModal();
+  $("#productDetail").scrollTop = 0;
+}
+
+// Sección 22.B/C de la Fase 28: un id inexistente y un id de un producto
+// unpublished se ven exactamente igual desde el frontend — la API nunca
+// entrega productos unpublished en primer lugar (ver
+// api/catalog/products.js), así que state.products jamás los contiene.
+// Nunca se muestra información editorial de un producto que no llegó.
+function renderProductNotFound() {
+  $("#productDetail").innerHTML = `<div class="pdp-not-found">
+    <p class="eyebrow">VIBE</p>
+    <h2>Producto no encontrado</h2>
+    <p>Es posible que ya no esté disponible o que el enlace no sea correcto.</p>
+    <button type="button" class="button dark" id="pdpBackToCatalog">Ver catálogo</button>
+  </div>`;
+}
+
+// pushHistory=false se usa al reconstruir el estado desde la URL (carga
+// inicial de un link compartido, o navegación con back/forward) — en esos
+// casos la URL ya es la correcta y no debe empujarse una entrada nueva.
+function openProduct(id, { pushHistory = true } = {}) {
+  const p = findProduct(state.products, id);
+  if (!p) {
+    state.product = null;
+    renderProductNotFound();
+    if (!$("#productDialog").open) $("#productDialog").showModal();
+    return;
+  }
+  state.product = p;
+  state.variant = p.variants[0].id;
+  renderProductDetail(p);
+  if (pushHistory) {
+    try {
+      window.history.pushState({ vibeProduct: String(p.id) }, "", buildUrl(window.location.pathname, { ...state, product: p.id }));
+    } catch {
+      // history/URL APIs unavailable — no bloquea la apertura del producto.
+    }
+  }
+  if (!$("#productDialog").open) $("#productDialog").showModal();
 }
 
 function selected() {
   return state.product.variants.find(v => v.id === state.variant) || state.product.variants[0];
+}
+
+function selectGalleryThumb(thumb) {
+  const images = pdpGalleryImages(state.product);
+  const idx = Number(thumb.dataset.thumb);
+  const main = $("#pdpMainImage");
+  if (main && images[idx]) main.src = images[idx];
+  document.querySelectorAll(".pdp-thumb").forEach((t) => t.classList.toggle("active", t === thumb));
 }
 
 function bindProductGrid(id) {
@@ -444,6 +565,10 @@ $("#activeFilters").addEventListener("click", (e) => {
 
 bindProductGrid("#productGrid");
 bindProductGrid("#featuredGrid");
+// Fase 28: estas dos nunca estuvieron enlazadas desde la Fase 26 — hacer
+// clic en una tarjeta de Novedades o Promociones en Home no abría nada.
+bindProductGrid("#novedadesGrid");
+bindProductGrid("#promocionesGrid");
 
 $("#cartButton").onclick = openCart;
 $("#closeCart").onclick = closeCart;
@@ -468,21 +593,117 @@ $("#cartItems").addEventListener("click", e => {
 });
 
 $("#productDialog").addEventListener("click", e => {
+  if (e.target.id === "pdpBackToCatalog") {
+    $("#productDialog").close();
+    $("#catalogo").scrollIntoView({ behavior: "smooth" });
+    return;
+  }
+
+  const thumb = e.target.closest("[data-thumb]");
+  if (thumb) {
+    selectGalleryThumb(thumb);
+    return;
+  }
+
+  // Un producto relacionado (sección "También te puede interesar") usa
+  // el mismo atributo data-product que cualquier tarjeta del catálogo —
+  // reabre el PDP sobre el propio diálogo, sin cerrar/reabrir, en vez de
+  // duplicar el mecanismo de apertura.
+  const related = e.target.closest("[data-product]");
+  if (related) {
+    openProduct(related.dataset.product);
+    return;
+  }
+
   const v = e.target.closest("[data-variant]");
   if (v) {
     state.variant = v.dataset.variant;
     document.querySelectorAll(".variant").forEach(x => x.classList.toggle("selected", x.dataset.variant === state.variant));
-    $("#detailPrice").textContent = money(selected().price);
+    $("#detailPrice").textContent = money(currentEffectivePrice());
+    return;
   }
+
   const q = e.target.closest("[data-q]");
   if (q) {
     const i = $("#detailQty");
-    i.value = Math.max(1, (Number(i.value) || 1) + Number(q.dataset.q));
+    i.value = clampQuantity(i.value, q.dataset.q);
+    return;
   }
-  if (e.target.id === "addButton" && state.product.available !== false) {
-    addToCart(state.product, selected(), Math.max(1, Number($("#detailQty").value) || 1));
+
+  if (e.target.id === "addButton" && state.product && state.product.available !== false) {
+    const variant = selected();
+    const qty = Math.max(1, Number($("#detailQty").value) || 1);
+    // Respeta el precio efectivo (promocional cuando aplica), nunca el
+    // precio original de la variante — ver currentEffectivePrice().
+    addToCart(state.product, { ...variant, price: currentEffectivePrice() }, qty);
     $("#productDialog").close();
     openCart();
+  }
+});
+
+// Swipe táctil de la galería del PDP — mismo patrón ya usado en el Hero
+// (js/hero-carousel.js): puramente pasivo, nunca preventDefault, nunca
+// interfiere con el scroll vertical. Los listeners se registran una sola
+// vez sobre #productDialog (que nunca se destruye, a diferencia de su
+// contenido) y se acotan a [data-gallery] con closest().
+const PDP_SWIPE_THRESHOLD = 40;
+let pdpTouchStartX = null;
+let pdpTouchStartY = null;
+$("#productDialog").addEventListener(
+  "touchstart",
+  (e) => {
+    if (!e.target.closest("[data-gallery]")) return;
+    const t = e.touches[0];
+    pdpTouchStartX = t.clientX;
+    pdpTouchStartY = t.clientY;
+  },
+  { passive: true }
+);
+$("#productDialog").addEventListener(
+  "touchend",
+  (e) => {
+    if (pdpTouchStartX === null || !state.product) return;
+    const gallery = e.target.closest("[data-gallery]");
+    const t = e.changedTouches[0];
+    const deltaX = t.clientX - pdpTouchStartX;
+    const deltaY = t.clientY - pdpTouchStartY;
+    pdpTouchStartX = null;
+    pdpTouchStartY = null;
+    if (!gallery) return;
+    const images = pdpGalleryImages(state.product);
+    if (images.length < 2) return;
+    if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > PDP_SWIPE_THRESHOLD) {
+      const thumbs = [...document.querySelectorAll(".pdp-thumb")];
+      const current = thumbs.findIndex((t) => t.classList.contains("active"));
+      const nextIndex = deltaX < 0 ? Math.min(current + 1, images.length - 1) : Math.max(current - 1, 0);
+      if (thumbs[nextIndex]) thumbs[nextIndex].click();
+    }
+  },
+  { passive: true }
+);
+
+// Fase 28 — el producto abierto se refleja en la URL (compartible,
+// refresh-safe, back/forward), sin introducir un router nuevo: reutiliza
+// exactamente el mismo mecanismo de query params de la PLP (Fase 27).
+// Abrir empuja una entrada de historial nueva (ver openProduct) para que
+// el botón atrás del navegador cierre el PDP en vez de salir del sitio;
+// cerrar por cualquier vía (X, Escape, agregar al carrito) pasa siempre
+// por este único evento nativo 'close' del <dialog>.
+let suppressHistoryOnClose = false;
+$("#productDialog").addEventListener("close", () => {
+  state.product = null;
+  if (suppressHistoryOnClose) {
+    suppressHistoryOnClose = false;
+    return;
+  }
+  try {
+    if (window.history.state && window.history.state.vibeProduct) {
+      window.history.back();
+    } else {
+      window.history.replaceState(null, "", buildUrl(window.location.pathname, { ...state, product: null }));
+    }
+  } catch {
+    // history/URL APIs unavailable — el diálogo ya se cerró de todos modos.
   }
 });
 
@@ -528,8 +749,10 @@ onScroll();
 // catalog data — no reason to make it wait on the network.
 renderCart();
 
-async function loadCatalog() {
-  const urlState = readStateFromSearch(window.location.search);
+// Compartida entre la carga inicial y popstate (back/forward): vuelca los
+// campos de filtro/orden de la URL al estado en memoria. No toca
+// state.product — eso lo maneja cada llamador según corresponda.
+function applyUrlToFilterState(urlState) {
   state.group = urlState.group;
   state.category = urlState.category;
   state.subcategory = urlState.subcategory;
@@ -540,6 +763,32 @@ async function loadCatalog() {
   state.newOnly = urlState.newOnly;
   state.sort = urlState.sort;
   $("#searchInput").value = state.search;
+}
+
+// Fase 28 — back/forward: como abrir un producto empuja una entrada de
+// historial (ver openProduct), navegar con los botones del navegador
+// dispara este evento nativo. Se reconstruye todo el estado (filtros +
+// producto) desde la URL de destino, nunca se asume qué había antes.
+window.addEventListener("popstate", () => {
+  if (!state.products.length) return; // el catálogo aún no cargó — nada que reconciliar todavía
+  const urlState = readStateFromSearch(window.location.search);
+  applyUrlToFilterState(urlState);
+  renderNav();
+  renderProducts();
+
+  if (urlState.product) {
+    if (!state.product || String(state.product.id) !== String(urlState.product)) {
+      openProduct(urlState.product, { pushHistory: false });
+    }
+  } else if ($("#productDialog").open) {
+    suppressHistoryOnClose = true;
+    $("#productDialog").close();
+  }
+});
+
+async function loadCatalog() {
+  const urlState = readStateFromSearch(window.location.search);
+  applyUrlToFilterState(urlState);
 
   $("#productGrid").innerHTML = `<p class="empty">Cargando catálogo...</p>`;
   $("#featuredGrid").innerHTML = `<p class="empty">Cargando selección...</p>`;
@@ -562,6 +811,15 @@ async function loadCatalog() {
   renderNovedades();
   renderPromociones();
   renderCategoryShowcase();
+
+  // Fase 28 — link compartido de un producto (?product=<id>): la URL ya
+  // es la correcta en este punto, así que no se empuja una entrada nueva
+  // de historial. Si el id no existe (o no está publicado — la API nunca
+  // lo habría incluido en state.products), openProduct() ya sabe mostrar
+  // el estado "producto no encontrado" en vez de fallar en silencio.
+  if (urlState.product) {
+    openProduct(urlState.product, { pushHistory: false });
+  }
 }
 
 loadCatalog();

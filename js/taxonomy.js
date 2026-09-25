@@ -199,3 +199,119 @@ export function activeFilterChips(state = {}) {
   if (state.search) chips.push({ key: "search", label: `"${state.search}"` });
   return chips;
 }
+
+// ==========================================================================
+// Fase 28 — PDP (Product Detail Page). Misma disciplina que el resto de
+// este archivo: lógica pura, sin DOM, reutilizando groupOf/categoryOf/
+// byEditorialOrderThenName ya definidos arriba. app.js solo la consume
+// para construir el HTML — ninguna de estas funciones inventa contenido:
+// cuando un campo no existe, simplemente no aparece en el resultado.
+// ==========================================================================
+
+// Busca un producto por id de forma robusta frente a tipos: los ids reales
+// del POS llegan como número (Supabase/Postgres), pero cualquier id leído
+// desde un atributo data-* del DOM o desde la URL siempre es string. Antes
+// de esta fase, app.js comparaba con === directamente, lo que hacía que
+// abrir un producto real (id numérico) desde su tarjeta nunca funcionara.
+export function findProduct(products, id) {
+  return products.find((p) => String(p.id) === String(id)) || null;
+}
+
+// Precio efectivo del PDP: mismo criterio que effectivePrice() (más
+// arriba, usado por sortProducts) y que productCard() en app.js — nunca
+// calcula un descuento por su cuenta si no hay promoPrice real. El
+// porcentaje de descuento usa una única regla matemática explícita y
+// consistente (redondeo estándar), y solo se muestra si da un número
+// mayor a 0.
+export function pdpPriceInfo(p) {
+  const showPromo = p.promoActive === true && p.promoPrice != null;
+  let discountPercent = null;
+  if (showPromo && p.price > 0) {
+    const pct = Math.round((1 - p.promoPrice / p.price) * 100);
+    if (pct > 0) discountPercent = pct;
+  }
+  return {
+    currentPrice: showPromo ? p.promoPrice : p.price,
+    originalPrice: showPromo ? p.price : null,
+    showPromo,
+    discountPercent,
+  };
+}
+
+// Mismo criterio de badge que productCard() en app.js: el badge editorial
+// (ej. "Nuevo") siempre tiene prioridad; el de promoción solo se usa
+// cuando no hay ninguno editorial asignado.
+export function pdpBadge(p) {
+  const showPromo = p.promoActive === true && p.promoPrice != null;
+  return p.badge || (showPromo ? p.promoText || "Promo" : null);
+}
+
+// Galería: imagen principal + adicionales de catalog_metadata, sin
+// duplicados y sin inventar ninguna. Si no hay ninguna imagen real, el
+// resultado es un arreglo vacío — app.js decide el estado visual de
+// ausencia, nunca esta función.
+export function pdpGalleryImages(p) {
+  const all = [p.image, ...(Array.isArray(p.images) ? p.images : [])].filter(Boolean);
+  return [...new Set(all)];
+}
+
+// Orden editorial fijo de la ficha (sección 12 de la Fase 28). Cada bloque
+// solo aparece si tiene contenido real: nunca "próximamente" ni texto
+// genérico. `benefits` es una lista — solo cuenta como presente si tiene
+// al menos un elemento real.
+const PDP_SECTIONS = [
+  { key: "description", label: "Descripción" },
+  { key: "benefits", label: "Beneficios" },
+  { key: "usage", label: "Cómo usar" },
+  { key: "ingredients", label: "Ingredientes" },
+  { key: "presentation", label: "Presentación" },
+];
+export function pdpContentSections(p) {
+  return PDP_SECTIONS.map(({ key, label }) => ({ key, label, content: p[key] })).filter(({ key, content }) =>
+    key === "benefits" ? Array.isArray(content) && content.length > 0 : Boolean(content)
+  );
+}
+
+// Breadcrumb del PDP: Inicio / Grupo / Categoría / Producto (sección 3 de
+// la Fase 28) — misma prioridad editorial que breadcrumbLabel/categoryOf,
+// nunca inventa un nivel que el producto no tenga.
+export function breadcrumbForProduct(p) {
+  const parts = ["Inicio"];
+  const group = groupOf(p);
+  const category = categoryOf(p);
+  if (group) parts.push(group);
+  if (category && category !== group) parts.push(category);
+  parts.push(p.name);
+  return parts;
+}
+
+// Productos relacionados: regla real y reproducible, sin aleatoriedad ni
+// popularidad inventada. Prioriza coincidencias más específicas (misma
+// subcategoría) sobre las más amplias (misma categoría editorial, luego
+// misma marca), y solo entre productos publicados y disponibles. Si nada
+// coincide, devuelve un arreglo vacío — app.js oculta la sección entera en
+// ese caso, nunca muestra un "también te puede gustar" sin productos.
+export function selectRelated(products, product, { limit = 4 } = {}) {
+  if (!product) return [];
+  const productCategory = categoryOf(product);
+  const scored = products
+    .filter((p) => p.id !== product.id && p.available !== false)
+    .map((p) => {
+      let score = 0;
+      if (product.subcategory && p.subcategory === product.subcategory) score += 3;
+      if (productCategory && categoryOf(p) === productCategory) score += 2;
+      if (product.brand && p.brand === product.brand) score += 1;
+      return { p, score };
+    })
+    .filter((x) => x.score > 0);
+  return scored
+    .sort((a, b) => b.score - a.score || byEditorialOrderThenName(a.p, b.p))
+    .slice(0, limit)
+    .map((x) => x.p);
+}
+
+// Stepper de cantidad del PDP: nunca permite bajar de 1. Extraída como
+// función pura para poder testearla sin DOM.
+export function clampQuantity(qty, delta) {
+  return Math.max(1, (Number(qty) || 1) + Number(delta));
+}

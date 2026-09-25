@@ -22,6 +22,10 @@ export function readStateFromSearch(search) {
     featuredOnly: params.get("featured") === "true",
     newOnly: params.get("new") === "true",
     sort: params.get("sort") || "relevance",
+    // Fase 28 — PDP: id del producto abierto, si lo hay. Siempre string
+    // (o null) porque viene de un query param — ver findProduct() en
+    // taxonomy.js para la comparación robusta contra ids numéricos reales.
+    product: params.get("product") || null,
   };
 }
 
@@ -38,6 +42,12 @@ export function buildUrl(pathname, state) {
   if (state.featuredOnly) params.set("featured", "true");
   if (state.newOnly) params.set("new", "true");
   if (state.sort && state.sort !== "relevance") params.set("sort", state.sort);
+  // state.product puede llegar como id (string/number, uso de la Fase 28
+  // en app.js) o como el objeto producto completo (uso legado de
+  // state.product en el resto de la app) — se normaliza aquí para que
+  // buildUrl nunca dependa de cuál de los dos le llegó.
+  const productId = state.product && typeof state.product === "object" ? state.product.id : state.product;
+  if (productId) params.set("product", productId);
   const qs = params.toString();
   return `${pathname}${qs ? "?" + qs : ""}#catalogo`;
 }

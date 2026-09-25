@@ -67,6 +67,9 @@ function normalizeDemoProduct(p) {
     // catalog_metadata row yet.
     editorialCategory: null,
     editorialOrder: p.editorialOrder ?? null,
+    // Los productos demo no tienen marca curada — null, igual que un
+    // producto real sin catalog_metadata.brand asignado todavía.
+    brand: p.brand ?? null,
     // Los productos demo nunca tienen una promoción real del POS detrás.
     promoActive: false,
     promoPrice: null,
@@ -102,6 +105,11 @@ function normalizeApiProduct(p) {
     image: p.image ?? null,
     images: Array.isArray(p.images) ? p.images : [],
     imageLabel: "VIBE",
+    // Fase 28 — faltaba en Fase 26: catalog_metadata.brand ya se
+    // seleccionaba y devolvía en la API (ver api/catalog/_lib/merge.js)
+    // pero nunca se pasaba al frontend. Sin este campo, el PDP no podía
+    // mostrar "Marca" ni usarla para productos relacionados.
+    brand: p.brand ?? null,
     badge: p.badge ?? null,
     featured: Boolean(p.featured),
     editorialOrder: p.editorialOrder ?? null,

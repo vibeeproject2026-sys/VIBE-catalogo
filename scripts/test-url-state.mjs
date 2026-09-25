@@ -23,7 +23,7 @@ function test(name, fn) {
   }
 }
 
-const DEFAULTS = { group: "Todos", category: "Todos", subcategory: "Todos", search: "", available: false, promo: false, featuredOnly: false, newOnly: false, sort: "relevance" };
+const DEFAULTS = { group: "Todos", category: "Todos", subcategory: "Todos", search: "", available: false, promo: false, featuredOnly: false, newOnly: false, sort: "relevance", product: null };
 
 console.log("readStateFromSearch (simula un refresh / link compartido)");
 test("querystring vacío -> todo en su default", () => {
@@ -52,6 +52,15 @@ test("lee sort cuando está presente", () => {
   assert.equal(readStateFromSearch("?sort=price-asc").sort, "price-asc");
 });
 
+console.log("readStateFromSearch — producto (Fase 28, PDP)");
+test("lee product cuando está presente en la URL", () => {
+  assert.equal(readStateFromSearch("?product=56").product, "56");
+});
+test("sin product en la URL, cae a null (no a undefined ni string vacío)", () => {
+  assert.equal(readStateFromSearch("").product, null);
+  assert.equal(readStateFromSearch("?group=Skincare").product, null);
+});
+
 console.log("buildUrl");
 test("sin selección activa, la URL solo lleva el hash del catálogo", () => {
   const url = buildUrl("/", DEFAULTS);
@@ -71,6 +80,24 @@ test("sort='relevance' (el default) no ensucia la URL", () => {
   assert.equal(url, "/#catalogo");
 });
 
+console.log("buildUrl — producto (Fase 28, PDP)");
+test("agrega product a la URL cuando state.product es un id", () => {
+  const url = buildUrl("/", { ...DEFAULTS, product: 56 });
+  assert.equal(url, "/?product=56#catalogo");
+});
+test("agrega product a la URL cuando state.product es el objeto producto completo", () => {
+  const url = buildUrl("/", { ...DEFAULTS, product: { id: 56, name: "Cualquiera" } });
+  assert.equal(url, "/?product=56#catalogo");
+});
+test("product convive con filtros/orden activos en la misma URL", () => {
+  const url = buildUrl("/", { ...DEFAULTS, group: "Maquillaje", sort: "price-asc", product: 56 });
+  assert.equal(url, "/?group=Maquillaje&sort=price-asc&product=56#catalogo");
+});
+test("sin producto abierto, no aparece product en la URL", () => {
+  const url = buildUrl("/", DEFAULTS);
+  assert.equal(url, "/#catalogo");
+});
+
 console.log("round-trip (lo que pasa en un refresh real)");
 test("buildUrl -> readStateFromSearch reproduce el mismo estado de filtros clásicos", () => {
   const original = { ...DEFAULTS, group: "Skincare", subcategory: "Hidratación", search: "mist" };
@@ -81,6 +108,13 @@ test("buildUrl -> readStateFromSearch reproduce el mismo estado de filtros clás
 });
 test("round-trip también con los filtros/orden nuevos de Fase 27 combinados", () => {
   const original = { ...DEFAULTS, group: "Maquillaje", available: true, promo: true, sort: "editorial" };
+  const url = buildUrl("/", original);
+  const queryPart = url.split("#")[0].split("?")[1] || "";
+  const roundTripped = readStateFromSearch("?" + queryPart);
+  assert.deepEqual(roundTripped, original);
+});
+test("round-trip de un link de producto compartido (Fase 28)", () => {
+  const original = { ...DEFAULTS, group: "Maquillaje", product: "56" };
   const url = buildUrl("/", original);
   const queryPart = url.split("#")[0].split("?")[1] || "";
   const roundTripped = readStateFromSearch("?" + queryPart);

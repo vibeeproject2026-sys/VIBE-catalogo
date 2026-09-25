@@ -204,19 +204,53 @@ dialog::backdrop{background:#000d}
 .detail-img{min-height:520px;background:#111;display:grid;place-items:center;text-align:center;color:#aaa;padding:0;overflow:hidden}
 .detail-photo{width:100%;height:100%;min-height:520px;object-fit:cover;display:block}
 .detail-copy{padding:45px 38px}
-.detail-copy .eyebrow{color:var(--pink)}
 .detail-copy h2{font-size:38px;line-height:1;margin:0 0 10px}
-.detail-copy .description{color:#aaa}
-.section{border-top:1px solid #292929;margin-top:20px;padding-top:18px}
-.section h3{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--pink)}
-.section p{font-size:13px;color:#aaa}
 .variants{display:flex;gap:8px;flex-wrap:wrap;margin:20px 0}
 .variant{border:1px solid #333;background:transparent;color:#fff;border-radius:999px;padding:9px 13px;font-size:12px}
 .variant.selected{background:var(--pink);border-color:var(--pink)}
 .detail-actions{display:grid;grid-template-columns:120px 1fr;gap:10px;margin-top:24px}
 .quantity{display:flex;border:1px solid #333;border-radius:999px;overflow:hidden}
 .quantity button{border:0;background:transparent;color:#fff;width:35px}
+.quantity button:disabled{opacity:.4}
 .quantity input{width:45px;border:0;text-align:center;outline:0;background:transparent;color:#fff}
+
+/* Fase 28 — PDP: la galería reemplaza el centrado simple de .detail-img
+   por una columna (imagen principal + thumbnails), reutilizando .detail-
+   img/.detail-photo tal cual para el tamaño/recorte de la imagen
+   principal (misma regla mobile que ya existía en @media(max-width:640px)). */
+.pdp-gallery{display:flex;flex-direction:column;height:100%}
+.pdp-gallery-main{flex:1;min-height:0;position:relative;overflow:hidden}
+.pdp-no-image{width:100%;height:100%;min-height:520px;display:grid;place-items:center;background:linear-gradient(160deg,#151515,#0b0b0b);color:var(--pink);font-weight:800;letter-spacing:.16em;font-size:14px}
+.pdp-thumbs{display:flex;gap:8px;padding:10px;overflow-x:auto;background:#0d0d0d;scrollbar-width:none}
+.pdp-thumbs::-webkit-scrollbar{display:none}
+.pdp-thumb{flex:0 0 56px;width:56px;height:56px;border-radius:10px;overflow:hidden;border:2px solid transparent;padding:0;background:#111;cursor:pointer}
+.pdp-thumb.active{border-color:var(--pink)}
+.pdp-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+
+.pdp-breadcrumb{margin-bottom:16px}
+.pdp-badge{display:inline-block;position:static;background:var(--pink);color:#fff;font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:4px 10px;border-radius:999px;margin-bottom:10px}
+.pdp-brand{margin:0 0 6px;font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#aaa}
+.pdp-short-desc{color:#ccc;font-size:14px;margin:0 0 16px}
+.pdp-price{display:flex;align-items:baseline;flex-wrap:wrap;gap:10px;margin:4px 0}
+.pdp-price strong{font-size:30px;font-weight:800}
+.pdp-discount{background:var(--pink);color:#fff;font-size:11px;font-weight:800;padding:3px 9px;border-radius:999px}
+.pdp-promo-text{color:var(--pink);font-size:13px;font-weight:700;margin:0 0 12px}
+
+.pdp-sections{margin-top:22px}
+.pdp-accordion{border-top:1px solid #292929;padding:16px 0}
+.pdp-accordion summary{cursor:pointer;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--pink);font-weight:800}
+.pdp-accordion-body{font-size:13px;color:#aaa;padding-top:12px;line-height:1.6}
+.pdp-accordion-body ul{margin:0;padding-left:18px}
+.pdp-accordion-body li{margin-bottom:4px}
+
+.pdp-related{margin-top:32px;border-top:1px solid #292929;padding-top:24px}
+.pdp-related h3{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--pink);margin:0 0 16px}
+.pdp-related .grid{grid-template-columns:repeat(2,1fr);gap:14px}
+
+.pdp-not-found{grid-column:1/-1;padding:70px 38px;text-align:center}
+.pdp-not-found .eyebrow{color:var(--pink)}
+.pdp-not-found h2{font-size:26px;margin:8px 0 10px}
+.pdp-not-found p{color:#aaa;margin:0 0 22px}
 
 #checkoutDialog{width:min(560px,calc(100% - 28px))}
 #checkoutForm{padding:28px;display:grid;gap:16px}
@@ -310,5 +344,8 @@ footer small{letter-spacing:.25em;font-size:7px}
   .detail-actions{grid-template-columns:1fr}
   #productDetail{grid-template-columns:1fr}
   .detail-img,.detail-photo{min-height:330px}
+  .pdp-no-image{min-height:330px}
+  .pdp-price strong{font-size:24px}
+  .pdp-related .grid{grid-template-columns:1fr 1fr;gap:12px}
   footer .wrap{flex-direction:column;align-items:flex-start;gap:16px}
 }

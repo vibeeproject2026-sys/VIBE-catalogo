@@ -24,6 +24,14 @@ const {
   sortProducts,
   emptyStateCopy,
   activeFilterChips,
+  findProduct,
+  pdpPriceInfo,
+  pdpBadge,
+  pdpGalleryImages,
+  pdpContentSections,
+  breadcrumbForProduct,
+  selectRelated,
+  clampQuantity,
 } = await import("data:text/javascript," + encodeURIComponent(src));
 
 let passed = 0;
@@ -347,6 +355,160 @@ test("cada filtro activo produce su propio chip removible individualmente", () =
     chips.map((c) => c.key),
     ["group", "available", "promo", "search"]
   );
+});
+
+console.log("findProduct (Fase 28 — PDP, TEST 1/2/3/20/23: lookup robusto)");
+const idFixture = [
+  { id: 56, name: "Producto real", available: true },
+  { id: "cleanser", name: "Producto demo", available: true },
+];
+test("encuentra un producto con id numérico (POS) a partir de un id string (URL/dataset)", () => {
+  // Este es el bug real encontrado en la auditoría de la Fase 28: antes de
+  // findProduct(), app.js comparaba con === directo y nunca encontraba un
+  // producto real (id numérico) a partir de un data-product/URL (string).
+  assert.equal(findProduct(idFixture, "56").id, 56);
+});
+test("encuentra un producto demo con id string", () => {
+  assert.equal(findProduct(idFixture, "cleanser").name, "Producto demo");
+});
+test("un id inexistente devuelve null, nunca undefined ni lanza (producto inexistente / unpublished)", () => {
+  assert.equal(findProduct(idFixture, "999"), null);
+});
+
+console.log("pdpPriceInfo (Fase 28 — TEST 13/14: precio y promoción del PDP)");
+test("sin promoción, currentPrice es el precio de lista y no hay descuento", () => {
+  const r = pdpPriceInfo({ price: 18000, promoActive: false, promoPrice: null });
+  assert.deepEqual(r, { currentPrice: 18000, originalPrice: null, showPromo: false, discountPercent: null });
+});
+test("con promoción real, currentPrice es el promocional y originalPrice queda visible", () => {
+  const r = pdpPriceInfo({ price: 100000, promoActive: true, promoPrice: 75000 });
+  assert.equal(r.currentPrice, 75000);
+  assert.equal(r.originalPrice, 100000);
+  assert.equal(r.showPromo, true);
+});
+test("el descuento usa una única regla matemática explícita y consistente", () => {
+  assert.equal(pdpPriceInfo({ price: 100000, promoActive: true, promoPrice: 75000 }).discountPercent, 25);
+  assert.equal(pdpPriceInfo({ price: 20000, promoActive: true, promoPrice: 15000 }).discountPercent, 25);
+});
+test("promoActive=true sin promoPrice real NO se trata como promoción (nunca inventa un descuento)", () => {
+  const r = pdpPriceInfo({ price: 18000, promoActive: true, promoPrice: null });
+  assert.equal(r.showPromo, false);
+  assert.equal(r.currentPrice, 18000);
+});
+
+console.log("pdpBadge (Fase 28 — TEST 16: mismo criterio que la PLP, sin duplicar)");
+test("el badge editorial tiene prioridad sobre el de promoción", () => {
+  assert.equal(pdpBadge({ badge: "Nuevo", promoActive: true, promoPrice: 100, promoText: "Flash" }), "Nuevo");
+});
+test("sin badge editorial, usa promoText si hay promoción real", () => {
+  assert.equal(pdpBadge({ badge: null, promoActive: true, promoPrice: 100, promoText: "Flash" }), "Flash");
+});
+test("promoción real sin promoText -> 'Promo' genérico, nunca copy inventado", () => {
+  assert.equal(pdpBadge({ badge: null, promoActive: true, promoPrice: 100, promoText: null }), "Promo");
+});
+test("sin badge ni promoción, null (no se muestra ningún badge)", () => {
+  assert.equal(pdpBadge({ badge: null, promoActive: false, promoPrice: null }), null);
+});
+
+console.log("pdpGalleryImages (Fase 28 — TEST 4/5: galería)");
+test("combina image + images sin duplicar", () => {
+  assert.deepEqual(pdpGalleryImages({ image: "a.jpg", images: ["a.jpg", "b.jpg"] }), ["a.jpg", "b.jpg"]);
+});
+test("solo image, sin adicionales", () => {
+  assert.deepEqual(pdpGalleryImages({ image: "a.jpg", images: [] }), ["a.jpg"]);
+});
+test("sin ninguna imagen real, arreglo vacío (nunca se inventa una)", () => {
+  assert.deepEqual(pdpGalleryImages({ image: null, images: [] }), []);
+});
+
+console.log("pdpContentSections (Fase 28 — TEST 8/9/10/11/12: bloques editoriales opcionales)");
+test("con metadata completa, los 5 bloques en el orden definido", () => {
+  const r = pdpContentSections({
+    description: "Desc",
+    benefits: ["B1", "B2"],
+    usage: "Usar así",
+    ingredients: "Agua, glicerina",
+    presentation: "30 ml",
+  });
+  assert.deepEqual(r.map((s) => s.key), ["description", "benefits", "usage", "ingredients", "presentation"]);
+});
+test("con metadata parcial (solo description), muestra un único bloque — no 5 bloques vacíos", () => {
+  const r = pdpContentSections({ description: "Solo esto", benefits: [], usage: null, ingredients: null, presentation: null });
+  assert.deepEqual(r.map((s) => s.key), ["description"]);
+});
+test("benefits vacío ([]) cuenta como ausente, igual que null", () => {
+  const r = pdpContentSections({ description: null, benefits: [], usage: null, ingredients: null, presentation: null });
+  assert.deepEqual(r, []);
+});
+test("sin ningún campo editorial, arreglo vacío (nunca 'próximamente')", () => {
+  assert.deepEqual(pdpContentSections({}), []);
+});
+
+console.log("breadcrumbForProduct (Fase 28 — sección 3: Inicio / Grupo / Categoría / Producto)");
+test("usa editorialCategory antes que la categoría POS, y siempre termina en el nombre del producto", () => {
+  const p = { name: "Mascarilla Facial", categoryGroup: "Maquillaje", category: "Labios", editorialCategory: "Skincare" };
+  assert.deepEqual(breadcrumbForProduct(p), ["Inicio", "Maquillaje", "Skincare", "Mascarilla Facial"]);
+});
+test("sin editorialCategory, usa la categoría POS tal cual", () => {
+  const p = { name: "VIBE Lover Lips", categoryGroup: "Maquillaje", category: "Labios", editorialCategory: null };
+  assert.deepEqual(breadcrumbForProduct(p), ["Inicio", "Maquillaje", "Labios", "VIBE Lover Lips"]);
+});
+test("colapsa el nivel de categoría si es igual al grupo (demo)", () => {
+  const p = { name: "Daily Glow Cleanser", categoryGroup: "Skincare", category: "Skincare", editorialCategory: null };
+  assert.deepEqual(breadcrumbForProduct(p), ["Inicio", "Skincare", "Daily Glow Cleanser"]);
+});
+
+console.log("selectRelated (Fase 28 — TEST 21/22: regla real, reproducible, sin aleatoriedad)");
+const relatedFixture = [
+  { id: 1, name: "Base", subcategory: "Labios", editorialCategory: "Maquillaje", category: "Maquillaje", brand: "VIBE", available: true },
+  { id: 2, name: "Misma subcategoría", subcategory: "Labios", editorialCategory: "Maquillaje", category: "Maquillaje", brand: "Otra", available: true },
+  { id: 3, name: "Misma categoría, otra sub", subcategory: "Rostro", editorialCategory: "Maquillaje", category: "Maquillaje", brand: "Otra", available: true },
+  { id: 4, name: "Misma marca solamente", subcategory: "Skincare", editorialCategory: "Skincare", category: "Skincare", brand: "VIBE", available: true },
+  { id: 5, name: "Sin relación real", subcategory: "Accesorios", editorialCategory: "Accesorios", category: "Accesorios", brand: "Otra", available: true },
+  { id: 6, name: "Coincide pero agotado", subcategory: "Labios", editorialCategory: "Maquillaje", category: "Maquillaje", brand: "Otra", available: false },
+];
+test("prioriza misma subcategoría > misma categoría editorial > misma marca", () => {
+  const r = selectRelated(relatedFixture, relatedFixture[0]);
+  assert.deepEqual(r.map((p) => p.id), [2, 3, 4]);
+});
+test("nunca se incluye a sí mismo", () => {
+  const r = selectRelated(relatedFixture, relatedFixture[0]);
+  assert.ok(!r.some((p) => p.id === 1));
+});
+test("excluye productos sin disponibilidad, aunque coincidan", () => {
+  const r = selectRelated(relatedFixture, relatedFixture[0]);
+  assert.ok(!r.some((p) => p.id === 6));
+});
+test("productos sin ninguna relación real quedan fuera (nunca se rellena con lo que sea)", () => {
+  const r = selectRelated(relatedFixture, relatedFixture[0]);
+  assert.ok(!r.some((p) => p.id === 5));
+});
+test("sin ningún producto elegible, arreglo vacío — la sección debe ocultarse por completo", () => {
+  assert.deepEqual(selectRelated([relatedFixture[0]], relatedFixture[0]), []);
+});
+test("es determinístico: misma entrada produce siempre el mismo orden (sin Math.random)", () => {
+  const a = selectRelated(relatedFixture, relatedFixture[0]).map((p) => p.id);
+  const b = selectRelated(relatedFixture, relatedFixture[0]).map((p) => p.id);
+  assert.deepEqual(a, b);
+});
+test("sin producto de referencia, arreglo vacío", () => {
+  assert.deepEqual(selectRelated(relatedFixture, null), []);
+});
+
+console.log("clampQuantity (Fase 28 — TEST 16/17/18: cantidad mínima 1)");
+test("incrementa normalmente", () => {
+  assert.equal(clampQuantity(2, 1), 3);
+});
+test("decrementa normalmente", () => {
+  assert.equal(clampQuantity(2, -1), 1);
+});
+test("nunca baja de 1", () => {
+  assert.equal(clampQuantity(1, -1), 1);
+  assert.equal(clampQuantity(1, -5), 1);
+});
+test("un valor inválido en el input (NaN/vacío) se trata como 1 antes de aplicar el delta", () => {
+  assert.equal(clampQuantity("", 1), 2);
+  assert.equal(clampQuantity(undefined, 1), 2);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);
