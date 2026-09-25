@@ -1,15 +1,15 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1920">
   <defs>
     <linearGradient id="g2" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#fff5f9"/>
       <stop offset="100%" stop-color="#ffe3f0"/>
     </linearGradient>
   </defs>
-  <rect width="1600" height="1000" fill="url(#g2)"/>
-  <circle cx="1350" cy="780" r="320" fill="#FF007A" opacity=".08"/>
-  <circle cx="180" cy="150" r="180" fill="#FF007A" opacity=".06"/>
-  <text x="130" y="440" font-family="Arial,Helvetica,sans-serif" font-size="34" letter-spacing="10" fill="#FF007A" font-weight="700">RITUAL SKINCARE</text>
-  <text x="120" y="570" font-family="Arial,Helvetica,sans-serif" font-size="122" letter-spacing="-4" fill="#111111" font-weight="800">Cuida tu</text>
-  <text x="120" y="690" font-family="Arial,Helvetica,sans-serif" font-size="122" letter-spacing="-4" fill="#111111" font-weight="800">esencia</text>
-  <text x="130" y="760" font-family="Arial,Helvetica,sans-serif" font-size="30" fill="#7a7a7a">Placeholder — pieza gráfica final a cargo del equipo creativo VIBE</text>
+  <rect width="1080" height="1920" fill="url(#g2)"/>
+  <circle cx="920" cy="1550" r="320" fill="#FF007A" opacity=".08"/>
+  <circle cx="140" cy="260" r="200" fill="#FF007A" opacity=".06"/>
+  <text x="90" y="740" font-family="Arial,Helvetica,sans-serif" font-size="28" letter-spacing="8" fill="#FF007A" font-weight="700">RITUAL SKINCARE</text>
+  <text x="86" y="860" font-family="Arial,Helvetica,sans-serif" font-size="92" letter-spacing="-3" fill="#111111" font-weight="800">Cuida tu</text>
+  <text x="86" y="965" font-family="Arial,Helvetica,sans-serif" font-size="92" letter-spacing="-3" fill="#111111" font-weight="800">esencia</text>
+  <text x="90" y="1030" font-family="Arial,Helvetica,sans-serif" font-size="24" fill="#7a7a7a">Placeholder 9:16 — pieza gráfica final a cargo del equipo creativo VIBE</text>
 </svg>

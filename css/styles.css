@@ -62,17 +62,22 @@ header.scrolled .logo-image{width:126px;height:50px}
    ver abajo) se usa object-fit:contain — la pieza creativa completa es
    la prioridad, nunca recortarla.
 
-   Recomendación para las piezas reales que suba VIBE más adelante (no
+   Formato editorial definido (Fase 1.1): 1080x1920px, proporción 9:16
+   — es el que deben usar las piezas reales para el Hero mobile. Con ese
+   formato, el letterboxing en "contain" queda mínimo o nulo en la
+   mayoría de los teléfonos (su viewport es parecido a 9:16, aunque casi
+   ningún modelo lo iguala exactamente).
+
+   Recomendación general si llega una pieza en otro formato (no
    implementado como sistema, solo documentado aquí):
-     - verticales (retrato, ej. 4:5 o 9:16): las que mejor aprovechan el
-       alto del hero mobile — llenan el ancho con letterboxing mínimo o
-       nulo.
-     - horizontales (paisaje, ej. 16:9): se verán con franjas de fondo
-       arriba/abajo (letterbox) en el hero mobile, porque el contenedor
-       es más alto que ancho — la imagen se ve completa, sin recorte,
-       pero no llena todo el alto disponible.
-     - cuadradas (1:1): comportamiento intermedio, con franjas
-       arriba/abajo más pequeñas que una horizontal. */
+     - verticales (ej. 4:5, más "cuadrada" que 9:16): algo de
+       letterboxing arriba/abajo, menor que una horizontal.
+     - horizontales (paisaje, ej. 16:9): letterboxing notorio
+       arriba/abajo en el hero mobile, porque el contenedor es mucho más
+       alto que ancho — la imagen se ve completa, sin recorte, pero no
+       llena todo el alto disponible.
+     - cuadradas (1:1): letterboxing intermedio, mayor que 9:16 pero
+       menor que una horizontal. */
 .hero-slide img{width:100%;height:100%;object-fit:cover;display:block}
 
 @media(prefers-reduced-motion:reduce){
@@ -236,17 +241,29 @@ footer small{letter-spacing:.25em;font-size:7px}
   /* "Gran escaparate": el carrusel rompe el gutter de .wrap (14px por
      lado en este breakpoint) para llegar borde a borde, y ocupa
      prácticamente todo el alto disponible bajo el header (78px fijo en
-     este breakpoint) usando dvh para evitar el bug clásico de 100vh en
-     navegadores móviles con barra de direcciones dinámica. */
+     este breakpoint).
+
+     Fase 1.1 — se usa 100svh (small viewport height), NO 100dvh. dvh
+     cambia en vivo mientras el usuario hace scroll (crece cuando el
+     navegador oculta su barra de direcciones), lo que generaba un
+     reflow grande del Hero exactamente durante el gesto de scroll —
+     esto competía visualmente con la animación de encogido del header
+     (78px→64px) y la volvía imperceptible. svh usa el valor más
+     pequeño/estable (barra de navegador siempre expandida), así el
+     alto del Hero queda fijo desde el primer render y no vuelve a
+     recalcularse mientras se hace scroll. */
   .hero-carousel{
-    height:calc(100dvh - 78px);
+    height:calc(100svh - 78px);
     margin-left:-14px;
     margin-right:-14px;
     width:calc(100% + 28px);
     border-radius:0;
   }
   /* La pieza creativa se ve completa, nunca recortada — ver nota junto
-     a .hero-slide img más arriba. */
+     a .hero-slide img más arriba. Los placeholders ahora son 9:16
+     (1080x1920, el formato editorial real definido por VIBE), así que
+     con un contenedor mobile también vertical el letterboxing de
+     "contain" queda mínimo o nulo en la mayoría de los teléfonos. */
   .hero-slide img{object-fit:contain}
   .hero-arrow{width:34px;height:34px;font-size:17px}
   .hero-arrow-prev{left:8px}
