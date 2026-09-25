@@ -21,8 +21,8 @@
       <a href="#catalogo" data-group="Maquillaje">Maquillaje</a>
       <a href="#catalogo" data-group="Skincare">Skincare</a>
       <a href="#catalogo" data-group="Accesorios">Accesorios</a>
-      <a href="#novedades">Novedades</a>
-      <a href="#promociones" id="navPromociones" class="hidden">Promociones</a>
+      <a href="#catalogo" id="navNovedades">Novedades</a>
+      <a href="#catalogo" id="navPromociones" class="hidden">Promociones</a>
     </nav>
     <div class="nav-actions">
       <button id="cartButton" class="cart-btn">Carrito <b id="cartCount">0</b></button>
@@ -35,8 +35,8 @@
     <a href="#catalogo" data-group="Maquillaje">Maquillaje</a>
     <a href="#catalogo" data-group="Skincare">Skincare</a>
     <a href="#catalogo" data-group="Accesorios">Accesorios</a>
-    <a href="#novedades">Novedades</a>
-    <a href="#promociones" id="mobileNavPromociones" class="hidden">Promociones</a>
+    <a href="#catalogo" id="mobileNavNovedades">Novedades</a>
+    <a href="#catalogo" id="mobileNavPromociones" class="hidden">Promociones</a>
     <a href="#catalogo" id="mobileSearchLink">Buscar</a>
   </nav>
 </header>
@@ -113,9 +113,10 @@
 
 <section id="catalogo" class="catalog">
   <div class="wrap">
+    <p id="catalogBreadcrumb" class="breadcrumb"></p>
     <div class="heading">
-      <div><p class="eyebrow">DESCUBRE</p><h2>Catálogo</h2></div>
-      <p>Esenciales de belleza seleccionados para elevar tu ritual.</p>
+      <div><p class="eyebrow">DESCUBRE</p><h2 id="catalogTitle">Catálogo</h2></div>
+      <p id="catalogSubtitle">Esenciales de belleza seleccionados para elevar tu ritual.</p>
     </div>
     <div class="tools">
       <div id="groupTabs" class="tabs"></div>
@@ -123,6 +124,12 @@
     </div>
     <div id="categoryTabs" class="tabs tabs-sub hidden"></div>
     <div id="subcategoryTabs" class="tabs tabs-sub hidden"></div>
+    <div class="catalog-meta">
+      <span id="resultCount" class="result-count"></span>
+      <button type="button" id="openFilterSort" class="button outline filter-sort-btn">Filter &amp; Sort</button>
+    </div>
+    <div id="activeFilters" class="active-filters hidden"></div>
+    <p id="allSoldOutNotice" class="notice hidden">Todos los productos de esta selección están agotados por ahora.</p>
     <div id="productGrid" class="grid"></div>
     <p id="emptyState" class="empty hidden">Estamos preparando algo especial para ti.</p>
   </div>
@@ -160,6 +167,35 @@
 <dialog id="productDialog">
   <button id="closeProduct" class="x dialog-x">×</button>
   <div id="productDetail"></div>
+</dialog>
+<dialog id="filterSortDialog">
+  <div class="dialog-head">
+    <div><p class="eyebrow">FILTRAR Y ORDENAR</p><h2>Filter &amp; Sort</h2></div>
+    <button id="closeFilterSort" class="x" aria-label="Cerrar">×</button>
+  </div>
+  <form id="filterSortForm" class="filter-sort-form">
+    <label>Ordenar por
+      <select id="sortSelect" name="sort">
+        <option value="relevance">Relevancia</option>
+        <option value="price-asc">Precio: menor a mayor</option>
+        <option value="price-desc">Precio: mayor a menor</option>
+        <option value="new">Novedades primero</option>
+        <option value="editorial">Orden editorial VIBE</option>
+      </select>
+    </label>
+    <label class="checkbox-field"><input type="checkbox" id="filterAvailable"> Solo disponibles</label>
+    <label class="checkbox-field"><input type="checkbox" id="filterPromo"> Solo en promoción</label>
+    <label class="checkbox-field"><input type="checkbox" id="filterFeatured"> Solo destacados VIBE</label>
+    <div id="filterBrandGroup" class="hidden">
+      <label>Marca
+        <select id="filterBrandSelect"><option value="">Todas</option></select>
+      </label>
+    </div>
+    <div class="save-row">
+      <button type="button" id="clearFilters" class="button outline">Limpiar filtros</button>
+      <button type="submit" class="button dark">Ver resultados</button>
+    </div>
+  </form>
 </dialog>
 <dialog id="checkoutDialog">
   <div class="dialog-head">

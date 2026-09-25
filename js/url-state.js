@@ -3,6 +3,13 @@
 // DOM (URLSearchParams is available in plain Node). See
 // docs/fase8-navigation.md, "URL / estado".
 
+// Fase 27 — se agregan available/promo/featured/new/sort, extendiendo el
+// mismo mecanismo de query params ya existente (no se introduce un
+// router de rutas reales tipo /maquillaje: ver docs/fase27-plp.md para
+// la justificación — la arquitectura actual de una sola página con
+// query params ya es refresh-safe/compartible/reproducible, y añadir
+// rutas reales requeriría reescribir el hosting estático con rewrites de
+// Vercel, un cambio de infraestructura no evaluado en esta fase).
 export function readStateFromSearch(search) {
   const params = new URLSearchParams(search || "");
   return {
@@ -10,6 +17,11 @@ export function readStateFromSearch(search) {
     category: params.get("category") || "Todos",
     subcategory: params.get("subcategory") || "Todos",
     search: params.get("q") || "",
+    available: params.get("available") === "true",
+    promo: params.get("promo") === "true",
+    featuredOnly: params.get("featured") === "true",
+    newOnly: params.get("new") === "true",
+    sort: params.get("sort") || "relevance",
   };
 }
 
@@ -21,6 +33,11 @@ export function buildUrl(pathname, state) {
   if (state.category && state.category !== "Todos") params.set("category", state.category);
   if (state.subcategory && state.subcategory !== "Todos") params.set("subcategory", state.subcategory);
   if (state.search) params.set("q", state.search);
+  if (state.available) params.set("available", "true");
+  if (state.promo) params.set("promo", "true");
+  if (state.featuredOnly) params.set("featured", "true");
+  if (state.newOnly) params.set("new", "true");
+  if (state.sort && state.sort !== "relevance") params.set("sort", state.sort);
   const qs = params.toString();
   return `${pathname}${qs ? "?" + qs : ""}#catalogo`;
 }

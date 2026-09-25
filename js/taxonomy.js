@@ -40,12 +40,22 @@ export function getSubcategories(products, group, category) {
   return [...new Set(scoped.map((p) => p.subcategory).filter(Boolean))].sort(collator);
 }
 
-export function filterProducts(products, { group, category, subcategory, search } = {}) {
+// Fase 27 — se agregan available/promo/featuredOnly/newOnly/brand, todos
+// campos reales ya presentes en el shape del producto (ninguno inventado
+// aquí). Cada uno es estrictamente opuesto por defecto (ausente/false no
+// filtra nada) — mismo comportamiento de siempre para cualquier llamada
+// que no los use.
+export function filterProducts(products, { group, category, subcategory, search, available, promo, featuredOnly, newOnly, brand } = {}) {
   const q = (search || "").toLowerCase().trim();
   return products.filter((p) => {
     if (group && group !== "Todos" && groupOf(p) !== group) return false;
     if (category && category !== "Todos" && categoryOf(p) !== category) return false;
     if (subcategory && subcategory !== "Todos" && p.subcategory !== subcategory) return false;
+    if (available === true && p.available === false) return false;
+    if (promo === true && p.promoActive !== true) return false;
+    if (featuredOnly === true && p.featured !== true) return false;
+    if (newOnly === true && p.badge !== "Nuevo") return false;
+    if (brand && p.brand !== brand) return false;
     if (q) {
       const haystack = [p.name, categoryOf(p), p.subcategory, p.shortDescription].filter(Boolean).join(" ").toLowerCase();
       if (!haystack.includes(q)) return false;
@@ -114,4 +124,78 @@ export function breadcrumbLabel(p) {
   if (category && category !== group) parts.push(category);
   if (p.subcategory) parts.push(p.subcategory);
   return parts.join(" / ");
+}
+
+// Fase 27 — breadcrumb de la PLP (a partir del estado de navegación
+// actual, no de un producto individual). Misma prioridad que en
+// breadcrumbLabel: categoría editorial antes que categoría POS, y nunca
+// se inventa un nombre — solo refleja lo que el propio estado ya trae.
+export function breadcrumbForState({ group, category, subcategory } = {}) {
+  const parts = ["Inicio"];
+  if (group && group !== "Todos") parts.push(group);
+  if (category && category !== "Todos") parts.push(category);
+  if (subcategory && subcategory !== "Todos") parts.push(subcategory);
+  return parts;
+}
+
+// Fase 27 — precio real que pagaría la clienta: el promocional cuando
+// aplica (ya resuelto server-side), si no el de lista. Nunca calcula un
+// descuento por su cuenta.
+function effectivePrice(p) {
+  return p.promoActive === true && p.promoPrice != null ? p.promoPrice : p.price;
+}
+
+// Fase 27 — Ordenamiento. Cada opción tiene una fuente real y documentada
+// (ver docs de la fase): "relevance" conserva el orden ya entregado
+// (server/API), "price-*" usa el precio efectivo, "new" prioriza
+// badge==="Nuevo" (mismo criterio que selectNew, nunca fechas), y
+// "editorial" es editorial_order puro. No existe una opción de "más
+// vendidos" ni "más popular" porque no hay ninguna métrica real detrás.
+export function sortProducts(products, sortKey) {
+  const list = [...products];
+  switch (sortKey) {
+    case "price-asc":
+      return list.sort((a, b) => effectivePrice(a) - effectivePrice(b));
+    case "price-desc":
+      return list.sort((a, b) => effectivePrice(b) - effectivePrice(a));
+    case "new":
+      return list.sort((a, b) => {
+        const an = a.badge === "Nuevo";
+        const bn = b.badge === "Nuevo";
+        if (an !== bn) return an ? -1 : 1;
+        return byEditorialOrderThenName(a, b);
+      });
+    case "editorial":
+      return list.sort(byEditorialOrderThenName);
+    default:
+      return list; // "relevance" — se conserva el orden ya entregado, sin re-ordenar
+  }
+}
+
+// Fase 27 — copy de estado vacío, distinto según la causa real (nunca un
+// único mensaje genérico para todo): búsqueda sin resultados, filtros sin
+// resultados, o simplemente una categoría todavía sin curar.
+export function emptyStateCopy(state = {}) {
+  if (state.search) return `No encontramos productos para "${state.search}". Intenta con otra palabra.`;
+  if (state.available || state.promo || state.featuredOnly || state.newOnly || state.brand) {
+    return "No hay productos que coincidan con estos filtros. Prueba ajustándolos.";
+  }
+  return "Estamos preparando algo especial para ti.";
+}
+
+// Fase 27 — chips de filtros activos, para que el estado sea siempre
+// visible y removible individualmente. Pura lógica de presentación, sin
+// tocar el DOM — app.js solo renderiza lo que esto devuelve.
+export function activeFilterChips(state = {}) {
+  const chips = [];
+  if (state.group && state.group !== "Todos") chips.push({ key: "group", label: state.group });
+  if (state.category && state.category !== "Todos") chips.push({ key: "category", label: state.category });
+  if (state.subcategory && state.subcategory !== "Todos") chips.push({ key: "subcategory", label: state.subcategory });
+  if (state.available) chips.push({ key: "available", label: "Disponibles" });
+  if (state.promo) chips.push({ key: "promo", label: "Promoción" });
+  if (state.featuredOnly) chips.push({ key: "featuredOnly", label: "Destacados" });
+  if (state.newOnly) chips.push({ key: "newOnly", label: "Novedades" });
+  if (state.brand) chips.push({ key: "brand", label: state.brand });
+  if (state.search) chips.push({ key: "search", label: `"${state.search}"` });
+  return chips;
 }

@@ -1,10 +1,37 @@
 import { getProducts } from "./data-source.js";
 import { getCart, addToCart, changeQuantity, removeFromCart, clearCart, getCartCount, getCartTotal } from "./cart.js";
-import { getGroups, getCategoriesInGroup, getSubcategories, filterProducts, breadcrumbLabel, selectFeatured, selectNew, selectPromotions } from "./taxonomy.js";
+import {
+  getGroups,
+  getCategoriesInGroup,
+  getSubcategories,
+  filterProducts,
+  breadcrumbLabel,
+  breadcrumbForState,
+  selectFeatured,
+  selectNew,
+  selectPromotions,
+  sortProducts,
+  emptyStateCopy,
+  activeFilterChips,
+} from "./taxonomy.js";
 import { readStateFromSearch, buildUrl } from "./url-state.js";
 
 const WHATSAPP_NUMBER = "57XXXXXXXXXX";
-const state = { group: "Todos", category: "Todos", subcategory: "Todos", search: "", product: null, variant: null, products: [] };
+// Fase 27: se agregan los filtros/orden de la PLP. Todos arrancan
+// "apagados" — ningún filtro activo por defecto, igual que antes.
+const DEFAULT_FILTERS = {
+  group: "Todos",
+  category: "Todos",
+  subcategory: "Todos",
+  search: "",
+  available: false,
+  promo: false,
+  featuredOnly: false,
+  newOnly: false,
+  brand: null,
+  sort: "relevance",
+};
+const state = { ...DEFAULT_FILTERS, product: null, variant: null, products: [] };
 const $ = s => document.querySelector(s);
 const money = n => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(n);
 const esc = s => String(s ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
@@ -77,10 +104,107 @@ function productCard(p) {
   </article>`;
 }
 
+function renderCatalogHeading() {
+  const isAll = state.group === "Todos";
+  $("#catalogTitle").textContent = isAll ? "Catálogo" : state.group;
+  // Sin descripción editorial por categoría en el modelo de datos actual
+  // (ver docs/fase27-plp.md) — se muestra la intro general solo en "Todos"
+  // y se deja limpio en vez de inventar un texto por categoría.
+  $("#catalogSubtitle").textContent = isAll ? "Esenciales de belleza seleccionados para elevar tu ritual." : "";
+}
+
+function renderBreadcrumbUI() {
+  $("#catalogBreadcrumb").textContent = breadcrumbForState(state).join(" / ");
+}
+
+function renderActiveFilters() {
+  const chips = activeFilterChips(state);
+  const el = $("#activeFilters");
+  if (!chips.length) {
+    el.classList.add("hidden");
+    el.innerHTML = "";
+    return;
+  }
+  el.classList.remove("hidden");
+  el.innerHTML =
+    chips.map((c) => `<button type="button" class="filter-chip" data-remove="${esc(c.key)}">${esc(c.label)} ×</button>`).join("") +
+    `<button type="button" class="filter-chip filter-chip-clear" id="clearAllFilters">Limpiar filtros</button>`;
+}
+
+function populateBrandFilter() {
+  const brands = [...new Set(state.products.map((p) => p.brand).filter(Boolean))].sort((a, b) => a.localeCompare(b, "es"));
+  const group = $("#filterBrandGroup");
+  // No se muestra el filtro de marca si ningún producto público tiene una
+  // marca curada todavía — mismo principio que ya aplican las pills de
+  // subcategoría (nunca una opción que lleve a 0 resultados).
+  if (!brands.length) {
+    group.classList.add("hidden");
+    return;
+  }
+  group.classList.remove("hidden");
+  $("#filterBrandSelect").innerHTML =
+    `<option value="">Todas</option>` +
+    brands.map((b) => `<option value="${esc(b)}" ${state.brand === b ? "selected" : ""}>${esc(b)}</option>`).join("");
+}
+
 function renderProducts() {
-  const list = filterProducts(state.products, state);
+  let list = filterProducts(state.products, state);
+  list = sortProducts(list, state.sort);
   $("#productGrid").innerHTML = list.map(productCard).join("");
-  $("#emptyState").classList.toggle("hidden", !!list.length);
+
+  const isEmpty = list.length === 0;
+  $("#emptyState").classList.toggle("hidden", !isEmpty);
+  if (isEmpty) $("#emptyState").textContent = emptyStateCopy(state);
+
+  // Estado E (sección 17): la lista tiene resultados pero ninguno está
+  // disponible — se avisa sin ocultar el grid (siguen siendo productos
+  // reales, solo agotados).
+  const allSoldOut = !isEmpty && list.every((p) => p.available === false);
+  $("#allSoldOutNotice").classList.toggle("hidden", !allSoldOut);
+
+  $("#resultCount").textContent = list.length === 1 ? "1 producto" : `${list.length} productos`;
+
+  renderActiveFilters();
+  renderCatalogHeading();
+  renderBreadcrumbUI();
+}
+
+// Único punto de entrada para "algo del estado de filtros/orden cambió":
+// re-renderiza navegación + grid (que a su vez actualiza heading,
+// breadcrumb, chips y contador) y sincroniza la URL.
+function applyFiltersAndRender() {
+  renderNav();
+  renderProducts();
+  syncUrl();
+}
+
+// "Limpiar filtros" reinicia toda la PLP (incluida la navegación por
+// mundo/categoría/subcategoría), no solo los filtros nuevos de Fase 27.
+function resetFilters() {
+  Object.assign(state, DEFAULT_FILTERS);
+  $("#searchInput").value = "";
+  applyFiltersAndRender();
+}
+
+function removeFilter(key) {
+  if (key === "group") {
+    state.group = "Todos";
+    state.category = "Todos";
+    state.subcategory = "Todos";
+  } else if (key === "category") {
+    state.category = "Todos";
+    state.subcategory = "Todos";
+  } else if (key === "subcategory") {
+    state.subcategory = "Todos";
+  } else if (key === "search") {
+    state.search = "";
+    $("#searchInput").value = "";
+  } else if (key === "brand") {
+    state.brand = null;
+  } else {
+    state[key] = false; // available / promo / featuredOnly / newOnly
+  }
+  applyFiltersAndRender();
 }
 
 function renderFeatured() {
@@ -118,15 +242,15 @@ function renderPromociones() {
   if (hasPromotions) $("#promocionesGrid").innerHTML = list.map(productCard).join("");
 }
 
-// Filtro compartido por Shop by World (tarjetas de categoría) y por los
-// enlaces de mundo del header — misma lógica, un solo lugar.
-function goToGroup(group) {
-  state.group = group;
-  state.category = "Todos";
-  state.subcategory = "Todos";
-  renderNav();
-  renderProducts();
-  syncUrl();
+// Punto de entrada compartido por Shop by World, los enlaces de mundo del
+// header, y los enlaces de Novedades/Promociones del header: reinicia
+// todos los filtros y aplica exactamente los que se pidan, para que
+// saltar desde el header nunca deje una combinación de filtros previa a
+// medias.
+function goToFilter(overrides) {
+  Object.assign(state, DEFAULT_FILTERS, overrides);
+  $("#searchInput").value = state.search;
+  applyFiltersAndRender();
   $("#catalogo").scrollIntoView({ behavior: "smooth" });
 }
 
@@ -219,9 +343,7 @@ $("#groupTabs").addEventListener("click", e => {
   state.group = b.dataset.group;
   state.category = "Todos";
   state.subcategory = "Todos";
-  renderNav();
-  renderProducts();
-  syncUrl();
+  applyFiltersAndRender();
 });
 
 $("#categoryTabs").addEventListener("click", e => {
@@ -229,24 +351,20 @@ $("#categoryTabs").addEventListener("click", e => {
   if (!b) return;
   state.category = b.dataset.category;
   state.subcategory = "Todos";
-  renderNav();
-  renderProducts();
-  syncUrl();
+  applyFiltersAndRender();
 });
 
 $("#subcategoryTabs").addEventListener("click", e => {
   const b = e.target.closest("[data-subcategory]");
   if (!b) return;
   state.subcategory = b.dataset.subcategory;
-  renderNav();
-  renderProducts();
-  syncUrl();
+  applyFiltersAndRender();
 });
 
 $("#categoryShowcase").addEventListener("click", e => {
   const b = e.target.closest("[data-group]");
   if (!b) return;
-  goToGroup(b.dataset.group);
+  goToFilter({ group: b.dataset.group });
 });
 
 function bindWorldNav(selector) {
@@ -256,16 +374,72 @@ function bindWorldNav(selector) {
     const b = e.target.closest("[data-group]");
     if (!b) return;
     e.preventDefault();
-    goToGroup(b.dataset.group);
+    goToFilter({ group: b.dataset.group });
   });
 }
 bindWorldNav(".nav-links");
 bindWorldNav("#mobileNav");
 
+// Fase 27: los enlaces de Novedades/Promociones del header ahora navegan
+// a la PLP real filtrada (antes solo hacían scroll a la franja de la
+// Home). Las franjas de Home (renderNovedades/renderPromociones, Fase 26)
+// no cambian.
+document.querySelectorAll("#navNovedades, #mobileNavNovedades").forEach((el) => {
+  el.addEventListener("click", (e) => {
+    e.preventDefault();
+    goToFilter({ newOnly: true });
+  });
+});
+document.querySelectorAll("#navPromociones, #mobileNavPromociones").forEach((el) => {
+  el.addEventListener("click", (e) => {
+    e.preventDefault();
+    goToFilter({ promo: true });
+  });
+});
+
 $("#searchInput").addEventListener("input", e => {
   state.search = e.target.value;
-  renderProducts();
-  syncUrl();
+  applyFiltersAndRender();
+});
+
+// Filter & Sort — aplica al confirmar (no en vivo por cada click): a
+// diferencia de las tabs/búsqueda (que sí aplican en vivo), este panel
+// junta varios controles y se abre como diálogo modal sobre el propio
+// grid, así que no tiene sentido re-renderizar en cada toggle mientras
+// sigue abierto. "Limpiar filtros" es la única acción inmediata.
+$("#openFilterSort").addEventListener("click", () => {
+  $("#sortSelect").value = state.sort;
+  $("#filterAvailable").checked = state.available;
+  $("#filterPromo").checked = state.promo;
+  $("#filterFeatured").checked = state.featuredOnly;
+  populateBrandFilter();
+  $("#filterSortDialog").showModal();
+});
+$("#closeFilterSort").addEventListener("click", () => $("#filterSortDialog").close());
+$("#filterSortForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  state.sort = $("#sortSelect").value;
+  state.available = $("#filterAvailable").checked;
+  state.promo = $("#filterPromo").checked;
+  state.featuredOnly = $("#filterFeatured").checked;
+  const brandSelect = document.getElementById("filterBrandSelect");
+  state.brand = brandSelect && brandSelect.value ? brandSelect.value : null;
+  applyFiltersAndRender();
+  $("#filterSortDialog").close();
+});
+$("#clearFilters").addEventListener("click", () => {
+  resetFilters();
+  $("#filterSortDialog").close();
+});
+
+$("#activeFilters").addEventListener("click", (e) => {
+  if (e.target.id === "clearAllFilters") {
+    resetFilters();
+    return;
+  }
+  const b = e.target.closest("[data-remove]");
+  if (!b) return;
+  removeFilter(b.dataset.remove);
 });
 
 bindProductGrid("#productGrid");
@@ -360,6 +534,11 @@ async function loadCatalog() {
   state.category = urlState.category;
   state.subcategory = urlState.subcategory;
   state.search = urlState.search;
+  state.available = urlState.available;
+  state.promo = urlState.promo;
+  state.featuredOnly = urlState.featuredOnly;
+  state.newOnly = urlState.newOnly;
+  state.sort = urlState.sort;
   $("#searchInput").value = state.search;
 
   $("#productGrid").innerHTML = `<p class="empty">Cargando catálogo...</p>`;

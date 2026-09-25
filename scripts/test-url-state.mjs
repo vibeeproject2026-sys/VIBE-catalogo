@@ -23,34 +23,65 @@ function test(name, fn) {
   }
 }
 
+const DEFAULTS = { group: "Todos", category: "Todos", subcategory: "Todos", search: "", available: false, promo: false, featuredOnly: false, newOnly: false, sort: "relevance" };
+
 console.log("readStateFromSearch (simula un refresh / link compartido)");
-test("querystring vacío -> todo en 'Todos', búsqueda vacía", () => {
-  assert.deepEqual(readStateFromSearch(""), { group: "Todos", category: "Todos", subcategory: "Todos", search: "" });
+test("querystring vacío -> todo en su default", () => {
+  assert.deepEqual(readStateFromSearch(""), DEFAULTS);
 });
-test("lee los 4 parámetros de un link compartido completo", () => {
+test("lee los 4 parámetros clásicos de un link compartido", () => {
   const r = readStateFromSearch("?group=Maquillaje&category=Labios&subcategory=Gloss&q=brillo");
-  assert.deepEqual(r, { group: "Maquillaje", category: "Labios", subcategory: "Gloss", search: "brillo" });
+  assert.deepEqual(r, { ...DEFAULTS, group: "Maquillaje", category: "Labios", subcategory: "Gloss", search: "brillo" });
 });
 test("parámetros parciales no rompen — el resto cae a su default", () => {
   const r = readStateFromSearch("?group=Skincare");
-  assert.deepEqual(r, { group: "Skincare", category: "Todos", subcategory: "Todos", search: "" });
+  assert.deepEqual(r, { ...DEFAULTS, group: "Skincare" });
+});
+
+console.log("readStateFromSearch — filtros y orden de Fase 27");
+test("lee available/promo/featured/new como booleanos reales", () => {
+  const r = readStateFromSearch("?available=true&promo=true&featured=true&new=true");
+  assert.deepEqual(r, { ...DEFAULTS, available: true, promo: true, featuredOnly: true, newOnly: true });
+});
+test("cualquier valor que no sea exactamente 'true' se trata como false (nunca truthy accidental)", () => {
+  const r = readStateFromSearch("?available=1&promo=yes");
+  assert.equal(r.available, false);
+  assert.equal(r.promo, false);
+});
+test("lee sort cuando está presente", () => {
+  assert.equal(readStateFromSearch("?sort=price-asc").sort, "price-asc");
 });
 
 console.log("buildUrl");
 test("sin selección activa, la URL solo lleva el hash del catálogo", () => {
-  const url = buildUrl("/", { group: "Todos", category: "Todos", subcategory: "Todos", search: "" });
+  const url = buildUrl("/", DEFAULTS);
   assert.equal(url, "/#catalogo");
 });
 test("con selección completa, produce una URL reconstruible", () => {
-  const state = { group: "Maquillaje", category: "Labios", subcategory: "Gloss", search: "brillo" };
+  const state = { ...DEFAULTS, group: "Maquillaje", category: "Labios", subcategory: "Gloss", search: "brillo" };
   const url = buildUrl("/", state);
   assert.equal(url, "/?group=Maquillaje&category=Labios&subcategory=Gloss&q=brillo#catalogo");
 });
+test("solo agrega available/promo/featured/new/sort a la URL cuando están activos", () => {
+  const url = buildUrl("/", { ...DEFAULTS, available: true, promo: true, featuredOnly: true, newOnly: true, sort: "price-desc" });
+  assert.equal(url, "/?available=true&promo=true&featured=true&new=true&sort=price-desc#catalogo");
+});
+test("sort='relevance' (el default) no ensucia la URL", () => {
+  const url = buildUrl("/", { ...DEFAULTS, sort: "relevance" });
+  assert.equal(url, "/#catalogo");
+});
 
 console.log("round-trip (lo que pasa en un refresh real)");
-test("buildUrl -> readStateFromSearch reproduce el mismo estado de filtros", () => {
-  const original = { group: "Skincare", category: "Todos", subcategory: "Hidratación", search: "mist" };
+test("buildUrl -> readStateFromSearch reproduce el mismo estado de filtros clásicos", () => {
+  const original = { ...DEFAULTS, group: "Skincare", subcategory: "Hidratación", search: "mist" };
   const url = buildUrl("/index.html", original);
+  const queryPart = url.split("#")[0].split("?")[1] || "";
+  const roundTripped = readStateFromSearch("?" + queryPart);
+  assert.deepEqual(roundTripped, original);
+});
+test("round-trip también con los filtros/orden nuevos de Fase 27 combinados", () => {
+  const original = { ...DEFAULTS, group: "Maquillaje", available: true, promo: true, sort: "editorial" };
+  const url = buildUrl("/", original);
   const queryPart = url.split("#")[0].split("?")[1] || "";
   const roundTripped = readStateFromSearch("?" + queryPart);
   assert.deepEqual(roundTripped, original);
