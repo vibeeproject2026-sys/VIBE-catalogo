@@ -114,6 +114,46 @@ function initHeroCarousel() {
     restartAutoplay();
   });
 
+  // Swipe táctil (mobile) — puramente pasivo: nunca llama
+  // preventDefault, nunca bloquea ni interfiere con el scroll vertical
+  // de la página. Solo mide la distancia entre el inicio y el final del
+  // toque (no sigue al dedo en vivo, es un gesto de "flick" al soltar);
+  // si el desplazamiento es predominantemente horizontal y supera un
+  // umbral mínimo, cambia de slide. Los listeners están acotados a
+  // #heroCarousel — no hay ningún listener global de touch en la
+  // página.
+  const SWIPE_THRESHOLD = 40;
+  let touchStartX = null;
+  let touchStartY = null;
+
+  root.addEventListener(
+    "touchstart",
+    (e) => {
+      const t = e.touches[0];
+      touchStartX = t.clientX;
+      touchStartY = t.clientY;
+    },
+    { passive: true }
+  );
+
+  root.addEventListener(
+    "touchend",
+    (e) => {
+      if (touchStartX === null) return;
+      const t = e.changedTouches[0];
+      const deltaX = t.clientX - touchStartX;
+      const deltaY = t.clientY - touchStartY;
+      touchStartX = null;
+      touchStartY = null;
+      if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > SWIPE_THRESHOLD) {
+        if (deltaX < 0) next();
+        else prev();
+        restartAutoplay();
+      }
+    },
+    { passive: true }
+  );
+
   render();
   startAutoplay();
 }

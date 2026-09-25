@@ -57,6 +57,22 @@ header.scrolled .logo-image{width:126px;height:50px}
 .hero-slides{position:relative;width:100%;height:100%}
 .hero-slide{position:absolute;inset:0;display:block;opacity:0;transition:opacity 1s ease}
 .hero-slide.active{opacity:1;z-index:1}
+/* Desktop (sin rediseñar todavía, Fase Diseño Mobile-First 1): se
+   mantiene object-fit:cover tal como ya funcionaba. En mobile (≤640px,
+   ver abajo) se usa object-fit:contain — la pieza creativa completa es
+   la prioridad, nunca recortarla.
+
+   Recomendación para las piezas reales que suba VIBE más adelante (no
+   implementado como sistema, solo documentado aquí):
+     - verticales (retrato, ej. 4:5 o 9:16): las que mejor aprovechan el
+       alto del hero mobile — llenan el ancho con letterboxing mínimo o
+       nulo.
+     - horizontales (paisaje, ej. 16:9): se verán con franjas de fondo
+       arriba/abajo (letterbox) en el hero mobile, porque el contenedor
+       es más alto que ancho — la imagen se ve completa, sin recorte,
+       pero no llena todo el alto disponible.
+     - cuadradas (1:1): comportamiento intermedio, con franjas
+       arriba/abajo más pequeñas que una horizontal. */
 .hero-slide img{width:100%;height:100%;object-fit:cover;display:block}
 
 @media(prefers-reduced-motion:reduce){
@@ -207,12 +223,35 @@ footer small{letter-spacing:.25em;font-size:7px}
   .nav-links{display:none}
   .menu-btn{display:flex}
   .mobile-nav{display:flex}
-  .hero{padding:45px 0 65px}
-  .hero h1{font-size:62px}
-  .hero-carousel{min-height:300px}
+  /* Fase Diseño Mobile-First 1 — el Hero mobile deja de ser
+     texto+imagen y pasa a ser un escaparate de pieza creativa a
+     pantalla casi completa. El copy actual (eyebrow/H1/lead/CTA) se
+     oculta solo aquí — sigue intacto en el código y en desktop, no se
+     eliminó (no se reutiliza en ningún otro lugar del sitio, se
+     verificó antes de tocar nada). */
+  .hero{padding:0}
+  .hero-copy{display:none}
+  .hero-grid{gap:0}
+
+  /* "Gran escaparate": el carrusel rompe el gutter de .wrap (14px por
+     lado en este breakpoint) para llegar borde a borde, y ocupa
+     prácticamente todo el alto disponible bajo el header (78px fijo en
+     este breakpoint) usando dvh para evitar el bug clásico de 100vh en
+     navegadores móviles con barra de direcciones dinámica. */
+  .hero-carousel{
+    height:calc(100dvh - 78px);
+    margin-left:-14px;
+    margin-right:-14px;
+    width:calc(100% + 28px);
+    border-radius:0;
+  }
+  /* La pieza creativa se ve completa, nunca recortada — ver nota junto
+     a .hero-slide img más arriba. */
+  .hero-slide img{object-fit:contain}
   .hero-arrow{width:34px;height:34px;font-size:17px}
   .hero-arrow-prev{left:8px}
   .hero-arrow-next{right:8px}
+  .hero-dots{padding-bottom:env(safe-area-inset-bottom,0px)}
   .values{padding:28px 0}
   .values-grid{grid-template-columns:1fr 1fr;gap:18px}
   .explore{padding:52px 0 10px}
