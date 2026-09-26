@@ -1,22 +1,26 @@
-// VIBE — Hero banner carousel (Fase Visual 2).
+// VIBE — Hero banner carousel (Fase Visual 2; administrable desde Fase 33).
 //
-// Deliberadamente aislado de app.js/data-source.js: no importa nada del
-// catálogo y nada del catálogo lo importa a él. El Hero exhibe piezas
-// gráficas ya diseñadas externamente — este archivo solo sabe mostrar
-// una imagen a la vez, avanzar automáticamente y responder a la
-// navegación manual. No compone tarjetas, precios, badges ni texto
-// sobre la imagen.
+// Deliberadamente aislado de app.js/data-source.js/taxonomy.js: no
+// importa nada del catálogo y nada del catálogo lo importa a él. Su
+// única fuente de contenido nueva es js/hero-source.js (GET público
+// /api/hero/slides) — ningún producto, carrito ni checkout pasa por
+// aquí.
 //
-// HERO_SLIDES usa el mismo shape { image, alt, href, order, active }
-// pensado para que, en una fase futura, esta lista pueda venir de
-// Supabase/admin sin cambiar la lógica de abajo — hoy son datos
-// estáticos de prueba, ninguna imagen real de campaña.
+// Fase 33 — fuente real vs. fallback: se intenta primero
+// getHeroSlides() (los slides reales activos, administrados desde
+// /admin). Si la llamada falla o devuelve cero slides activos, se usa
+// FALLBACK_HERO_SLIDES — el mismo contenido estático de diseño que ya
+// existía (no es "contenido inventado", son las piezas gráficas
+// originales del sitio) — para que el Home nunca quede con un hueco
+// vacío en su primera sección. Un solo slide real activo ya reemplaza
+// por completo al fallback (no se mezclan).
+import { getHeroSlides } from "./hero-source.js";
 
-const HERO_SLIDES = [
-  { image: "assets/hero/slide-1.svg", alt: "Nueva colección VIBE", href: "#catalogo", order: 1, active: true },
-  { image: "assets/hero/slide-2.svg", alt: "Ritual skincare VIBE", href: "#catalogo", order: 2, active: true },
-  { image: "assets/hero/slide-3.svg", alt: "Kit Esencial VIBE, edición limitada", href: "#catalogo", order: 3, active: true },
-  { image: "assets/hero/slide-4.svg", alt: "VIBE — Tu ritual, tu VIBE", href: "#catalogo", order: 4, active: true },
+const FALLBACK_HERO_SLIDES = [
+  { image: "assets/hero/slide-1.svg", alt: "Nueva colección VIBE", ctaHref: "#catalogo", order: 1, active: true },
+  { image: "assets/hero/slide-2.svg", alt: "Ritual skincare VIBE", ctaHref: "#catalogo", order: 2, active: true },
+  { image: "assets/hero/slide-3.svg", alt: "Kit Esencial VIBE, edición limitada", ctaHref: "#catalogo", order: 3, active: true },
+  { image: "assets/hero/slide-4.svg", alt: "VIBE — Tu ritual, tu VIBE", ctaHref: "#catalogo", order: 4, active: true },
 ];
 
 const AUTOPLAY_MS = 5000;
@@ -24,7 +28,44 @@ const AUTOPLAY_MS = 5000;
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 
-function initHeroCarousel() {
+// Sección 2 — el contenido textual es siempre opcional: un slide con
+// solo imagen se ve exactamente igual que antes de esta fase (sin
+// overlay). El overlay solo aparece si el admin cargó al menos uno de
+// estos campos. mobileImage también es opcional: si no existe, se usa
+// la misma imagen en todos los tamaños (comportamiento actual).
+function heroSlideHtml(s, i) {
+  const href = s.ctaHref || "#catalogo";
+  const hasMobileVariant = s.mobileImage && s.mobileImage !== s.image;
+  const hasCopy = s.eyebrow || s.title || s.subtitle || s.ctaText;
+  return `<a class="hero-slide${i === 0 ? " active" : ""}" href="${esc(href)}" data-index="${i}">
+    <picture>
+      ${hasMobileVariant ? `<source media="(max-width: 640px)" srcset="${esc(s.mobileImage)}">` : ""}
+      <img src="${esc(s.image)}" alt="${esc(s.alt || "")}" loading="${i === 0 ? "eager" : "lazy"}">
+    </picture>
+    ${
+      hasCopy
+        ? `<div class="hero-slide-copy">
+      ${s.eyebrow ? `<p class="hero-slide-eyebrow">${esc(s.eyebrow)}</p>` : ""}
+      ${s.title ? `<h2 class="hero-slide-title">${esc(s.title)}</h2>` : ""}
+      ${s.subtitle ? `<p class="hero-slide-subtitle">${esc(s.subtitle)}</p>` : ""}
+      ${s.ctaText ? `<span class="hero-slide-cta">${esc(s.ctaText)}</span>` : ""}
+    </div>`
+        : ""
+    }
+  </a>`;
+}
+
+async function resolveSlides() {
+  try {
+    const real = await getHeroSlides();
+    if (real.length) return real;
+  } catch (e) {
+    console.error("[VIBE hero] No se pudieron cargar los slides reales, usando el contenido de respaldo.", e && e.message ? e.message : e);
+  }
+  return FALLBACK_HERO_SLIDES.filter((s) => s.active !== false).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+}
+
+async function initHeroCarousel() {
   const root = $("#heroCarousel");
   if (!root) return; // el bloque no está en esta página — nada que hacer
 
@@ -33,19 +74,13 @@ function initHeroCarousel() {
   const prevBtn = $("#heroPrev");
   const nextBtn = $("#heroNext");
 
-  const slides = HERO_SLIDES.filter((s) => s.active !== false).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  const slides = await resolveSlides();
   if (!slides.length) {
     root.classList.add("hidden");
     return;
   }
 
-  slidesEl.innerHTML = slides
-    .map(
-      (s, i) => `<a class="hero-slide${i === 0 ? " active" : ""}" href="${esc(s.href || "#catalogo")}" data-index="${i}">
-        <img src="${esc(s.image)}" alt="${esc(s.alt || "")}" loading="${i === 0 ? "eager" : "lazy"}">
-      </a>`
-    )
-    .join("");
+  slidesEl.innerHTML = slides.map(heroSlideHtml).join("");
 
   dotsEl.innerHTML = slides
     .map((_, i) => `<button type="button" class="hero-dot${i === 0 ? " active" : ""}" data-index="${i}" aria-label="Ir a la pieza ${i + 1}"></button>`)

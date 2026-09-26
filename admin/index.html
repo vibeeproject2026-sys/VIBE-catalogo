@@ -27,6 +27,10 @@
 
 <header class="admin-header hidden" id="adminHeader">
   <div class="admin-brand">VIBE <span>· Panel editorial</span></div>
+  <nav class="admin-tabs" id="adminTabs">
+    <button type="button" class="admin-tab active" id="tabProducts" data-view="products">Productos</button>
+    <button type="button" class="admin-tab" id="tabHero" data-view="hero">Carrusel Hero</button>
+  </nav>
   <button id="logoutButton" class="button outline-admin">Salir</button>
 </header>
 
@@ -67,9 +71,38 @@
   </div>
 </main>
 
+<main id="heroApp" class="admin-main hidden">
+  <section class="toolbar">
+    <p class="hero-admin-hint">Los slides activos aparecen en el Home, en el orden mostrado abajo. Un slide inactivo nunca se muestra públicamente.</p>
+    <button type="button" id="newSlideBtn" class="button dark">+ Nuevo slide</button>
+  </section>
+
+  <p id="heroLoadError" class="login-error hidden"></p>
+
+  <div class="table-wrap">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>Preview</th>
+          <th>Contenido</th>
+          <th>Orden</th>
+          <th>Activo</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="heroRows"></tbody>
+    </table>
+  </div>
+</main>
+
 <dialog id="editDialog">
   <button id="closeEdit" class="x">×</button>
   <div id="editContent"></div>
+</dialog>
+
+<dialog id="heroEditDialog">
+  <button id="closeHeroEdit" class="x">×</button>
+  <div id="heroEditContent"></div>
 </dialog>
 
 <script type="module" src="admin.js"></script>

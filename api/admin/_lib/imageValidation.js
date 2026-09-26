@@ -157,6 +157,64 @@ function validateUpload({ contentType, buffer, slot }) {
   return { ok: errors.length === 0, errors, warnings, dimensions, ext, bytes: buffer.length };
 }
 
+// Fase 33 — Hero carousel: formato deliberadamente distinto al de
+// producto (nunca 4:5 vertical obligatorio en desktop — sección 3:
+// "DESKTOP: formato horizontal apropiado"). "desktop" es la pieza
+// principal del carrusel (min 1200x900, sin proporción forzada — el CSS
+// ya usa object-fit:cover); "mobile" es opcional y, cuando se sube,
+// sigue el mismo estándar editorial 4:5 ya usado en el resto del sitio.
+const HERO_DESKTOP_MIN_WIDTH = 1200;
+const HERO_DESKTOP_MIN_HEIGHT = 900;
+const HERO_MOBILE_MIN_WIDTH = 800;
+const HERO_MOBILE_MIN_HEIGHT = 1000;
+
+function validateHeroUpload({ contentType, buffer, slot }) {
+  const errors = [];
+  const warnings = [];
+
+  const ext = extensionForType(contentType);
+  if (!ext) {
+    errors.push("Tipo de archivo no permitido. Usa WebP, JPEG o PNG.");
+    return { ok: false, errors, warnings, ext: null };
+  }
+  if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
+    errors.push("Archivo vacío o inválido.");
+    return { ok: false, errors, warnings, ext };
+  }
+  if (buffer.length > MAX_UPLOAD_BYTES) {
+    errors.push(
+      `El archivo pesa ${(buffer.length / 1024 / 1024).toFixed(1)}MB; el máximo permitido es ${(MAX_UPLOAD_BYTES / 1024 / 1024).toFixed(1)}MB.`
+    );
+  }
+
+  const dimensions = readImageDimensions(buffer, contentType);
+  if (!dimensions) {
+    errors.push("No se pudieron leer las dimensiones de la imagen; el archivo puede estar corrupto.");
+  } else {
+    const minWidth = slot === "mobile" ? HERO_MOBILE_MIN_WIDTH : HERO_DESKTOP_MIN_WIDTH;
+    const minHeight = slot === "mobile" ? HERO_MOBILE_MIN_HEIGHT : HERO_DESKTOP_MIN_HEIGHT;
+    if (dimensions.width < minWidth || dimensions.height < minHeight) {
+      errors.push(
+        `La imagen es de ${dimensions.width}x${dimensions.height}px; el mínimo para ${
+          slot === "mobile" ? "la imagen mobile del Hero" : "la imagen principal del Hero"
+        } es ${minWidth}x${minHeight}px.`
+      );
+    }
+    if (slot === "mobile" && dimensions.height > 0) {
+      const ratio = dimensions.width / dimensions.height;
+      if (Math.abs(ratio - RECOMMENDED_RATIO) > RATIO_TOLERANCE) {
+        warnings.push(`Proporción recomendada 4:5 vertical para mobile; esta imagen es ${dimensions.width}x${dimensions.height}px.`);
+      }
+    }
+  }
+
+  if (buffer.length <= MAX_UPLOAD_BYTES && buffer.length > TARGET_MAX_BYTES) {
+    warnings.push(`El archivo pesa más del peso objetivo (${Math.round(TARGET_MAX_BYTES / 1024)}KB); considera optimizarlo.`);
+  }
+
+  return { ok: errors.length === 0, errors, warnings, dimensions, ext, bytes: buffer.length };
+}
+
 module.exports = {
   ALLOWED_TYPES,
   MAX_UPLOAD_BYTES,
@@ -165,8 +223,13 @@ module.exports = {
   MAIN_MIN_HEIGHT,
   SECONDARY_MIN_WIDTH,
   SECONDARY_MIN_HEIGHT,
+  HERO_DESKTOP_MIN_WIDTH,
+  HERO_DESKTOP_MIN_HEIGHT,
+  HERO_MOBILE_MIN_WIDTH,
+  HERO_MOBILE_MIN_HEIGHT,
   extensionForType,
   decodeBase64Image,
   readImageDimensions,
   validateUpload,
+  validateHeroUpload,
 };

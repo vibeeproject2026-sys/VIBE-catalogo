@@ -80,11 +80,22 @@ header.scrolled .logo-image{width:126px;height:50px}
        poco alto dentro del contenedor 4:5.
      - cuadradas (1:1): letterboxing moderado, menor que una
        horizontal. */
+.hero-slide picture{display:block;width:100%;height:100%}
 .hero-slide img{width:100%;height:100%;object-fit:cover;display:block}
 
 @media(prefers-reduced-motion:reduce){
   .hero-slide{transition:none}
 }
+
+/* Fase 33 — overlay de texto opcional por slide (eyebrow/título/
+   subtítulo/CTA), administrable desde /admin. Ausente por completo en
+   cualquier slide que no traiga ninguno de estos campos — el
+   comportamiento "solo imagen" de siempre no cambia. */
+.hero-slide-copy{position:absolute;left:0;right:0;bottom:0;z-index:2;padding:28px 32px 34px;background:linear-gradient(0deg,#000000b3 0%,#00000000 70%);color:#fff;pointer-events:none}
+.hero-slide-eyebrow{margin:0 0 8px;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--pink);font-weight:800}
+.hero-slide-title{margin:0 0 8px;font-size:clamp(22px,3vw,34px);line-height:1.1;font-weight:800;max-width:520px}
+.hero-slide-subtitle{margin:0 0 14px;font-size:14px;color:#eee;max-width:440px}
+.hero-slide-cta{display:inline-flex;align-items:center;border:1px solid #fff;border-radius:999px;padding:9px 18px;font-size:12px;font-weight:800;letter-spacing:.02em}
 
 .hero-arrow{position:absolute;top:50%;transform:translateY(-50%);z-index:2;width:38px;height:38px;border-radius:50%;border:1px solid #ffffff33;background:#00000055;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);color:#fff;font-size:19px;line-height:1;display:grid;place-items:center;opacity:.65;transition:opacity .2s ease,background .2s ease}
 .hero-arrow:hover{opacity:1;background:#00000088}
@@ -405,6 +416,8 @@ footer small{letter-spacing:.25em;font-size:7px}
      contenedor en la misma proporción, "contain" no genera
      letterboxing perceptible. */
   .hero-slide img{object-fit:contain}
+  .hero-slide-copy{padding:20px 18px 26px}
+  .hero-slide-subtitle{display:none}
   .hero-arrow{width:34px;height:34px;font-size:17px}
   .hero-arrow-prev{left:8px}
   .hero-arrow-next{right:8px}
