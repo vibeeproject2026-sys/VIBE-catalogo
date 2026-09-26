@@ -17,11 +17,15 @@
       <span class="logo-image"><img src="assets/vibe-logo.svg" alt="VIBE"></span>
       <small>VIBRANT ICONIC BEAUTY ESSENTIALS</small>
     </a>
+    <!-- Fase 37 — orden inspirado en la navegación real de e.l.f.
+         (What's Hot primero, Discover al final): Novedades encabeza la
+         nav (la entrada de "qué hay nuevo"), Discover sigue siendo el
+         último ítem — mismos links/ids/handlers, ningún link nuevo. -->
     <nav class="nav-links">
+      <a href="#catalogo" id="navNovedades">Novedades</a>
       <a href="#catalogo" data-group="Maquillaje">Maquillaje</a>
       <a href="#catalogo" data-group="Skincare">Skincare</a>
       <a href="#catalogo" data-group="Accesorios">Accesorios</a>
-      <a href="#catalogo" id="navNovedades">Novedades</a>
       <a href="#catalogo" id="navPromociones" class="hidden">Promociones</a>
       <a href="#discover" id="navDiscover">Discover</a>
     </nav>
@@ -33,10 +37,10 @@
     </div>
   </div>
   <nav id="mobileNav" class="mobile-nav" aria-label="Menú móvil">
+    <a href="#catalogo" id="mobileNavNovedades">Novedades</a>
     <a href="#catalogo" data-group="Maquillaje">Maquillaje</a>
     <a href="#catalogo" data-group="Skincare">Skincare</a>
     <a href="#catalogo" data-group="Accesorios">Accesorios</a>
-    <a href="#catalogo" id="mobileNavNovedades">Novedades</a>
     <a href="#catalogo" id="mobileNavPromociones" class="hidden">Promociones</a>
     <a href="#discover" id="mobileNavDiscover">Discover</a>
     <a href="#catalogo" id="mobileSearchLink">Buscar</a>
@@ -80,6 +84,24 @@
   </div>
 </section>
 
+<!-- Fase 37 — bloque "Campaña": spotlight de UN producto destacado real
+     (mismo criterio que Destacados VIBE — featured===true), inspirado en
+     el patrón de e.l.f. de dar protagonismo editorial a un producto.
+     Oculto por completo si no hay ningún destacado real (ver
+     renderCampaign() en app.js) — nunca una campaña inventada. -->
+<section id="campaign" class="campaign hidden">
+  <div class="wrap campaign-inner">
+    <div id="campaignMedia" class="campaign-media"></div>
+    <div class="campaign-copy">
+      <p class="eyebrow accent">DESTACADO VIBE</p>
+      <h2 id="campaignName"></h2>
+      <p id="campaignDesc" class="campaign-desc"></p>
+      <p id="campaignPrice" class="campaign-price"></p>
+      <button type="button" id="campaignCta" class="button dark" data-product="">Ver producto</button>
+    </div>
+  </div>
+</section>
+
 <section id="novedades" class="featured hidden">
   <div class="wrap">
     <div class="heading">
@@ -113,6 +135,22 @@
   </div>
 </section>
 
+<!-- Fase 37 — pedido explícito: Discover no debe sentirse como "una
+     sección al final". Antes vivía después del catálogo completo, casi
+     pegada al footer; ahora es un beat de descubrimiento ANTES de la
+     grilla de "explorar todo", entre las colecciones curadas y la PLP —
+     misma disciplina de siempre (oculto sin artículos publicados). -->
+<section id="discoverHome" class="featured hidden">
+  <div class="wrap">
+    <div class="heading">
+      <div><p class="eyebrow">DISCOVER</p><h2>Vive tu VIBE</h2></div>
+      <p>Historias, rituales e inspiración para tu ritual de belleza.</p>
+    </div>
+    <div id="discoverHomeGrid" class="grid"></div>
+    <a class="button outline" href="#discover">Ver Discover completo</a>
+  </div>
+</section>
+
 <section id="catalogo" class="catalog">
   <div class="wrap">
     <p id="catalogBreadcrumb" class="breadcrumb"></p>
@@ -134,17 +172,6 @@
     <p id="allSoldOutNotice" class="notice hidden">Todos los productos de esta selección están agotados por ahora.</p>
     <div id="productGrid" class="grid"></div>
     <p id="emptyState" class="empty hidden">Estamos preparando algo especial para ti.</p>
-  </div>
-</section>
-
-<section id="discoverHome" class="featured hidden">
-  <div class="wrap">
-    <div class="heading">
-      <div><p class="eyebrow">DISCOVER</p><h2>Vive tu VIBE</h2></div>
-      <p>Historias, rituales e inspiración para tu ritual de belleza.</p>
-    </div>
-    <div id="discoverHomeGrid" class="grid"></div>
-    <a class="button outline" href="#discover">Ver Discover completo</a>
   </div>
 </section>
 

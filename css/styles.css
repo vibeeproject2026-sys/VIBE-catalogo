@@ -180,9 +180,29 @@ header.scrolled .logo-image{width:126px;height:50px}
 }
 .category-card span{font-size:12px;color:var(--pink);letter-spacing:.16em;text-transform:uppercase;font-weight:800}
 .category-card h3{margin:14px 0 0;font-size:clamp(26px,3vw,32px);font-weight:800;letter-spacing:-.02em;line-height:1.05}
-.category-card .arrow{display:inline-flex;align-items:center;justify-content:center;margin-top:22px;width:40px;height:40px;border-radius:50%;border:1px solid #ffffff44;font-size:18px;color:#fff;letter-spacing:normal;text-transform:none;transition:background .2s ease,border-color .2s ease}
+/* Fase 37 — antes solo había una flecha circular sin texto; benchmark
+   e.l.f. siempre acompaña el ícono con la acción en palabras
+   ("SHOP NOW"). Microcopy propia de VIBE, nunca esa frase textual. */
+.category-card-cta{display:flex;align-items:center;justify-content:space-between;margin-top:22px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#ddd}
+.category-card .arrow{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;border:1px solid #ffffff44;font-size:18px;color:#fff;letter-spacing:normal;text-transform:none;transition:background .2s ease,border-color .2s ease}
 .category-card:hover .arrow{background:var(--pink);border-color:var(--pink)}
 @media(prefers-reduced-motion:reduce){.category-card .arrow{transition:none}}
+
+/* Fase 37 — bloque "Campaña": spotlight editorial de un único producto
+   real (ver renderCampaign() en app.js), inspirado en el patrón de
+   e.l.f. de destacar un producto con foto grande + copy + CTA. Fondo
+   oscuro para diferenciarlo claramente de las grillas blancas de
+   alrededor — un momento propio, no una card más. */
+.campaign{background:#0b0b0b;padding:76px 0}
+.campaign-inner{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:center}
+.campaign-media{aspect-ratio:4/5;border-radius:var(--radius);overflow:hidden;background:#f2f2f2;display:grid;place-items:center;width:100%}
+.campaign-media:has(.card-img-empty){background:linear-gradient(160deg,#151515,#0b0b0b)}
+.campaign-photo{width:100%;height:100%;object-fit:cover;display:block}
+.campaign-copy{color:#fff}
+.campaign-copy h2{font-size:clamp(30px,4vw,46px);letter-spacing:-.02em;line-height:1.05;margin:12px 0 16px}
+.campaign-desc{color:#ccc;font-size:15px;line-height:1.6;margin:0 0 20px;max-width:440px}
+.campaign-price{font-size:26px;font-weight:800;color:#fff;margin:0 0 26px}
+.campaign-price .old{color:#888;font-size:16px;font-weight:400;margin-left:8px}
 
 .featured{background:#fff;color:#111;padding:88px 0 24px}
 .featured .eyebrow{color:var(--pink)}
@@ -578,6 +598,8 @@ footer small{letter-spacing:.25em;font-size:7px}
   .heading{align-items:flex-start;flex-direction:column}
   .values-grid{grid-template-columns:repeat(2,1fr)}
   .cta-final-inner{flex-direction:column;align-items:flex-start}
+  .campaign-inner{grid-template-columns:1fr;gap:28px}
+  .campaign{padding:48px 0}
 }
 
 @media(max-width:640px){

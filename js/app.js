@@ -194,10 +194,23 @@ function populateBrandFilter() {
     brands.map((b) => `<option value="${esc(b)}" ${state.brand === b ? "selected" : ""}>${esc(b)}</option>`).join("");
 }
 
+// Fase 37 — patrón real de e.l.f.: su botón "Filter & Sort" muestra la
+// CANTIDAD de filtros activos ("Filter & Sort (0)"). Cuenta solo los
+// controles que en VIBE realmente viven en ese diálogo (disponibilidad/
+// promoción/destacados/marca — ver #filterSortForm en index.html), no
+// el grupo/categoría/búsqueda (esos son pills/buscador aparte, no parte
+// de este panel) — evita un número que confunda sobre qué se está
+// filtrando desde dónde.
+function updateFilterSortButton() {
+  const count = [state.available, state.promo, state.featuredOnly, Boolean(state.brand)].filter(Boolean).length;
+  $("#openFilterSort").textContent = count ? `Filter & Sort (${count})` : "Filter & Sort";
+}
+
 function renderProducts() {
   let list = filterProducts(state.products, state);
   list = sortProducts(list, state.sort);
   $("#productGrid").innerHTML = list.map(productCard).join("");
+  updateFilterSortButton();
 
   const isEmpty = list.length === 0;
   $("#emptyState").classList.toggle("hidden", !isEmpty);
@@ -267,6 +280,33 @@ function renderFeatured() {
     : `<p class="empty">Estamos preparando la selección VIBE.</p>`;
 }
 
+// Fase 37 — bloque "Campaña": spotlight de UN producto real (el primero
+// de selectFeatured(), mismo criterio ya usado por Destacados VIBE —
+// featured===true && disponible), inspirado en el spotlight de producto
+// destacado de e.l.f. Sin ningún featured real, la sección completa
+// desaparece — mismo principio que Novedades/Promociones, nunca una
+// campaña inventada. Reutiliza productImage() (mismo placeholder oscuro
+// de las cards cuando no hay foto) en vez de asumir que el destacado
+// siempre tendrá fotografía cargada.
+function renderCampaign() {
+  const [product] = selectFeatured(state.products);
+  const section = $("#campaign");
+  section.classList.toggle("hidden", !product);
+  if (!product) return;
+  const showPromo = product.promoActive === true && product.promoPrice != null;
+  $("#campaignMedia").innerHTML = productImage(product, "campaign-photo");
+  $("#campaignName").textContent = product.name;
+  const descEl = $("#campaignDesc");
+  const hasDesc = Boolean(product.shortDescription);
+  descEl.textContent = hasDesc ? product.shortDescription : "";
+  descEl.classList.toggle("hidden", !hasDesc);
+  $("#campaignPrice").innerHTML = showPromo
+    ? `${money(product.promoPrice)} <span class="old">${money(product.price)}</span>`
+    : money(product.price);
+  $("#campaignCta").dataset.product = product.id;
+  $("#campaignMedia").dataset.product = product.id;
+}
+
 // Fase 26 — Novedades: única fuente, badge === "Nuevo". Si no hay
 // ninguna, la sección completa queda oculta (ausencia total, no un
 // estado vacío visible) — así lo definió el blueprint v1.0.
@@ -310,7 +350,7 @@ function renderCategoryShowcase() {
         <span>${count} producto${count === 1 ? "" : "s"}</span>
         <h3>${esc(g)}</h3>
       </div>
-      <span class="arrow">→</span>
+      <span class="category-card-cta">Explorar categoría <span class="arrow">→</span></span>
     </button>`;
   }).join("");
 }
@@ -677,8 +717,12 @@ function renderProductDetail(p) {
       ${priceInfo.discountPercent ? `<span class="pdp-discount">-${priceInfo.discountPercent}%</span>` : ""}
     </div>
     ${priceInfo.showPromo && p.promoText ? `<p class="pdp-promo-text">${esc(p.promoText)}</p>` : ""}
-    ${unavailable ? `<span class="availability-badge">Agotado</span>` : ""}
     ${hasVariants ? `<div class="variants">${p.variants.map((v) => `<button type="button" class="variant ${v.id === state.variant ? "selected" : ""}" data-variant="${v.id}">${esc(v.name)}</button>`).join("")}</div>` : ""}
+    <!-- Fase 37 — reorden de jerarquía inspirado en el benchmark (imagen
+         → marca → nombre → precio → variante → DISPONIBILIDAD → CTA):
+         antes "Agotado" aparecía antes de las variantes; ahora va justo
+         antes de la acción de compra, que es donde realmente importa. -->
+    ${unavailable ? `<span class="availability-badge">Agotado</span>` : ""}
     <div class="detail-actions">
       <div class="quantity">
         <button type="button" data-q="-1" ${unavailable ? "disabled" : ""}>−</button>
@@ -995,6 +1039,7 @@ bindProductGrid("#featuredGrid");
 // clic en una tarjeta de Novedades o Promociones en Home no abría nada.
 bindProductGrid("#novedadesGrid");
 bindProductGrid("#promocionesGrid");
+bindProductGrid("#campaign");
 // Fase 30 — Discover.
 bindArticleGrid("#discoverHomeGrid");
 bindArticleGrid("#discoverContent");
@@ -1490,6 +1535,7 @@ async function loadCatalog() {
   renderNav();
   renderProducts();
   renderFeatured();
+  renderCampaign();
   renderNovedades();
   renderPromociones();
   renderCategoryShowcase();
