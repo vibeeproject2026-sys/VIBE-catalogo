@@ -209,12 +209,12 @@ async function main() {
           query: {},
           body: {
             product_id: 56,
-            name: "Nombre falso", // operativo, debe ignorarse
-            price: 1, // operativo, debe ignorarse
-            stock: 999, // operativo, debe ignorarse
-            category: "Otro", // operativo, debe ignorarse
+            name: "Nombre falso", // operativo (products.name), debe ignorarse
+            price: 1, // operativo (products.price), debe ignorarse
+            stock: 999, // operativo (products.stock), debe ignorarse
             cost_base: 5, // prohibido, debe ignorarse
             badge: "NUEVO", // editorial, debe conservarse
+            category: "Rostro", // editorial legítimo desde Fase 22B (Categoría VIBE, catalog_metadata.category) — debe conservarse
             published: true, // editorial, debe conservarse
           },
         };
@@ -225,7 +225,8 @@ async function main() {
         assert.equal(capturedBody.product_id, 56);
         assert.equal(capturedBody.badge, "NUEVO");
         assert.equal(capturedBody.published, true);
-        for (const forbidden of ["name", "price", "stock", "category", "cost_base"]) {
+        assert.equal(capturedBody.category, "Rostro"); // Categoría VIBE viaja a catalog_metadata, nunca a products
+        for (const forbidden of ["name", "price", "stock", "cost_base"]) {
           assert.ok(!(forbidden in capturedBody), `campo prohibido llegó a Supabase: ${forbidden}`);
         }
       } finally {

@@ -21,7 +21,7 @@ const { sendJson, sendError, methodNotAllowed } = require("../catalog/_lib/http"
 
 const PRODUCT_COLUMNS = "id,name,price,stock,category";
 const METADATA_COLUMNS =
-  "product_id,image,images,short_description,description,benefits,ingredients,usage,presentation,subcategory,brand,badge,search_keywords,featured,editorial_order,published";
+  "product_id,image,images,short_description,description,benefits,ingredients,usage,presentation,category,subcategory,brand,badge,search_keywords,featured,editorial_order,published,additional_info";
 
 module.exports = async function handler(req, res) {
   if (req.method !== "GET" && req.method !== "PATCH") {

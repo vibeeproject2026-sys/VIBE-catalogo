@@ -60,13 +60,30 @@ dialog::backdrop{background:#000a}
 .x{position:absolute;right:14px;top:14px;border:0;background:transparent;font-size:24px;line-height:1;cursor:pointer;color:#666}
 .edit-pos{background:#f7f7f7;padding:20px 28px;border-bottom:1px solid #eee}
 .edit-pos h2{margin:0 0 12px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#888}
+.section-hint{color:#aaa;font-weight:500;text-transform:none;letter-spacing:0;font-size:11px}
 .edit-pos-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;font-size:13px}
 .edit-pos-grid div span{display:block;color:#999;font-size:10px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px}
+
+.edit-images{padding:24px 28px;border-bottom:1px solid #eee;display:grid;gap:20px}
+.edit-images h2{margin:0;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--pink)}
+.image-block{display:grid;gap:8px}
+.image-block-label{margin:0;font-size:12px;font-weight:700;color:#333}
+.image-preview-main{width:160px;aspect-ratio:4/5;border:1px solid #ddd;border-radius:8px;overflow:hidden;display:flex;align-items:center;justify-content:center;background:#fafafa}
+.image-preview-main img{width:100%;height:100%;object-fit:cover}
+.no-image{color:#999;font-size:12px;text-align:center;padding:8px}
+.image-block input[type="file"]{font-size:12px}
+.image-status{margin:0;font-size:12px;color:#777;min-height:16px}
+.secondary-thumbs{display:flex;flex-wrap:wrap;gap:10px}
+.secondary-thumb{position:relative;width:88px}
+.secondary-thumb img{width:88px;height:110px;object-fit:cover;border:1px solid #ddd;border-radius:6px}
+.secondary-thumb .delete-secondary{margin-top:4px;width:100%;border:1px solid #e2b0c4;background:#fff;color:#c30063;border-radius:6px;font-size:11px;padding:3px 0;cursor:pointer}
 .edit-form{padding:24px 28px;display:grid;gap:16px}
-.edit-form h2{margin:0 0 4px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--pink)}
+.edit-form h2{margin:12px 0 4px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--pink)}
+.edit-form h2:first-child{margin-top:0}
 .edit-form label{display:grid;gap:6px;font-size:12px;font-weight:700;color:#333}
-.edit-form input,.edit-form textarea{border:1px solid #ddd;border-radius:8px;padding:9px 11px;font-size:13px;color:#111}
-.edit-form textarea{min-height:64px;resize:vertical}
+.edit-form input,.edit-form textarea,.edit-form select{border:1px solid #ddd;border-radius:8px;padding:9px 11px;font-size:13px;color:#111;background:#fff}
+.edit-form textarea{min-height:64px;resize:vertical;font-weight:400}
+.edit-form input::placeholder,.edit-form textarea::placeholder{color:#b8b8b8;font-weight:400}
 .edit-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .edit-row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
 .checkbox-field{display:flex;align-items:center;gap:8px;flex-direction:row}

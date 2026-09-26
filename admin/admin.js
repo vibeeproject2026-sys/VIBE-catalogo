@@ -12,6 +12,131 @@ const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const money = (n) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(n);
 
+// Mirrors api/admin/_lib/imageValidation.js — client-side check is just
+// for fast feedback; the server is always the authoritative validator
+// (type, size, dimensions, aspect ratio warning).
+const MAX_UPLOAD_BYTES = 3 * 1024 * 1024;
+const ALLOWED_IMAGE_TYPES = ["image/webp", "image/jpeg", "image/png"];
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+// Uploads one image (slot: "main" | "secondary") via
+// POST /api/admin/product-images. Returns the parsed response payload on
+// success, or null (after writing a message into statusEl) on failure —
+// the server is always re-checked even when the quick client-side check
+// above already passed.
+async function uploadProductImage(productId, file, slot, statusEl) {
+  if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+    statusEl.textContent = "Tipo de archivo no permitido. Usa WebP, JPEG o PNG.";
+    return null;
+  }
+  if (file.size > MAX_UPLOAD_BYTES) {
+    statusEl.textContent = `El archivo pesa ${(file.size / 1024 / 1024).toFixed(1)}MB; el máximo es ${(MAX_UPLOAD_BYTES / 1024 / 1024).toFixed(1)}MB.`;
+    return null;
+  }
+  statusEl.textContent = "Subiendo...";
+  let dataUrl;
+  try {
+    dataUrl = await readFileAsDataUrl(file);
+  } catch {
+    statusEl.textContent = "No se pudo leer el archivo.";
+    return null;
+  }
+  const res = await adminFetch("/api/admin/product-images", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ product_id: productId, slot, contentType: file.type, dataBase64: dataUrl }),
+  });
+  if (res.status === 401) {
+    clearToken();
+    showLogin("Token incorrecto o vencido.");
+    return null;
+  }
+  const payload = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const detail = payload && Array.isArray(payload.details) ? payload.details.join(" ") : null;
+    statusEl.textContent = detail || (payload && payload.error) || "No se pudo subir la imagen.";
+    return null;
+  }
+  statusEl.textContent = payload.warnings && payload.warnings.length ? "Guardada, con avisos: " + payload.warnings.join(" ") : "Imagen guardada.";
+  return payload;
+}
+
+async function deleteSecondaryImage(productId, url, statusEl) {
+  const res = await adminFetch("/api/admin/product-images", {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ product_id: productId, path: url }),
+  });
+  if (res.status === 401) {
+    clearToken();
+    showLogin("Token incorrecto o vencido.");
+    return null;
+  }
+  const payload = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    if (statusEl) statusEl.textContent = (payload && payload.error) || "No se pudo eliminar la imagen.";
+    return null;
+  }
+  return payload;
+}
+
+// Taxonomía VIBE aprobada en Fase 20.2 (docs/fase20-curaduria-editorial-decisiones.md):
+// 3 grupos, 7 categorías. Se ofrecen aquí como opciones de selección
+// manual — nunca se asignan automáticamente. "Sin categoría" siempre
+// disponible; la administradora puede dejarlo vacío si no lo sabe.
+const VIBE_CATEGORY_GROUPS = [
+  { group: "Maquillaje", categories: ["Rostro", "Ojos", "Labios"] },
+  { group: "Skincare", categories: ["Limpieza", "Tratamiento"] },
+  { group: "Accesorios", categories: ["Herramientas de aplicación", "Complementos de belleza"] },
+];
+
+// Subcategorías propuestas en la Fase 20 — ofrecidas como sugerencias en
+// un <datalist>, nunca forzadas: el campo sigue siendo texto libre, así
+// que la administradora puede escribir cualquier otro valor o dejarlo
+// vacío.
+const VIBE_SUBCATEGORY_SUGGESTIONS = [
+  "Base y corrector", "Polvo y fijador", "Iluminador", "Rubor",
+  "Sombras", "Delineado", "Pestañas", "Cejas", "Kits de ojos",
+  "Labiales", "Gloss y oils", "Kits de labios",
+  "Limpiadores", "Tónicos", "Cremas faciales", "Contorno de ojos",
+  "Cuello y escote", "Pestañas (crecimiento)", "Papel matificante",
+  "Mascarillas", "Kits",
+  "Brochas", "Esponjas", "Accesorios para el cabello", "Cuidado personal",
+];
+
+function renderCategoryOptions(selected) {
+  const opts = [`<option value="">Sin categoría</option>`];
+  for (const { group, categories } of VIBE_CATEGORY_GROUPS) {
+    opts.push(`<optgroup label="${esc(group)}">`);
+    for (const c of categories) {
+      opts.push(`<option value="${esc(c)}" ${selected === c ? "selected" : ""}>${esc(c)}</option>`);
+    }
+    opts.push(`</optgroup>`);
+  }
+  return opts.join("");
+}
+
+function renderSecondaryThumbs(images) {
+  const list = Array.isArray(images) ? images : [];
+  if (!list.length) return `<p class="no-image">Sin imágenes secundarias todavía.</p>`;
+  return `<div class="secondary-thumbs">${list
+    .map(
+      (url) => `<div class="secondary-thumb">
+        <img src="${esc(url)}" alt="">
+        <button type="button" class="delete-secondary" data-url="${esc(url)}">Eliminar</button>
+      </div>`
+    )
+    .join("")}</div>`;
+}
+
 let state = { products: [], search: "", status: "all", category: "all" };
 
 function getToken() {
@@ -154,68 +279,117 @@ async function openEdit(productId) {
 
   $("#editContent").innerHTML = `
     <div class="edit-pos">
-      <h2>Información del POS (solo lectura)</h2>
+      <h2>Producto <span class="section-hint">(POS · solo lectura)</span></h2>
       <div class="edit-pos-grid">
         <div><span>ID</span>${product.id}</div>
         <div><span>Nombre</span>${esc(product.name)}</div>
-        <div><span>Categoría</span>${esc(product.category)}</div>
+        <div><span>Categoría POS</span>${esc(product.category)}</div>
         <div><span>Precio</span>${money(product.price)}</div>
         <div><span>Disponibilidad</span>${Number(product.stock) > 0 ? "Disponible" : "Agotado"} (stock: ${product.stock})</div>
       </div>
     </div>
+    <div class="edit-images">
+      <h2>Imágenes</h2>
+      <div class="image-block">
+        <p class="image-block-label">Imagen principal</p>
+        <div class="image-preview-main" id="mainImagePreview">
+          ${m.image ? `<img src="${esc(m.image)}" alt="">` : `<span class="no-image">Sin imagen</span>`}
+        </div>
+        <input type="file" id="mainImageInput" accept="image/webp,image/jpeg,image/png">
+        <button type="button" id="uploadMainBtn" class="button dark">Subir / reemplazar principal</button>
+        <p id="mainImageStatus" class="image-status"></p>
+      </div>
+      <div class="image-block">
+        <p class="image-block-label">Imágenes secundarias</p>
+        <div id="secondaryList">${renderSecondaryThumbs(m.images)}</div>
+        <input type="file" id="secondaryImageInput" accept="image/webp,image/jpeg,image/png">
+        <button type="button" id="uploadSecondaryBtn" class="button">Agregar secundaria</button>
+        <p id="secondaryImageStatus" class="image-status"></p>
+      </div>
+    </div>
     <form id="editForm" class="edit-form">
-      <h2>Información VIBE (editorial)</h2>
+      <h2>Información del producto</h2>
       <label>Imagen (ruta o URL)
         <input name="image" value="${esc(m.image || "")}" placeholder="assets/products/ejemplo.svg">
-        <span class="image-hint">La carga de archivos todavía no está implementada — pega una ruta o URL ya existente. Ver docs/fase17-admin.md.</span>
+        <span class="image-hint">Se actualiza automáticamente al subir una imagen principal arriba. También puedes pegar una ruta o URL manualmente (por ejemplo, una imagen legacy ya existente).</span>
       </label>
-      <div class="edit-row">
-        <label>Subcategoría
-          <input name="subcategory" value="${esc(m.subcategory || "")}" placeholder="Ej. Brochas">
-        </label>
-        <label>Marca
-          <input name="brand" value="${esc(m.brand || "")}">
-        </label>
-      </div>
-      <div class="edit-row">
-        <label>Badge
-          <input name="badge" value="${esc(m.badge || "")}" placeholder="NUEVO / BEST SELLER / VIBE PICK">
-        </label>
-        <label>Presentación
-          <input name="presentation" value="${esc(m.presentation || "")}">
-        </label>
-      </div>
       <label>Descripción corta
-        <input name="short_description" value="${esc(m.short_description || "")}">
+        <input name="short_description" value="${esc(m.short_description || "")}" placeholder="Si no la conoces, déjala vacía.">
       </label>
       <label>Descripción
-        <textarea name="description">${esc(m.description || "")}</textarea>
+        <textarea name="description" rows="5" placeholder="Déjalo vacío si todavía no tienes esta información."></textarea>
       </label>
       <label>Beneficios (uno por línea)
-        <textarea name="benefits">${esc(arrayFieldToText(m.benefits))}</textarea>
+        <textarea name="benefits" rows="5" placeholder="Un beneficio por línea. Déjalo vacío si no lo sabes."></textarea>
       </label>
       <label>Ingredientes
-        <textarea name="ingredients">${esc(m.ingredients || "")}</textarea>
+        <textarea name="ingredients" rows="4" placeholder="Déjalo vacío si no lo sabes."></textarea>
       </label>
       <label>Modo de uso
-        <textarea name="usage">${esc(m.usage || "")}</textarea>
+        <textarea name="usage" rows="4" placeholder="Déjalo vacío si no lo sabes."></textarea>
       </label>
-      <label>Keywords de búsqueda (uno por línea)
-        <textarea name="search_keywords">${esc(arrayFieldToText(m.search_keywords))}</textarea>
-      </label>
-      <div class="edit-row-3">
-        <label class="checkbox-field"><input type="checkbox" name="featured" ${m.featured ? "checked" : ""}> Destacado</label>
-        <label>Orden editorial
-          <input type="number" name="editorial_order" value="${m.editorial_order ?? ""}">
+      <div class="edit-row">
+        <label>Presentación
+          <input name="presentation" value="${esc(m.presentation || "")}" placeholder="Ej. 30ml, set de 5 unidades...">
         </label>
-        <label class="checkbox-field"><input type="checkbox" name="published" ${m.published ? "checked" : ""}> Publicado</label>
+        <label>Marca
+          <input name="brand" value="${esc(m.brand || "")}" placeholder="Déjalo vacío si no la conoces.">
+        </label>
       </div>
+
+      <h2>Clasificación VIBE</h2>
+      <div class="edit-row">
+        <label>Categoría VIBE
+          <select name="category">${renderCategoryOptions(m.category || "")}</select>
+        </label>
+        <label>Subcategoría VIBE
+          <input name="subcategory" list="subcategorySuggestions" value="${esc(m.subcategory || "")}" placeholder="Elige una sugerencia o escribe la tuya">
+        </label>
+      </div>
+      <datalist id="subcategorySuggestions">
+        ${VIBE_SUBCATEGORY_SUGGESTIONS.map((s) => `<option value="${esc(s)}">`).join("")}
+      </datalist>
+      <label>Palabras clave (una por línea)
+        <textarea name="search_keywords" rows="3" placeholder="Una palabra o frase clave por línea."></textarea>
+      </label>
+
+      <h2>Editorial</h2>
+      <div class="edit-row">
+        <label>Badge
+          <input name="badge" value="${esc(m.badge || "")}" placeholder="Ej. NUEVO, VIBE PICK... déjalo vacío si no aplica.">
+        </label>
+        <label>Orden editorial
+          <input type="number" name="editorial_order" value="${m.editorial_order ?? ""}" placeholder="Déjalo vacío si no aplica.">
+        </label>
+      </div>
+      <label class="checkbox-field"><input type="checkbox" name="featured" ${m.featured ? "checked" : ""}> Producto destacado</label>
+
+      <h2>Información adicional</h2>
+      <label>Notas, características u observaciones que no tengan un campo específico
+        <textarea name="additional_info" rows="5" placeholder="Texto libre. No se procesa ni se interpreta automáticamente."></textarea>
+      </label>
+
+      <h2>Publicación</h2>
+      <label class="checkbox-field"><input type="checkbox" name="published" ${m.published ? "checked" : ""}> Publicado</label>
+
       <div class="save-row">
         <span id="saveStatus" class="save-status"></span>
-        <button type="submit" class="button dark">Guardar</button>
+        <button type="button" id="cancelEdit" class="outline-admin">Cancelar</button>
+        <button type="submit" class="button dark">Guardar cambios</button>
       </div>
     </form>
   `;
+
+  // Los <textarea> se llenan por separado (en vez de interpolarlos en el
+  // template de arriba) para no tener que sanitizar contenido largo
+  // dentro de atributos/backticks — .value asigna el texto tal cual, sin
+  // riesgo de romper el HTML generado.
+  $("textarea[name=description]").value = m.description || "";
+  $("textarea[name=benefits]").value = arrayFieldToText(m.benefits);
+  $("textarea[name=ingredients]").value = m.ingredients || "";
+  $("textarea[name=usage]").value = m.usage || "";
+  $("textarea[name=search_keywords]").value = arrayFieldToText(m.search_keywords);
+  $("textarea[name=additional_info]").value = m.additional_info || "";
 
   $("#editForm").addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -223,6 +397,7 @@ async function openEdit(productId) {
     const payload = {
       product_id: product.id,
       image: fd.get("image") || null,
+      category: fd.get("category") || null,
       subcategory: fd.get("subcategory") || null,
       brand: fd.get("brand") || null,
       badge: fd.get("badge") || null,
@@ -235,6 +410,7 @@ async function openEdit(productId) {
       search_keywords: textToArrayField(fd.get("search_keywords") || ""),
       featured: fd.get("featured") === "on",
       editorial_order: fd.get("editorial_order") ? Number(fd.get("editorial_order")) : null,
+      additional_info: fd.get("additional_info") || null,
       published: fd.get("published") === "on",
     };
 
@@ -256,6 +432,51 @@ async function openEdit(productId) {
     $("#saveStatus").textContent = "Guardado.";
     await loadProducts();
     setTimeout(() => $("#editDialog").close(), 500);
+  });
+
+  $("#cancelEdit").addEventListener("click", () => $("#editDialog").close());
+
+  $("#uploadMainBtn").addEventListener("click", async () => {
+    const file = $("#mainImageInput").files[0];
+    const statusEl = $("#mainImageStatus");
+    if (!file) {
+      statusEl.textContent = "Selecciona un archivo primero.";
+      return;
+    }
+    const result = await uploadProductImage(product.id, file, "main", statusEl);
+    if (result) {
+      $("#mainImagePreview").innerHTML = `<img src="${esc(result.image)}" alt="">`;
+      $("input[name=image]").value = result.image || "";
+      await loadProducts();
+    }
+  });
+
+  $("#uploadSecondaryBtn").addEventListener("click", async () => {
+    const file = $("#secondaryImageInput").files[0];
+    const statusEl = $("#secondaryImageStatus");
+    if (!file) {
+      statusEl.textContent = "Selecciona un archivo primero.";
+      return;
+    }
+    const result = await uploadProductImage(product.id, file, "secondary", statusEl);
+    if (result) {
+      $("#secondaryList").innerHTML = renderSecondaryThumbs(result.images);
+      $("#secondaryImageInput").value = "";
+      await loadProducts();
+    }
+  });
+
+  $("#secondaryList").addEventListener("click", async (e) => {
+    const btn = e.target.closest(".delete-secondary");
+    if (!btn) return;
+    if (!confirm("¿Eliminar esta imagen secundaria?")) return;
+    const statusEl = $("#secondaryImageStatus");
+    const result = await deleteSecondaryImage(product.id, btn.dataset.url, statusEl);
+    if (result) {
+      $("#secondaryList").innerHTML = renderSecondaryThumbs(result.images);
+      statusEl.textContent = "Imagen eliminada.";
+      await loadProducts();
+    }
   });
 
   $("#editDialog").showModal();

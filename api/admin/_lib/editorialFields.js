@@ -12,6 +12,7 @@ const EDITORIAL_FIELDS = [
   "ingredients",
   "usage",
   "presentation",
+  "category",
   "subcategory",
   "brand",
   "badge",
@@ -19,6 +20,7 @@ const EDITORIAL_FIELDS = [
   "featured",
   "editorial_order",
   "published",
+  "additional_info",
 ];
 
 function pickEditorialFields(body) {

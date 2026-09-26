@@ -103,16 +103,24 @@ test("con el token correcto, autoriza (true) y no escribe ninguna respuesta", ()
 });
 
 console.log("pickEditorialFields — whitelist");
-test("solo copia los 15 campos editoriales definidos", () => {
-  assert.equal(EDITORIAL_FIELDS.length, 15);
+test("solo copia los 17 campos editoriales definidos (Fase 22B agrega category y additional_info)", () => {
+  assert.equal(EDITORIAL_FIELDS.length, 17);
+  assert.ok(EDITORIAL_FIELDS.includes("category"), "category (Categoría VIBE) debe estar en la whitelist");
+  assert.ok(EDITORIAL_FIELDS.includes("additional_info"), "additional_info debe estar en la whitelist");
 });
-test("un payload con campos operativos/prohibidos solo conserva los editoriales", () => {
+test("un payload con campos operativos/prohibidos del POS solo conserva los editoriales", () => {
+  // Nota: "category" aquí SÍ es un campo editorial legítimo desde la
+  // Fase 22B (catalog_metadata.category = "Categoría VIBE", distinta de
+  // products.category del POS) — esta función nunca escribe en la tabla
+  // products bajo ninguna circunstancia (eso lo garantiza que
+  // _lib/adminWrite.js solo apunta a catalog_metadata, no el nombre de
+  // la clave), así que no hay ambigüedad real: da igual que el nombre de
+  // la columna coincida, la tabla de destino nunca cambia.
   const malicious = {
     product_id: 999, // se maneja aparte por el handler, no por esta función
     name: "Producto falso",
     price: 1,
     stock: 999,
-    category: "Otro",
     cost_base: 1,
     cost_pack: 1,
     min_stock: 1,
@@ -120,11 +128,13 @@ test("un payload con campos operativos/prohibidos solo conserva los editoriales"
     transactions: "algo",
     published: true,
     badge: "NUEVO",
+    category: "Rostro", // editorial legítimo (Categoría VIBE), debe conservarse
+    additional_info: "nota interna de prueba", // editorial legítimo, debe conservarse
   };
   const picked = pickEditorialFields(malicious);
-  assert.deepEqual(Object.keys(picked).sort(), ["badge", "published"]);
-  for (const forbidden of ["product_id", "name", "price", "stock", "category", "cost_base", "cost_pack", "min_stock", "sales", "transactions"]) {
-    assert.ok(!(forbidden in picked), `campo prohibido se filtró: ${forbidden}`);
+  assert.deepEqual(Object.keys(picked).sort(), ["additional_info", "badge", "category", "published"]);
+  for (const forbidden of ["product_id", "name", "price", "stock", "cost_base", "cost_pack", "min_stock", "sales", "transactions"]) {
+    assert.ok(!(forbidden in picked), `campo prohibido del POS se filtró: ${forbidden}`);
   }
 });
 test("un payload vacío o inválido no lanza y devuelve objeto vacío", () => {
