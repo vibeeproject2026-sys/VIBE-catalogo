@@ -8,11 +8,16 @@
 // Embedding can be adopted later as an optimization once the schema is
 // live and confirmed.
 
+// Fase 31 — LEFT JOIN: todo producto del POS se incluye, tenga o no una
+// fila editorial publicada. metadata queda null cuando no existe (o
+// cuando existe pero published !== true — metadataRows ya viene filtrada
+// a published=true, así que ambos casos llegan aquí como "sin fila" y
+// shapeProduct() los trata exactamente igual: el producto se muestra con
+// los datos del POS solamente, nunca se cae del catálogo por falta de
+// curaduría editorial).
 function joinCatalog(products, metadataRows) {
   const metaByProductId = new Map(metadataRows.map((m) => [String(m.product_id), m]));
-  return products
-    .map((product) => ({ product, metadata: metaByProductId.get(String(product.id)) }))
-    .filter((row) => Boolean(row.metadata)); // metadataRows is expected to already be published=true only
+  return products.map((product) => ({ product, metadata: metaByProductId.get(String(product.id)) || null }));
 }
 
 // Fase 26 — resuelve la promoción del producto server-side: promo_active
@@ -28,7 +33,17 @@ function resolvePromoActive(product, now = new Date()) {
   return true;
 }
 
+// Fase 31 — name/price/available (derivado de stock) vienen siempre de
+// `product` (POS), nunca de metadata, y nunca se duplican en
+// catalog_metadata (ver migración 0001, comentario de la tabla). Todo lo
+// demás es editorial y estrictamente opcional: cuando metadata es null
+// (producto sin ficha, o con una fila aún no publicada — join Catalog ya
+// unifica ambos casos), cada campo cae a su valor "ausente" (null, []
+// o false) exactamente igual que cuando la fila existe pero un campo
+// puntual no fue llenado. El frontend ya sabe ocultar con elegancia
+// cualquier campo así.
 function shapeProduct(product, metadata, resolveCategoryGroup) {
+  const m = metadata || {};
   return {
     id: product.id,
     name: product.name,
@@ -43,23 +58,20 @@ function shapeProduct(product, metadata, resolveCategoryGroup) {
     // `category` (POS) and `categoryGroup` (static fallback derived from
     // POS category). Additive field: null until an admin sets it, never
     // inferred or defaulted from the other two.
-    editorialCategory: metadata.category ?? null,
-    subcategory: metadata.subcategory ?? null,
-    image: metadata.image ?? null,
-    images: Array.isArray(metadata.images) ? metadata.images : [],
-    shortDescription: metadata.short_description ?? null,
-    description: metadata.description ?? null,
-    benefits: Array.isArray(metadata.benefits) ? metadata.benefits : [],
-    ingredients: metadata.ingredients ?? null,
-    usage: metadata.usage ?? null,
-    presentation: metadata.presentation ?? null,
-    brand: metadata.brand ?? null,
-    badge: metadata.badge ?? null,
-    featured: Boolean(metadata.featured),
-    editorialOrder:
-      metadata.editorial_order === null || metadata.editorial_order === undefined
-        ? null
-        : Number(metadata.editorial_order),
+    editorialCategory: m.category ?? null,
+    subcategory: m.subcategory ?? null,
+    image: m.image ?? null,
+    images: Array.isArray(m.images) ? m.images : [],
+    shortDescription: m.short_description ?? null,
+    description: m.description ?? null,
+    benefits: Array.isArray(m.benefits) ? m.benefits : [],
+    ingredients: m.ingredients ?? null,
+    usage: m.usage ?? null,
+    presentation: m.presentation ?? null,
+    brand: m.brand ?? null,
+    badge: m.badge ?? null,
+    featured: Boolean(m.featured),
+    editorialOrder: m.editorial_order === null || m.editorial_order === undefined ? null : Number(m.editorial_order),
   };
 }
 

@@ -130,7 +130,7 @@ async function main() {
       }
     });
 
-    await test("GET with a full mocked dataset returns only published products, shaped and cached", async () => {
+    await test("GET with a full mocked dataset returns every POS product, shaped and cached (Fase 31: editorial metadata is optional)", async () => {
       process.env.SUPABASE_URL = "https://example.supabase.co";
       process.env.SUPABASE_SERVICE_ROLE_KEY = "test-key-not-real";
       const originalFetch = global.fetch;
@@ -142,7 +142,7 @@ async function main() {
             text: async () =>
               JSON.stringify([
                 { id: 1, name: "Daily Glow Cleanser", price: 58900, stock: 5, category: "Skincare", cost_base: 999 },
-                { id: 2, name: "Unpublished Thing", price: 1000, stock: 3, category: "Otro", cost_base: 1 },
+                { id: 2, name: "Sin ficha editorial todavia", price: 1000, stock: 3, category: "Otro", cost_base: 1 },
               ]),
           };
         }
@@ -169,7 +169,8 @@ async function main() {
                   editorial_order: 1,
                   published: true,
                 },
-                // product id 2 has NO metadata row -> must not appear
+                // product id 2 has NO metadata row -> must still appear
+                // (Fase 31), only with name/price/stock-derived availability.
               ]),
           };
         }
@@ -181,13 +182,22 @@ async function main() {
         await handler(req, res);
         assert.equal(res.statusCode, 200);
         if (label === "products") {
-          assert.equal(res.body.products.length, 1);
-          assert.equal(res.body.products[0].id, 1);
+          assert.equal(res.body.products.length, 2);
+          const withMeta = res.body.products.find((p) => p.id === 1);
+          const withoutMeta = res.body.products.find((p) => p.id === 2);
+          assert.equal(withMeta.image, "assets/products/cleanser.svg");
+          assert.equal(withoutMeta.name, "Sin ficha editorial todavia");
+          assert.equal(withoutMeta.price, 1000);
+          assert.equal(withoutMeta.available, true); // stock: 3
+          assert.equal(withoutMeta.image, null);
+          assert.deepEqual(withoutMeta.benefits, []);
           assert.equal(JSON.stringify(res.body).includes("cost_base"), false);
           assert.equal(JSON.stringify(res.body).includes('"stock"'), false);
         } else {
-          assert.equal(res.body.categories.length, 1);
-          assert.equal(res.body.categories[0].group, "Skincare");
+          // Ambos productos aportan a la navegación ahora, no solo el curado.
+          assert.equal(res.body.categories.length, 2);
+          const groups = res.body.categories.map((g) => g.group).sort();
+          assert.deepEqual(groups, ["Otros", "Skincare"]);
         }
         assert.ok(res.headers["Cache-Control"].includes("max-age"));
       } finally {

@@ -2,11 +2,11 @@
 //
 // Returns the catalog's navigation structure: editorial group (static
 // mapping, see _lib/categoryGroups.js) -> POS category -> subcategories
-// actually present in published products. Groups/categories with zero
-// published products are omitted — showing an empty category would lead
-// a customer into a dead end, which runs against the "curated
-// discovery" UX principle defined in Fase 2. This is a deliberate
-// decision, not an oversight.
+// actually present in the catalog. Fase 31: every POS product counts
+// here now, not only ones with a published editorial row (see
+// _lib/merge.js#joinCatalog) — a group/category only ever appears if at
+// least one real product (curated or not) exists in it, so this still
+// never leads a customer into a dead end.
 
 const { getEnv } = require("./_lib/env");
 const { pgrestSelect } = require("./_lib/supabaseRead");

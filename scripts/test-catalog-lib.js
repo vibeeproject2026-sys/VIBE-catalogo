@@ -37,12 +37,17 @@ async function main() {
     assert.equal(resolveCategoryGroup("CategoriaQueNoExiste"), "Otros");
   });
 
-  console.log("joinCatalog");
-  await test("only keeps products that have a matching metadata row", () => {
+  console.log("joinCatalog (Fase 31 — LEFT JOIN: todo producto del POS se incluye)");
+  await test("incluye TODOS los productos, tengan o no una fila de metadata", () => {
     const products = [{ id: 1 }, { id: 2 }, { id: 3 }];
     const metadata = [{ product_id: 1 }, { product_id: 3 }];
     const joined = joinCatalog(products, metadata);
-    assert.deepEqual(joined.map((r) => r.product.id), [1, 3]);
+    assert.deepEqual(joined.map((r) => r.product.id), [1, 2, 3]);
+  });
+  await test("un producto sin fila de metadata queda con metadata: null (nunca undefined, nunca se cae del join)", () => {
+    const joined = joinCatalog([{ id: 5 }], []);
+    assert.equal(joined.length, 1);
+    assert.equal(joined[0].metadata, null);
   });
 
   console.log("shapeProduct");
@@ -162,6 +167,64 @@ async function main() {
     delete metadataWithNoPrice.price; // metadata never has a price field to begin with
     const shaped = shapeProduct(sampleProduct, metadataWithNoPrice, resolveCategoryGroup);
     assert.equal(shaped.price, 58900);
+  });
+
+  console.log("shapeProduct — Fase 31 (metadata null: producto solo-POS)");
+  await test("con metadata null, el producto se arma igual (nombre/precio/disponibilidad del POS), sin lanzar", () => {
+    const shaped = shapeProduct(sampleProduct, null, resolveCategoryGroup);
+    assert.equal(shaped.name, "Daily Glow Cleanser");
+    assert.equal(shaped.price, 58900);
+    assert.equal(shaped.available, true);
+    assert.equal(shaped.category, "Skincare");
+    assert.equal(shaped.categoryGroup, "Skincare");
+  });
+  await test("con metadata null, todos los campos editoriales caen a su valor 'ausente' (null/[]/false), nunca undefined ni inventado", () => {
+    const shaped = shapeProduct(sampleProduct, null, resolveCategoryGroup);
+    assert.deepEqual(
+      {
+        editorialCategory: shaped.editorialCategory,
+        subcategory: shaped.subcategory,
+        image: shaped.image,
+        images: shaped.images,
+        shortDescription: shaped.shortDescription,
+        description: shaped.description,
+        benefits: shaped.benefits,
+        ingredients: shaped.ingredients,
+        usage: shaped.usage,
+        presentation: shaped.presentation,
+        brand: shaped.brand,
+        badge: shaped.badge,
+        featured: shaped.featured,
+        editorialOrder: shaped.editorialOrder,
+      },
+      {
+        editorialCategory: null,
+        subcategory: null,
+        image: null,
+        images: [],
+        shortDescription: null,
+        description: null,
+        benefits: [],
+        ingredients: null,
+        usage: null,
+        presentation: null,
+        brand: null,
+        badge: null,
+        featured: false,
+        editorialOrder: null,
+      }
+    );
+  });
+  await test("promociones del POS siguen funcionando aunque el producto no tenga ninguna ficha editorial", () => {
+    const shaped = shapeProduct({ ...sampleProduct, promo_active: true, promo_price: 45000, promo_text: "-20%" }, null, resolveCategoryGroup);
+    assert.equal(shaped.promoActive, true);
+    assert.equal(shaped.promoPrice, 45000);
+  });
+  await test("metadata con una fila real produce exactamente el mismo resultado de siempre (sin regresión)", () => {
+    const withMeta = shapeProduct(sampleProduct, sampleMetadata, resolveCategoryGroup);
+    assert.equal(withMeta.image, "assets/products/cleanser.svg");
+    assert.equal(withMeta.featured, true);
+    assert.equal(withMeta.badge, "Nuevo");
   });
 
   console.log("sortCatalog");

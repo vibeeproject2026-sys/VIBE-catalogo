@@ -1,10 +1,15 @@
 // GET /api/catalog/products — public, read-only.
 //
-// Returns only products that are ready to be shown in the VIBE catalog:
-// products.stock/price/category come from the POS (single source of
-// truth); everything else comes from catalog_metadata, and only rows
-// with published = true are ever considered. No write methods exist on
-// this endpoint on purpose (Fase 6 is read-only by design).
+// Fase 31: every product in the POS is returned — name/price/stock
+// (-> available) always come straight from products, the single
+// operational source of truth, and are never duplicated into
+// catalog_metadata. Editorial enrichment (image, description, etc.) is
+// strictly progressive: it's layered in from catalog_metadata only for
+// rows that exist and are published = true (see
+// _lib/merge.js#joinCatalog/shapeProduct); a product with no editorial
+// row at all is just as valid a catalog entry as a fully curated one.
+// No write methods exist on this endpoint on purpose (Fase 6 is
+// read-only by design).
 
 const { getEnv } = require("./_lib/env");
 const { pgrestSelect } = require("./_lib/supabaseRead");

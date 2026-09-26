@@ -114,7 +114,7 @@ function productCard(p) {
     <div class="card-body">
       <p class="product-category">${esc(p.category)}</p>
       <h3>${esc(p.name)}</h3>
-      <p class="desc">${esc(p.shortDescription)}</p>
+      ${p.shortDescription ? `<p class="desc">${esc(p.shortDescription)}</p>` : ""}
       <span class="price">${money(showPromo ? p.promoPrice : p.price)}</span>
       ${showPromo ? `<span class="old">${money(p.price)}</span>` : p.oldPrice ? `<span class="old">${money(p.oldPrice)}</span>` : ""}
       ${p.available === false ? `<span class="availability-badge">Agotado</span>` : ""}
