@@ -81,9 +81,21 @@ module.exports = async function handler(req, res) {
     return sendError(res, 502, "No se pudo subir la imagen.");
   }
 
+  // Fase 36 — reemplazar una imagen con el mismo slot/extensión sube al
+  // MISMO path (x-upsert sobrescribe el objeto), así que la URL pública
+  // no cambia — y esa URL sí vive detrás de la CDN pública de Storage
+  // (a diferencia de la lectura autenticada del manifiesto, ver
+  // storage.js). Sin un cache-buster, el navegador y la CDN siguen
+  // sirviendo el archivo anterior indefinidamente bajo esa misma URL. Un
+  // query string con la hora del reemplazo fuerza contenido fresco sin
+  // cambiar el path real en Storage — pathFromUrl ya lo ignora al
+  // reconstruir el path para las comparaciones/limpieza de abajo.
+  const version = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const versionedUrl = `${uploadedUrl}?v=${version}`;
+
   const field = slot === "mobile" ? "mobileImage" : "image";
   const previous = slides[index][field] || null;
-  const updated = { ...slides[index], [field]: uploadedUrl, updatedAt: new Date().toISOString() };
+  const updated = { ...slides[index], [field]: versionedUrl, updatedAt: new Date().toISOString() };
   const next = [...slides];
   next[index] = updated;
 

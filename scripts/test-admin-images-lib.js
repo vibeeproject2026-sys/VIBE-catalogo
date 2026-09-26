@@ -115,6 +115,21 @@ test("isOwnedPath rechaza imágenes legacy/externas (ej. producto 56, assets/pro
   assert.equal(pathFromUrl(env, "assets/products/brush.svg"), null);
 });
 
+// Fase 36 — hero-slide-image.js le agrega "?v=<timestamp>" a la URL que
+// guarda (cache-busting real, ver storage.js/downloadObject) para que un
+// reemplazo de imagen con el mismo slot/extensión no siga sirviendo el
+// archivo anterior desde la CDN pública. pathFromUrl debe seguir
+// reconociendo el path real por debajo de esa query string — si no, la
+// limpieza best-effort del archivo anterior (hero-slide-image.js,
+// hero-slides.js DELETE) apuntaría a un path inexistente.
+test("pathFromUrl ignora un query string de cache-busting (?v=...) al reconstruir el path real", () => {
+  const env = { url: "https://example.supabase.co" };
+  const path = buildMainPath(56, "webp");
+  const versionedUrl = `${publicUrl(env, path)}?v=1234567890`;
+  assert.equal(pathFromUrl(env, versionedUrl), path);
+  assert.equal(isOwnedPath(env, versionedUrl), true);
+});
+
 test("nextSecondarySeq usa el máximo numérico ya usado, no solo la longitud del arreglo (evita colisiones tras un delete intermedio)", () => {
   const env = { url: "https://example.supabase.co" };
   const images = [publicUrl(env, "products/56/01.webp"), publicUrl(env, "products/56/03.webp")];

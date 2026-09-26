@@ -73,7 +73,10 @@ function mockStorage(initialFiles = {}) {
     const method = opts.method || "GET";
     const m = url.match(/\/storage\/v1\/object\/product-images\/(.+)$/);
     if (!m) throw new Error("URL de storage inesperada en el mock: " + url);
-    const path = m[1];
+    // Fase 36 — downloadObject ahora agrega un query string de
+    // cache-busting (ver storage.js); Storage real ignora la query al
+    // resolver el objeto, así que el mock hace lo mismo.
+    const path = m[1].split("?")[0];
     if (method === "GET") {
       // Comportamiento real confirmado contra Supabase Storage (Fase
       // 33): un objeto inexistente responde HTTP 400, no 404 — el "404"
@@ -336,6 +339,85 @@ async function main() {
     });
   });
 
+  // Fase 36 — antes, mover una fila en Admin hacía dos PATCH secuenciales
+  // (uno por slide), cada uno su propio read-modify-write del manifiesto
+  // completo: el segundo request podía basarse en una copia que no
+  // incluía lo que el primero acababa de guardar y perder ese cambio
+  // (lost update). PATCH { reorder: [...] } aplica ambos `order` en un
+  // único read-modify-write, así que no hay ventana entre medio.
+  await test("PATCH { reorder } aplica varios order en un único read-modify-write (fix del bug de reordenar)", async () => {
+    await withEnv(BASE_ENV, async () => {
+      const { fetchImpl } = mockStorage();
+      const originalFetch = global.fetch;
+      global.fetch = fetchImpl;
+      try {
+        const ids = [];
+        for (const title of ["Uno", "Dos"]) {
+          const r = mockRes();
+          await adminHandler({ method: "POST", headers: AUTH, body: { title } }, r);
+          ids.push(r.body.slide.id);
+        }
+        const [idUno, idDos] = ids;
+
+        const res = mockRes();
+        await adminHandler(
+          {
+            method: "PATCH",
+            headers: AUTH,
+            body: {
+              reorder: [
+                { id: idUno, order: 2 },
+                { id: idDos, order: 1 },
+              ],
+            },
+          },
+          res
+        );
+        assert.equal(res.statusCode, 200);
+        const byId = Object.fromEntries(res.body.slides.map((s) => [s.id, s.order]));
+        assert.equal(byId[idUno], 2);
+        assert.equal(byId[idDos], 1);
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
+  });
+
+  await test("PATCH { reorder } con un id inexistente -> 404, no guarda ningún cambio", async () => {
+    await withEnv(BASE_ENV, async () => {
+      const { fetchImpl } = mockStorage();
+      const originalFetch = global.fetch;
+      global.fetch = fetchImpl;
+      try {
+        const createRes = mockRes();
+        await adminHandler({ method: "POST", headers: AUTH, body: { title: "Real" } }, createRes);
+        const realId = createRes.body.slide.id;
+
+        const res = mockRes();
+        await adminHandler(
+          {
+            method: "PATCH",
+            headers: AUTH,
+            body: {
+              reorder: [
+                { id: realId, order: 5 },
+                { id: "no-existe", order: 6 },
+              ],
+            },
+          },
+          res
+        );
+        assert.equal(res.statusCode, 404);
+
+        const check = mockRes();
+        await adminHandler({ method: "GET", headers: AUTH, body: {} }, check);
+        assert.notEqual(check.body.slides.find((s) => s.id === realId).order, 5);
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
+  });
+
   console.log("\nupload de imagen (desktop y mobile)");
 
   await test("upload desktop válido actualiza slide.image y aparece en el endpoint público al activar", async () => {
@@ -403,6 +485,37 @@ async function main() {
         await imageHandler({ method: "POST", headers: AUTH, body: { slide_id: id, slot: "desktop", contentType: "image/jpeg", dataBase64: jpegBuf.toString("base64") } }, mockRes());
         await new Promise((r) => setImmediate(r));
         assert.ok(calls.deletes.includes(`hero/${id}/main.png`));
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
+  });
+
+  // Fase 36 — el bug real reportado ("reemplazar imagen no funciona"):
+  // reemplazar con el MISMO slot/extensión sube al mismo path (x-upsert
+  // sobreescribe), así que sin un cache-buster la URL pública devuelta era
+  // literalmente idéntica a la anterior — navegador y CDN seguían
+  // sirviendo el archivo viejo bajo esa misma URL indefinidamente. La URL
+  // guardada ahora lleva "?v=<timestamp>", que cambia en cada subida.
+  await test("reemplazo de imagen con MISMO slot/extensión: la URL devuelta cambia (cache-busting), aunque el path real sea el mismo", async () => {
+    await withEnv(BASE_ENV, async () => {
+      const { fetchImpl } = mockStorage();
+      const originalFetch = global.fetch;
+      global.fetch = fetchImpl;
+      try {
+        const createRes = mockRes();
+        await adminHandler({ method: "POST", headers: AUTH, body: { title: "X" } }, createRes);
+        const id = createRes.body.slide.id;
+
+        const first = mockRes();
+        await imageHandler({ method: "POST", headers: AUTH, body: { slide_id: id, slot: "desktop", contentType: "image/png", dataBase64: makePng(1600, 900).toString("base64") } }, first);
+        const second = mockRes();
+        await imageHandler({ method: "POST", headers: AUTH, body: { slide_id: id, slot: "desktop", contentType: "image/png", dataBase64: makePng(1400, 1000).toString("base64") } }, second);
+
+        assert.notEqual(first.body.slide.image, second.body.slide.image, "la URL debe cambiar entre reemplazos aunque el path de Storage sea el mismo");
+        // el path real (sin query) debe seguir siendo el mismo objeto — no se creó basura nueva
+        assert.ok(first.body.slide.image.includes(`hero/${id}/main.png`));
+        assert.ok(second.body.slide.image.includes(`hero/${id}/main.png`));
       } finally {
         global.fetch = originalFetch;
       }

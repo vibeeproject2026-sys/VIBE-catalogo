@@ -29,7 +29,12 @@ module.exports = async function handler(req, res) {
   try {
     const slides = await loadSlides(env);
     const active = getActiveSlides(slides).map(shapePublicSlide);
-    res.setHeader("Cache-Control", "public, max-age=60, s-maxage=300, stale-while-revalidate=600");
+    // Fase 36 — s-maxage=300/swr=600 (hasta 15 min en el peor caso) es lo
+    // que hacía que un cambio guardado en Admin tardara demasiado en
+    // reflejarse en el catálogo público vía la CDN de Vercel. 30s es
+    // suficiente para seguir aliviando carga sin que un cambio de Hero se
+    // sienta "perdido".
+    res.setHeader("Cache-Control", "public, max-age=15, s-maxage=30, stale-while-revalidate=60");
     return sendJson(res, 200, { slides: active });
   } catch (e) {
     console.error("[hero/slides] " + (e && e.message ? e.message : e));

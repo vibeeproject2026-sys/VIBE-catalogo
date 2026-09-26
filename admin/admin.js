@@ -766,6 +766,31 @@ async function patchSlide(id, fields) {
   return payload;
 }
 
+// Fase 36 — antes, mover una fila hacía dos patchSlide() secuenciales (uno
+// por slide). Cada uno era su propio read-modify-write del manifiesto
+// completo, así que el segundo podía escribir sobre una copia que no
+// incluía lo que el primero acababa de guardar y perder ese cambio. Un
+// solo PATCH con { reorder: [...] } aplica ambos `order` en un único
+// read-modify-write en el servidor — ver api/admin/hero-slides.js.
+async function reorderSlides(updates) {
+  const res = await adminFetch("/api/admin/hero-slides", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ reorder: updates }),
+  });
+  if (res.status === 401) {
+    clearToken();
+    showLogin("Token incorrecto o vencido.");
+    return null;
+  }
+  const payload = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    alert((payload && payload.error) || "No se pudo reordenar.");
+    return null;
+  }
+  return payload;
+}
+
 function heroPreviewHtml(fields) {
   const hasCopy = fields.eyebrow || fields.title || fields.subtitle || fields.ctaText;
   return `<div class="hero-preview">
@@ -919,29 +944,39 @@ function openHeroEdit(slide) {
 
   $("#cancelHeroEdit").addEventListener("click", () => $("#heroEditDialog").close());
 
-  $("#uploadHeroDesktopBtn").addEventListener("click", async () => {
+  $("#uploadHeroDesktopBtn").addEventListener("click", async (e) => {
     const file = $("#heroDesktopInput").files[0];
     const statusEl = $("#heroDesktopStatus");
     if (!file) {
       statusEl.textContent = "Selecciona un archivo primero.";
       return;
     }
-    const updated = await uploadHeroImage(s.id, file, "desktop", statusEl);
-    if (updated) {
-      $("#heroPreviewBox").dataset.image = updated.image || "";
-      updateHeroPreview();
-      await loadHeroSlides();
+    e.currentTarget.disabled = true;
+    try {
+      const updated = await uploadHeroImage(s.id, file, "desktop", statusEl);
+      if (updated) {
+        $("#heroPreviewBox").dataset.image = updated.image || "";
+        updateHeroPreview();
+        await loadHeroSlides();
+      }
+    } finally {
+      e.currentTarget.disabled = false;
     }
   });
-  $("#uploadHeroMobileBtn").addEventListener("click", async () => {
+  $("#uploadHeroMobileBtn").addEventListener("click", async (e) => {
     const file = $("#heroMobileInput").files[0];
     const statusEl = $("#heroMobileStatus");
     if (!file) {
       statusEl.textContent = "Selecciona un archivo primero.";
       return;
     }
-    const updated = await uploadHeroImage(s.id, file, "mobile", statusEl);
-    if (updated) await loadHeroSlides();
+    e.currentTarget.disabled = true;
+    try {
+      const updated = await uploadHeroImage(s.id, file, "mobile", statusEl);
+      if (updated) await loadHeroSlides();
+    } finally {
+      e.currentTarget.disabled = false;
+    }
   });
 
   $("#heroEditDialog").showModal();
@@ -949,27 +984,33 @@ function openHeroEdit(slide) {
 
 $("#tabProducts").addEventListener("click", () => switchAdminView("products"));
 $("#tabHero").addEventListener("click", () => switchAdminView("hero"));
-$("#newSlideBtn").addEventListener("click", async () => {
-  // Crea el draft en el servidor ANTES de abrir el diálogo — nunca hay
-  // upload UI para un slide que todavía no existe (ver comentario arriba
-  // de openHeroEdit).
-  const res = await adminFetch("/api/admin/hero-slides", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({}),
-  });
-  if (res.status === 401) {
-    clearToken();
-    showLogin("Token incorrecto o vencido.");
-    return;
+$("#newSlideBtn").addEventListener("click", async (e) => {
+  if (e.currentTarget.disabled) return;
+  e.currentTarget.disabled = true;
+  try {
+    // Crea el draft en el servidor ANTES de abrir el diálogo — nunca hay
+    // upload UI para un slide que todavía no existe (ver comentario arriba
+    // de openHeroEdit).
+    const res = await adminFetch("/api/admin/hero-slides", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    if (res.status === 401) {
+      clearToken();
+      showLogin("Token incorrecto o vencido.");
+      return;
+    }
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      alert((payload && payload.error) || "No se pudo crear el slide.");
+      return;
+    }
+    await loadHeroSlides();
+    openHeroEdit(payload.slide);
+  } finally {
+    e.currentTarget.disabled = false;
   }
-  const payload = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    alert((payload && payload.error) || "No se pudo crear el slide.");
-    return;
-  }
-  await loadHeroSlides();
-  openHeroEdit(payload.slide);
 });
 $("#closeHeroEdit").addEventListener("click", () => $("#heroEditDialog").close());
 
@@ -980,33 +1021,50 @@ $("#heroRows").addEventListener("click", async (e) => {
     if (slide) openHeroEdit(slide);
     return;
   }
+
   const toggleBtn = e.target.closest("[data-toggle]");
-  if (toggleBtn) {
-    const slide = heroState.slides.find((s) => s.id === toggleBtn.dataset.toggle);
-    if (slide) {
-      const saved = await patchSlide(slide.id, { active: !slide.active });
-      if (saved) await loadHeroSlides();
-    }
-    return;
-  }
   const deleteBtn = e.target.closest("[data-delete-slide]");
-  if (deleteBtn) {
-    if (!confirm("¿Eliminar este slide? Esta acción no se puede deshacer.")) return;
-    const res = await adminFetch("/api/admin/hero-slides", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: deleteBtn.dataset.deleteSlide }),
-    });
-    if (res.status === 401) {
-      clearToken();
-      showLogin("Token incorrecto o vencido.");
+  const moveBtn = e.target.closest("[data-move]");
+  const actionBtn = toggleBtn || deleteBtn || moveBtn;
+  if (!actionBtn || actionBtn.disabled) return;
+
+  // Fase 36, sección 10 — activar/desactivar, eliminar y reordenar son
+  // las tres acciones de esta tabla que van a la red; sin esto, un doble
+  // clic mientras la primera solicitud sigue en curso dispara una
+  // segunda antes de que la tabla se haya vuelto a renderizar. Se
+  // liberan siempre en el finally (éxito o error) — nunca dependen de
+  // que loadHeroSlides() las reemplace, que solo ocurre en el camino
+  // feliz.
+  // Solo se tocan los botones que no estaban ya deshabilitados por su
+  // propio estado (las flechas ↑/↓ en el borde de la lista, ver
+  // renderHeroTable) — nunca se los "reactiva" por error al terminar.
+  const rowButtons = [...$("#heroRows").querySelectorAll("button")].filter((b) => !b.disabled);
+  rowButtons.forEach((b) => (b.disabled = true));
+  try {
+    if (toggleBtn) {
+      const slide = heroState.slides.find((s) => s.id === toggleBtn.dataset.toggle);
+      if (slide) {
+        const saved = await patchSlide(slide.id, { active: !slide.active });
+        if (saved) await loadHeroSlides();
+      }
       return;
     }
-    if (res.ok) await loadHeroSlides();
-    return;
-  }
-  const moveBtn = e.target.closest("[data-move]");
-  if (moveBtn) {
+    if (deleteBtn) {
+      if (!confirm("¿Eliminar este slide? Esta acción no se puede deshacer.")) return;
+      const res = await adminFetch("/api/admin/hero-slides", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: deleteBtn.dataset.deleteSlide }),
+      });
+      if (res.status === 401) {
+        clearToken();
+        showLogin("Token incorrecto o vencido.");
+        return;
+      }
+      if (res.ok) await loadHeroSlides();
+      return;
+    }
+    // moveBtn
     const id = moveBtn.dataset.id;
     const dir = moveBtn.dataset.move;
     const index = heroState.slides.findIndex((s) => s.id === id);
@@ -1014,9 +1072,13 @@ $("#heroRows").addEventListener("click", async (e) => {
     if (swapWith < 0 || swapWith >= heroState.slides.length) return;
     const a = heroState.slides[index];
     const b = heroState.slides[swapWith];
-    await patchSlide(a.id, { order: b.order });
-    await patchSlide(b.id, { order: a.order });
-    await loadHeroSlides();
+    const saved = await reorderSlides([
+      { id: a.id, order: b.order },
+      { id: b.id, order: a.order },
+    ]);
+    if (saved) await loadHeroSlides();
+  } finally {
+    rowButtons.forEach((b) => (b.disabled = false));
   }
 });
 

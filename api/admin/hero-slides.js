@@ -97,6 +97,47 @@ module.exports = async function handler(req, res) {
     }
   }
 
+  // Fase 36 — reordenar movía dos slides con dos PATCH secuenciales
+  // independientes (cada uno su propio read-modify-write del manifiesto
+  // completo). Con dos requests separados, el segundo puede escribir a
+  // partir de una copia que no incluye lo que el primero acababa de
+  // guardar, perdiendo ese cambio (clásico lost update — sección 8 de la
+  // fase). Un solo request que aplica todos los `order` en un único
+  // read-modify-write elimina la ventana por completo. Reservado a
+  // `order`: es lo único que el reordenamiento necesita tocar.
+  if (req.method === "PATCH" && Array.isArray(body.reorder)) {
+    const updates = body.reorder;
+    for (const u of updates) {
+      if (!u || typeof u.id !== "string" || typeof u.order !== "number" || !Number.isFinite(u.order)) {
+        return sendError(res, 400, "reorder inválido: cada entrada necesita id (string) y order (número).");
+      }
+    }
+    let slides;
+    try {
+      slides = await loadSlides(env);
+    } catch (e) {
+      console.error("[admin/hero-slides] " + (e && e.message ? e.message : e));
+      return sendError(res, 502, "No se pudo obtener el listado de slides.");
+    }
+    const ids = new Set(slides.map((s) => s.id));
+    for (const u of updates) {
+      if (!ids.has(u.id)) return sendError(res, 404, `Ese slide no existe: ${u.id}`);
+    }
+    const now = new Date().toISOString();
+    const next = slides.map((s) => {
+      const u = updates.find((x) => x.id === s.id);
+      return u ? { ...s, order: u.order, updatedAt: now } : s;
+    });
+    try {
+      await saveSlides(env, next);
+      res.setHeader("Cache-Control", "no-store");
+      return sendJson(res, 200, { slides: next });
+    } catch (e) {
+      console.error("[admin/hero-slides] " + (e && e.message ? e.message : e));
+      return sendError(res, 502, "No se pudo guardar el nuevo orden.");
+    }
+  }
+
   // PATCH y DELETE necesitan un id existente.
   const id = typeof body.id === "string" ? body.id : null;
   if (!id) return sendError(res, 400, "id inválido o ausente.");

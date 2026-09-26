@@ -38,7 +38,10 @@ function isOwnedPath(env, url) {
 
 function pathFromUrl(env, url) {
   const prefix = publicUrlPrefix(env);
-  return typeof url === "string" && url.startsWith(prefix) ? url.slice(prefix.length) : null;
+  if (typeof url !== "string" || !url.startsWith(prefix)) return null;
+  const rest = url.slice(prefix.length);
+  const queryIdx = rest.indexOf("?");
+  return queryIdx === -1 ? rest : rest.slice(0, queryIdx);
 }
 
 // Next unused secondary sequence number, scanning existing images for the
@@ -92,20 +95,30 @@ async function deleteObject({ env, path, fetchImpl = fetch }) {
   return res.ok;
 }
 
-// Fase 33 — lectura autenticada directa (no la URL pública/CDN, que
-// puede quedar en caché justo después de un write): usada por
-// _lib/heroSlides.js para leer el manifiesto JSON de slides antes de
-// modificarlo. Devuelve null si el objeto no existe todavía — nunca
-// lanza para ese caso, que es el estado esperado antes del primer slide
-// creado.
+// Fase 33 — lectura autenticada directa (no la URL pública/CDN). Devuelve
+// null si el objeto no existe todavía — nunca lanza para ese caso, que es
+// el estado esperado antes del primer slide creado.
 //
-// Confirmado contra Storage real (no solo documentación): un objeto
-// inexistente responde HTTP 400, NO 404 — el "404" real viaja como
+// Fase 36 — auditoría real del módulo Hero: lo que el comentario original
+// de esta función atribuía a "eventual consistency" del backend resultó
+// ser, medido contra Storage real, un HIT de caché de borde (Cloudflare:
+// cf-cache-status/x-smart-cdn) sobre este mismo endpoint autenticado —
+// nada que ver con réplicas ni con el objeto en sí. Confirmado: pedir la
+// MISMA URL en un loop no lo arregla (el edge sigue sirviendo el HIT
+// cacheado), pero un query string distinto por request sí trae el
+// contenido real de inmediato. Por eso cada lectura agrega un parámetro
+// de cache-busting único — nunca se cachea esta URL en el navegador (solo
+// se usa server-to-server), así que no hay costo de caché que perder.
+// pathFromUrl ya ignora cualquier "?..." al reconstruir un path real.
+//
+// Confirmado además contra Storage real (no solo documentación): un
+// objeto inexistente responde HTTP 400, NO 404 — el "404" real viaja como
 // string dentro del cuerpo JSON (statusCode/code: "NoSuchKey"). Se
 // inspecciona el cuerpo además del status HTTP para no tratar un
 // "no existe todavía" como un error real.
 async function downloadObject({ env, path, fetchImpl = fetch }) {
-  const res = await fetchImpl(`${env.url}/storage/v1/object/${BUCKET}/${path}`, {
+  const cacheBuster = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const res = await fetchImpl(`${env.url}/storage/v1/object/${BUCKET}/${path}?cb=${cacheBuster}`, {
     headers: {
       apikey: env.serviceRoleKey,
       Authorization: `Bearer ${env.serviceRoleKey}`,
