@@ -82,23 +82,28 @@ async function initHeroCarousel() {
 
   slidesEl.innerHTML = slides.map(heroSlideHtml).join("");
 
-  // El contenedor mobile asumía aspect-ratio:4/5 fijo (ver css/styles.css),
-  // como si la pieza real siempre fuera exactamente 1080x1350 — cualquier
-  // asset con otra proporción quedaba con bandas dentro de ese marco. En
-  // vez de asumirlo, se mide la proporción REAL de la primera pieza (su
-  // imagen mobile si existe, si no la principal) y se expone como
-  // --hero-mobile-ratio; el CSS mobile la usa con var(...,4/5) como
-  // respaldo mientras esto carga o si la medición falla.
-  const firstSlideImage = slides[0].mobileImage || slides[0].image;
-  if (firstSlideImage) {
+  // El contenedor asumía una proporción fija (4/5 en mobile, height fija
+  // con object-fit:cover en desktop — ver css/styles.css) como si la
+  // pieza real siempre calzara exacto con eso; cualquier asset con otra
+  // proporción quedaba con bandas (mobile) o recortado/con zoom
+  // (desktop, cover rellena el cuadro recortando lo que sobre). En vez de
+  // asumirlo, se mide la proporción REAL de la primera pieza — su imagen
+  // principal para desktop, la mobile (o la principal si no hay mobile
+  // distinta) para el marco mobile — y se expone como
+  // --hero-desktop-ratio / --hero-mobile-ratio; el CSS las usa con
+  // var(...,fallback) mientras esto carga o si la medición falla.
+  function probeRatio(src, cssVar) {
+    if (!src) return;
     const probe = new Image();
     probe.onload = () => {
       if (probe.naturalWidth > 0 && probe.naturalHeight > 0) {
-        root.style.setProperty("--hero-mobile-ratio", `${probe.naturalWidth} / ${probe.naturalHeight}`);
+        root.style.setProperty(cssVar, `${probe.naturalWidth} / ${probe.naturalHeight}`);
       }
     };
-    probe.src = firstSlideImage;
+    probe.src = src;
   }
+  probeRatio(slides[0].image, "--hero-desktop-ratio");
+  probeRatio(slides[0].mobileImage || slides[0].image, "--hero-mobile-ratio");
 
   dotsEl.innerHTML = slides
     .map((_, i) => `<button type="button" class="hero-dot${i === 0 ? " active" : ""}" data-index="${i}" aria-label="Ir a la pieza ${i + 1}"></button>`)

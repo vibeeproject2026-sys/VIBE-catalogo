@@ -50,48 +50,40 @@ header.scrolled .logo-image{width:126px;height:50px}
 
 /* Hero banner carousel (Fase Visual 2) — pieza gráfica a pantalla
    completa, sin composición editorial generada por código: el catálogo
-   solo exhibe la imagen que llegue en cada slide. Mismos breakpoints de
-   altura que el bloque anterior (.hero-img), como punto de partida.
+   solo exhibe la imagen que llegue en cada slide.
    Fase estabilización — bug real: era min-height, no height. .hero-slides
    (hijo directo, height:100%) y en cascada .hero-slide/picture/img
    (position:absolute;inset:0 o herencia de 100%) necesitan que ESTE
    contenedor tenga una altura explícita para que un porcentaje se
    resuelva — min-height dejaba el "height" computado en auto, así que
-   %100 nunca resolvía a nada y colapsaba a 0px (confirmado con Playwright:
-   .hero-slides medía 0px de alto pese a que .hero-carousel sí medía
-   500px) — la imagen cargaba bien pero se veía negra porque su propio
-   alto real era 0. height fija resuelve la cascada sin cambiar el alto
-   visual ya usado (nada aquí crece más allá de este valor hoy). */
-.hero-carousel{position:relative;height:500px;border-radius:28px;overflow:hidden;background:#0c0c0c}
+   %100 nunca resolvía a nada y colapsaba a 0px.
+   Fase 35.2 — bug real reportado después: con height fija (500px) y
+   object-fit:cover, cualquier imagen que no fuera EXACTAMENTE esa
+   proporción se veía recortada/con zoom (cover rellena el cuadro
+   recortando lo que sobre). aspect-ratio:var(--hero-desktop-ratio,16/9)
+   (medida en vivo desde la imagen real por hero-carousel.js, igual que
+   ya se hacía para --hero-mobile-ratio) le da al contenedor la altura
+   REAL de la pieza en vez de una fija — con object-fit:contain (ver
+   abajo) esto muestra la composición completa, sin recortar producto,
+   modelo ni texto. min-height:260px es solo un piso de seguridad para
+   antes de que la medición llegue o si falla. */
+.hero-carousel{position:relative;aspect-ratio:var(--hero-desktop-ratio, 16/9);height:auto;min-height:260px;border-radius:28px;overflow:hidden;background:#0c0c0c}
 
 .hero-slides{position:relative;width:100%;height:100%}
 .hero-slide{position:absolute;inset:0;display:block;opacity:0;transition:opacity 1s ease}
 .hero-slide.active{opacity:1;z-index:1}
-/* Desktop (sin rediseñar todavía, Fase Diseño Mobile-First 1): se
-   mantiene object-fit:cover tal como ya funcionaba. En mobile (≤640px,
-   ver abajo) se usa object-fit:contain — la pieza creativa completa es
-   la prioridad, nunca recortarla.
-
-   Formato editorial oficial (Fase 1.2): 1080x1350px, proporción 4:5,
-   WebP preferido (PNG/JPG aceptables como fuente) — es el que deben
-   usar las piezas reales para el Hero mobile. 9:16 (usado brevemente en
-   la Fase 1.1) queda reservado para Stories/Reels, no para este Hero.
-   El contenedor mobile (.hero-carousel) usa aspect-ratio:4/5 sobre el
-   ancho completo, así que con una pieza real en 4:5 "contain" no genera
-   letterboxing perceptible.
-
-   Recomendación general si llega una pieza en otro formato (no
-   implementado como sistema, solo documentado aquí):
-     - verticales más alargadas (ej. 9:16): sobran arriba/abajo dentro
-       del contenedor 4:5 — se ven completas pero no llenan todo el
-       alto.
-     - horizontales (paisaje, ej. 16:9): letterboxing notorio
-       arriba/abajo — la imagen se ve completa, sin recorte, pero ocupa
-       poco alto dentro del contenedor 4:5.
-     - cuadradas (1:1): letterboxing moderado, menor que una
-       horizontal. */
+/* Fase 35.2 — object-fit:contain en desktop también (antes era cover,
+   que recortaba/hacía zoom en cualquier pieza que no calzara exacto con
+   el height fijo de entonces): la composición completa es la prioridad,
+   nunca recortarla, igual que ya regía en mobile. Con el contenedor
+   ahora dimensionado según la proporción real de la imagen (arriba),
+   "contain" no genera letterboxing perceptible salvo que un slide
+   posterior tenga una proporción distinta a la del primero (la que fija
+   el contenedor) — en ese caso se ve completo pero con márgenes, nunca
+   recortado: la alternativa (recalcular el contenedor por cada slide)
+   rompería la transición de crossfade entre slides superpuestos. */
 .hero-slide picture{display:block;width:100%;height:100%}
-.hero-slide img{width:100%;height:100%;object-fit:cover;display:block}
+.hero-slide img{width:100%;height:100%;object-fit:contain;display:block}
 
 @media(prefers-reduced-motion:reduce){
   .hero-slide{transition:none}
@@ -272,15 +264,18 @@ dialog::backdrop{background:#000d}
    ventana. width:100% + min-width:0 fuerzan que el ancho SIEMPRE venga
    de la columna del grid (429px reales), y aspect-ratio entonces deriva
    la altura a partir de ESE ancho, nunca al revés.
-   Fase estabilización (solo desktop — mobile abajo sigue con 4/5 fijo,
-   sin tocar) — bug real: 4/5 fijo asumía que toda foto de producto es
-   exactamente 1200x1500; las fotos reales varían (verificado contra
-   Storage: producto 122 va de 2:3 a 4:5 entre sus 4 fotos), así que el
-   contenedor quedaba más alto que la foto real, dejando espacio de
-   sobra. js/app.js mide la proporción REAL de la foto principal al abrir
-   el producto y la expone como --pdp-photo-ratio; 4/5 queda solo como
-   respaldo mientras esa medición no ha llegado o falla. */
-.detail-img{aspect-ratio:var(--pdp-photo-ratio, 4/5);width:100%;min-width:0;max-width:100%;background:#111;display:grid;place-items:center;text-align:center;color:#aaa;padding:0;overflow:hidden}
+   Fase 35.2 (solo desktop — mobile abajo sigue exactamente igual, sin
+   tocar) — bug real reportado dos veces: poner aspect-ratio aquí, en el
+   contenedor OUTER que incluye el strip de thumbnails, siempre dejaba un
+   residual de espacio — el strip le resta alto al total sin restarle
+   proporción a la foto, así que el ÁREA VISIBLE de la foto
+   (.pdp-gallery-main) terminaba con una proporción distinta a la real
+   de la imagen aunque el contenedor completo ya usara --pdp-photo-ratio
+   (confirmado con Playwright: quedaba un ~5% de banda a los lados,
+   pequeño pero real). La proporción real ahora se aplica DIRECTAMENTE a
+   .pdp-gallery-main (ver más abajo) — el contenedor total mide
+   exactamente foto + thumbnails, sin sobra ni redondeo. */
+.detail-img{width:100%;min-width:0;max-width:100%;background:#111;display:grid;place-items:center;text-align:center;color:#aaa;padding:0;overflow:hidden}
 /* Fase 35 — la foto de producto debe verse completa, nunca recortada:
    object-fit:contain (no cover). .detail-img conserva su fondo oscuro
    (#111) para el letterboxing cuando la proporción real de la foto no
@@ -310,7 +305,13 @@ dialog::backdrop{background:#000d}
    .pdp-thumbs se encogían a su ancho de contenido (medido: 383px/268px
    dentro de una columna de 429px) en vez de ocupar el ancho completo. */
 .pdp-gallery{display:flex;flex-direction:column;height:100%;align-items:stretch}
-.pdp-gallery-main{flex:1;min-height:0;position:relative;overflow:hidden}
+/* Fase 35.2 (solo desktop — la regla mobile de abajo restaura flex:1 /
+   min-height:0 sin tocar el comportamiento que ya funcionaba ahí) — el
+   área de la foto ahora dimensiona SU PROPIA altura según la proporción
+   real de la imagen (misma variable --pdp-photo-ratio que .detail-img
+   ya no necesita cargar), en vez de flex:1 estirándose dentro de un
+   total ya fijado por el contenedor exterior. */
+.pdp-gallery-main{width:100%;aspect-ratio:var(--pdp-photo-ratio, 4/5);position:relative;overflow:hidden}
 /* Fase 35.1 — flechas de navegación manual del PDP (sección 4): mismo
    lenguaje visual que .hero-arrow, pero con área táctil de 44px (mínimo
    recomendado para mobile) en vez de 38px. Nunca autoplay, nunca hover
@@ -319,7 +320,12 @@ dialog::backdrop{background:#000d}
 .pdp-arrow:hover,.pdp-arrow:focus-visible{opacity:1;background:#00000088}
 .pdp-arrow-prev{left:10px}
 .pdp-arrow-next{right:10px}
-.pdp-no-image{width:100%;height:100%;display:grid;place-items:center;background:linear-gradient(160deg,#151515,#0b0b0b);color:var(--pink);font-weight:800;letter-spacing:.16em;font-size:14px}
+/* Sin ninguna foto real, no hay proporción que medir — se mantiene un
+   4/5 fijo razonable solo para este estado (nunca para una foto real,
+   ver .pdp-gallery-main arriba). height:auto porque ya no depende de un
+   .detail-img con aspect-ratio propio (solo desktop; mobile lo restaura
+   con height:100% dentro de su propio .detail-img de alto fijo). */
+.pdp-no-image{width:100%;aspect-ratio:4/5;height:auto;display:grid;place-items:center;background:linear-gradient(160deg,#151515,#0b0b0b);color:var(--pink);font-weight:800;letter-spacing:.16em;font-size:14px}
 .pdp-thumbs{display:flex;gap:8px;padding:10px;overflow-x:auto;background:#0d0d0d;scrollbar-width:none}
 .pdp-thumbs::-webkit-scrollbar{display:none}
 .pdp-thumb{flex:0 0 56px;width:56px;height:56px;border-radius:10px;overflow:hidden;border:2px solid transparent;padding:0;background:#111;cursor:pointer}
@@ -439,7 +445,9 @@ footer small{letter-spacing:.25em;font-size:7px}
 @media(max-width:900px){
   .grid{grid-template-columns:repeat(2,1fr)}
   .hero-grid{grid-template-columns:1fr}
-  .hero-carousel{height:340px}
+  /* Fase 35.2 — height:340px fijo ya no hace falta: .hero-carousel ahora
+     deriva su alto de aspect-ratio (ver regla base), que ya responde
+     solo al ancho disponible en este breakpoint (columna completa). */
   .heading{align-items:flex-start;flex-direction:column}
   .values-grid{grid-template-columns:repeat(2,1fr)}
   .cta-final-inner{flex-direction:column;align-items:flex-start}
@@ -518,7 +526,14 @@ footer small{letter-spacing:.25em;font-size:7px}
   .detail-copy{padding:30px 24px}
   .detail-actions{grid-template-columns:1fr}
   #productDetail{grid-template-columns:1fr}
+  /* Restaura exactamente el patrón mobile de siempre (sin tocarlo): el
+     contenedor OUTER vuelve a fijar la proporción (4/5) y el área de la
+     foto vuelve a flex:1/min-height:0 estirándose dentro de ese total —
+     el rediseño de arriba (proporción real en .pdp-gallery-main) es
+     solo para desktop. */
   .detail-img{aspect-ratio:4/5;min-height:0}
+  .pdp-gallery-main{aspect-ratio:auto;flex:1;min-height:0}
+  .pdp-no-image{aspect-ratio:auto;height:100%}
   .pdp-price strong{font-size:24px}
   .pdp-related .grid{grid-template-columns:1fr 1fr;gap:12px}
   .checkout-summary{padding:20px 20px 0}

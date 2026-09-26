@@ -770,24 +770,50 @@ function bindProductGrid(id) {
 // + comprobación de relatedTarget emulan mouseenter/mouseleave (que no
 // burbujean) sin necesitar un listener por card individual.
 const CARD_HOVER_DELAY_MS = 500;
-const CARD_HOVER_STEP_MS = 1350;
+// Fase 35.2 — bug reportado: 1350ms se sentía como parpadeo/slideshow
+// acelerado, no como una vitrina elegante. ~2.5-3s por imagen es el
+// rango pedido; el crossfade de .25s (ver .product-photo en
+// css/styles.css) ya viene sincronizado con el setTimeout de abajo, así
+// que solo cambia el tiempo que cada foto queda quieta antes del
+// siguiente crossfade.
+const CARD_HOVER_STEP_MS = 2800;
 const cardHoverState = new WeakMap();
 
+// Fase 35.2 — bug reportado: salir del hover volvía a la imagen
+// principal con un corte duro (opacity:1 + src instantáneo), rompiendo
+// el efecto de vitrina elegante que sí tenía el ciclo entre imágenes.
+// Ahora usa el mismo crossfade de .25s (nunca si ya está en la primera
+// imagen — no hay nada que desvanecer). También limpia el setTimeout
+// del fade en curso (fadeTimeoutId): sin esto, un hover-out justo en
+// medio de un crossfade podía dejar ese swap pendiente disparándose
+// después de que la card ya había vuelto a su estado de reposo.
 function stopCardHover(card) {
   const s = cardHoverState.get(card);
   if (!s) return;
   clearTimeout(s.timeoutId);
   clearInterval(s.intervalId);
-  if (s.img) {
-    s.img.style.opacity = "1";
-    s.img.src = s.images[0]; // siempre vuelve a la imagen principal
-  }
+  clearTimeout(s.fadeTimeoutId);
   cardHoverState.delete(card);
+  if (!s.img) return;
+  if (s.currentIndex === 0) {
+    s.img.style.opacity = "1";
+    return;
+  }
+  s.img.style.opacity = "0";
+  setTimeout(() => {
+    s.img.src = s.images[0]; // siempre vuelve a la imagen principal
+    s.img.style.opacity = "1";
+  }, 250);
 }
 
 function startCardHover(card) {
   if (cardHoverState.has(card)) return;
   if (!window.matchMedia || !window.matchMedia("(hover: hover)").matches) return;
+  // Fase 35.2 — el autoplay del Hero ya respetaba prefers-reduced-motion
+  // (ver hero-carousel.js); esta alternancia por hover no lo comprobaba
+  // en absoluto. Con la preferencia activa, la card se queda quieta en
+  // su imagen principal — nunca cicla automáticamente.
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
   const img = card.querySelector(".product-photo");
   if (!img) return; // sin foto real (placeholder) -> nada que animar
   const p = findProduct(state.products, card.dataset.product);
@@ -797,14 +823,13 @@ function startCardHover(card) {
   // Precarga las adicionales solo ahora (intención real de ver la card),
   // nunca al renderizar el grid completo -> evita requests innecesarios.
   images.slice(1).forEach(src => { new Image().src = src; });
-  const state_ = { images, img, intervalId: null };
+  const state_ = { images, img, intervalId: null, currentIndex: 0 };
   state_.timeoutId = setTimeout(() => {
-    let i = 0;
     state_.intervalId = setInterval(() => {
-      i = (i + 1) % images.length;
+      state_.currentIndex = (state_.currentIndex + 1) % images.length;
       img.style.opacity = "0";
-      setTimeout(() => {
-        img.src = images[i];
+      state_.fadeTimeoutId = setTimeout(() => {
+        img.src = images[state_.currentIndex];
         img.style.opacity = "1";
       }, 250);
     }, CARD_HOVER_STEP_MS);

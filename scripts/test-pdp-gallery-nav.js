@@ -40,11 +40,11 @@ test("espera ~500ms antes de empezar a alternar imágenes", () => {
   assert.equal(Number(m[1]), 500);
 });
 
-test("el intervalo por imagen está entre 1.2 y 1.5 segundos", () => {
+test("el intervalo por imagen está entre 2.5 y 3 segundos (Fase 35.2 — antes 1.2-1.5s se sentía como parpadeo)", () => {
   const m = appSrc.match(/CARD_HOVER_STEP_MS\s*=\s*(\d+)/);
   assert.ok(m, "no se encontró CARD_HOVER_STEP_MS");
   const ms = Number(m[1]);
-  assert.ok(ms >= 1200 && ms <= 1500, `CARD_HOVER_STEP_MS=${ms} fuera del rango 1200-1500`);
+  assert.ok(ms >= 2500 && ms <= 3000, `CARD_HOVER_STEP_MS=${ms} fuera del rango 2500-3000`);
 });
 
 test("con una sola imagen no arranca ninguna animación (images.length < 2 -> return)", () => {
