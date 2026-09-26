@@ -5,8 +5,21 @@
 // See docs/fase7-data-source.md for the full design rationale.
 
 import { products as demoProducts, categories as demoCategories } from "./products.js";
+import { EDITORIAL_STRING_FIELDS, EDITORIAL_ARRAY_FIELDS } from "./taxonomy.js";
 
 const API_BASE = "/api/catalog";
+
+// Fase 34 — ~40 campos editoriales granulares (tono, acabado, cobertura,
+// cruelty-free, etc., ver api/_lib/editorialDetails.js y
+// js/taxonomy.js#EDITORIAL_STRING_FIELDS). Se pasan con un loop en vez de
+// escribir 40 líneas dos veces (demo + API): cada uno cae a null (string)
+// o [] (arreglo) si el producto no lo tiene, nunca a undefined — igual
+// que cualquier otro campo editorial opcional ya existente.
+function withEditorialDetails(target, source) {
+  for (const key of EDITORIAL_STRING_FIELDS) target[key] = source[key] ?? null;
+  for (const key of EDITORIAL_ARRAY_FIELDS) target[key] = Array.isArray(source[key]) ? source[key] : [];
+  return target;
+}
 
 // Explicit configuration constant, not hostname sniffing. Fase 24:
 // Supabase/catalog_metadata has been confirmed ready since Fase 11, and
@@ -57,7 +70,7 @@ function normalizeVariants(product) {
 // categoryGroup and category are honestly the same value. See
 // docs/fase8-navigation.md, "Nivel 1 vs. Nivel 2 en modo demo".
 function normalizeDemoProduct(p) {
-  return {
+  const normalized = {
     ...p,
     available: true,
     subcategory: p.subcategory ?? null,
@@ -76,6 +89,10 @@ function normalizeDemoProduct(p) {
     promoText: null,
     variants: normalizeVariants(p),
   };
+  // Fase 34 — los productos demo tampoco tienen ninguna ficha granular
+  // real detrás: todo cae a null/[] igual que cualquier otro campo
+  // editorial demo, nunca inventado.
+  return withEditorialDetails(normalized, {});
 }
 
 // The catalog API (Fase 6) never returns `variants` — synthesize a single
@@ -83,7 +100,7 @@ function normalizeDemoProduct(p) {
 // existing variant-selection code (which assumes a non-empty array) keeps
 // working unchanged.
 function normalizeApiProduct(p) {
-  return {
+  return withEditorialDetails({
     id: p.id,
     name: p.name,
     category: p.category,
@@ -119,7 +136,7 @@ function normalizeApiProduct(p) {
     promoPrice: p.promoPrice ?? null,
     promoText: p.promoText ?? null,
     variants: normalizeVariants(p),
-  };
+  }, p);
 }
 
 function getDemoProducts() {

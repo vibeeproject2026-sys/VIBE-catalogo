@@ -64,6 +64,31 @@ async function saveSlides(env, slides) {
   });
 }
 
+// Fase 34, sección 12 — corrige el error real "Ese slide_id no existe.":
+// medido contra Storage real (sobrescribir el mismo objeto —
+// hero/slides.json— repetidamente en sucesión rápida) que una lectura
+// inmediatamente después de escribir puede tardar VARIOS SEGUNDOS en
+// reflejar ese write (se midió hasta ~4.3s en pruebas reales; no es un
+// bug de este código, es una característica de consistencia eventual de
+// Storage sobre el mismo path, no documentada por Supabase). Reintenta
+// con espera fija hasta un tope acotado (~6.3s en total, con margen
+// sobre lo medido) antes de aceptar "no existe" como respuesta final —
+// se mantiene deliberadamente por debajo del límite de ejecución de las
+// funciones serverless de Vercel. Nunca se usa esto para esconder un id
+// genuinamente inexistente, solo para no fallar por una lectura que
+// llegó demasiado pronto. Si esto sigue causando fricción real en el uso
+// diario, la solución de fondo es migrar a una tabla SQL real
+// (consistencia inmediata) en cuanto haya acceso de escritura DDL a
+// Supabase — ver decisión de arquitectura de esta fase.
+async function loadSlidesUntilFound(env, id, { attempts = 10, delayMs = 700 } = {}) {
+  let slides = await loadSlides(env);
+  for (let i = 1; i < attempts && id && !slides.some((s) => s.id === id); i++) {
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+    slides = await loadSlides(env);
+  }
+  return slides;
+}
+
 // Sección 4/18 — jamás se muestran públicamente slides con active !== true.
 // Orden ascendente por `order`; sin campo `order`, al final, por id como
 // desempate estable.
@@ -119,6 +144,7 @@ module.exports = {
   makeSlideId,
   isSafeCtaHref,
   loadSlides,
+  loadSlidesUntilFound,
   saveSlides,
   getActiveSlides,
   shapePublicSlide,

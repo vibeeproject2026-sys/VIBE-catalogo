@@ -263,6 +263,25 @@ function textToArrayField(text) {
     .filter(Boolean);
 }
 
+// Fase 34 — helpers genéricos para no repetir el mismo template 55 veces.
+// input/text: valor va directo en el atributo (esc() ya lo protege).
+// textarea: el <textarea> se deja vacío en el HTML y su .value se llena
+// aparte (mismo motivo de siempre: contenido largo no debe vivir dentro
+// de un atributo/backtick).
+function textField(name, label, value, placeholder = "") {
+  return `<label>${label}<input name="${esc(name)}" value="${esc(value || "")}" placeholder="${esc(placeholder)}"></label>`;
+}
+function textareaField(name, label, placeholder = "", rows = 4) {
+  return `<label>${label}<textarea name="${esc(name)}" rows="${rows}" placeholder="${esc(placeholder)}"></textarea></label>`;
+}
+function triStateField(name, label, value) {
+  const current = value || "";
+  const opts = ["", "Sí", "No"]
+    .map((v) => `<option value="${esc(v)}" ${current === v ? "selected" : ""}>${v || "No especificado"}</option>`)
+    .join("");
+  return `<label>${label}<select name="${esc(name)}">${opts}</select></label>`;
+}
+
 async function openEdit(productId) {
   const res = await adminFetch(`/api/admin/catalog-metadata?product_id=${encodeURIComponent(productId)}`);
   if (res.status === 401) {
@@ -276,10 +295,16 @@ async function openEdit(productId) {
   }
   const { product, metadata } = await res.json();
   const m = metadata || {};
+  // Fase 34 — additional_info ya llega como objeto (el servidor lo
+  // parsea, ver api/admin/catalog-metadata.js): los ~40 campos
+  // granulares de la ficha VIBE. Todos en null/[] si el producto no
+  // tiene ficha todavía — nunca undefined, el formulario siempre puede
+  // poblarse sin checks extra.
+  const d = m.additional_info || {};
 
   $("#editContent").innerHTML = `
     <div class="edit-pos">
-      <h2>Producto <span class="section-hint">(POS · solo lectura)</span></h2>
+      <h2>1. Información del POS <span class="section-hint">(solo lectura)</span></h2>
       <div class="edit-pos-grid">
         <div><span>ID</span>${product.id}</div>
         <div><span>Nombre</span>${esc(product.name)}</div>
@@ -288,90 +313,175 @@ async function openEdit(productId) {
         <div><span>Disponibilidad</span>${Number(product.stock) > 0 ? "Disponible" : "Agotado"} (stock: ${product.stock})</div>
       </div>
     </div>
-    <div class="edit-images">
-      <h2>Imágenes</h2>
-      <div class="image-block">
-        <p class="image-block-label">Imagen principal</p>
-        <div class="image-preview-main" id="mainImagePreview">
-          ${m.image ? `<img src="${esc(m.image)}" alt="">` : `<span class="no-image">Sin imagen</span>`}
+
+    <details class="admin-accordion" open>
+      <summary>2. Identificación</summary>
+      <div class="admin-accordion-body">
+        ${textField("commercial_name", "Nombre comercial", d.commercialName, "Ej. Blusher Lotion Perfect Cheeks — Liquid Blush")}
+        <span class="image-hint">Editorial — nunca reemplaza el nombre del POS de arriba. Ambos coexisten.</span>
+        <div class="edit-row">
+          ${textField("brand", "Marca", m.brand, "Ej. Kevin&COCO")}
+          ${textField("line", "Línea / colección", d.line, "Ej. Perfect Cheeks")}
         </div>
-        <input type="file" id="mainImageInput" accept="image/webp,image/jpeg,image/png">
-        <button type="button" id="uploadMainBtn" class="button dark">Subir / reemplazar principal</button>
-        <p id="mainImageStatus" class="image-status"></p>
+        <div class="edit-row">
+          <label>Categoría VIBE
+            <select name="category">${renderCategoryOptions(m.category || "")}</select>
+          </label>
+          <label>Subcategoría VIBE
+            <input name="subcategory" list="subcategorySuggestions" value="${esc(m.subcategory || "")}" placeholder="Elige una sugerencia o escribe la tuya">
+          </label>
+        </div>
+        <datalist id="subcategorySuggestions">${VIBE_SUBCATEGORY_SUGGESTIONS.map((s) => `<option value="${esc(s)}">`).join("")}</datalist>
+        <div class="edit-row">
+          ${textField("product_type", "Tipo de producto", d.productType, "Ej. Rubor líquido")}
+          ${textField("presentation", "Presentación", m.presentation, "Ej. 30ml, set de 5 unidades...")}
+        </div>
+        <div class="edit-row">
+          ${textField("net_content", "Contenido neto", d.netContent, "Ej. 5 ml")}
+          ${textField("sku", "SKU / referencia", d.sku, "Ej. KC240258")}
+        </div>
+        <div class="edit-row">
+          ${textField("tone", "Tono", d.tone, "Ej. Rosa nude")}
+          ${textField("tone_code", "Código de tono", d.toneCode, "Ej. 02")}
+        </div>
+        <div class="edit-row">
+          ${textField("color", "Color", d.color, "")}
+          ${textField("variant", "Variante", d.variant, "")}
+        </div>
       </div>
-      <div class="image-block">
-        <p class="image-block-label">Imágenes secundarias</p>
-        <div id="secondaryList">${renderSecondaryThumbs(m.images)}</div>
-        <input type="file" id="secondaryImageInput" accept="image/webp,image/jpeg,image/png">
-        <button type="button" id="uploadSecondaryBtn" class="button">Agregar secundaria</button>
-        <p id="secondaryImageStatus" class="image-status"></p>
+    </details>
+
+    <details class="admin-accordion" open>
+      <summary>3. Imágenes</summary>
+      <div class="admin-accordion-body">
+        <div class="image-block">
+          <p class="image-block-label">Imagen principal</p>
+          <div class="image-preview-main" id="mainImagePreview">
+            ${m.image ? `<img src="${esc(m.image)}" alt="">` : `<span class="no-image">Sin imagen</span>`}
+          </div>
+          <input type="file" id="mainImageInput" accept="image/webp,image/jpeg,image/png">
+          <button type="button" id="uploadMainBtn" class="button dark">Subir / reemplazar principal</button>
+          <p id="mainImageStatus" class="image-status"></p>
+        </div>
+        <label>Imagen (ruta o URL)
+          <input name="image" value="${esc(m.image || "")}" placeholder="assets/products/ejemplo.svg">
+          <span class="image-hint">Se actualiza automáticamente al subir arriba. También puedes pegar una ruta/URL manual (ej. una imagen legacy).</span>
+        </label>
+        ${textField("main_image_alt", "Alt de la imagen principal", d.mainImageAlt, "Descripción para lectores de pantalla.")}
+        <div class="image-block">
+          <p class="image-block-label">Imágenes adicionales</p>
+          <div id="secondaryList">${renderSecondaryThumbs(m.images)}</div>
+          <input type="file" id="secondaryImageInput" accept="image/webp,image/jpeg,image/png">
+          <button type="button" id="uploadSecondaryBtn" class="button">Agregar adicional</button>
+          <p id="secondaryImageStatus" class="image-status"></p>
+        </div>
       </div>
-    </div>
+    </details>
+
+    <details class="admin-accordion" open>
+      <summary>4. Descripción</summary>
+      <div class="admin-accordion-body">
+        ${textareaField("what_is", "Qué es", "Déjalo vacío si no lo sabes.", 3)}
+        ${textField("short_description", "Descripción corta", m.short_description, "Si no la conoces, déjala vacía.")}
+        ${textareaField("description", "Descripción completa", "Déjalo vacío si todavía no tienes esta información.", 5)}
+        ${textareaField("characteristics", "Características principales", "Déjalo vacío si no lo sabes.", 4)}
+      </div>
+    </details>
+
+    <details class="admin-accordion">
+      <summary>5. Beneficios</summary>
+      <div class="admin-accordion-body">
+        ${textareaField("benefits", "Beneficios (uno por línea)", "Un beneficio por línea. Déjalo vacío si no lo sabes.", 5)}
+      </div>
+    </details>
+
+    <details class="admin-accordion">
+      <summary>6. Modo de uso</summary>
+      <div class="admin-accordion-body">
+        ${textareaField("usage", "Modo de uso", "Déjalo vacío si no lo sabes.", 3)}
+        ${textField("recommended_amount", "Cantidad recomendada", d.recommendedAmount, "Ej. 2-3 gotas")}
+        ${textField("application_area", "Dónde aplicar", d.applicationArea, "")}
+        ${textField("recommended_tool", "Herramienta recomendada", d.recommendedTool, "Ej. Brocha densa o esponja")}
+        ${textField("application_order", "Orden de aplicación", d.applicationOrder, "Ej. Después de base, antes de polvo")}
+        ${textareaField("application_tips", "Consejos de aplicación", "", 3)}
+      </div>
+    </details>
+
+    <details class="admin-accordion">
+      <summary>7. Ingredientes</summary>
+      <div class="admin-accordion-body">
+        ${textareaField("ingredients", "Ingredientes / INCI", "Déjalo vacío si no lo sabes.", 4)}
+        ${textareaField("highlighted_ingredients", "Ingredientes destacados (uno por línea)", "", 3)}
+        ${textField("active_ingredients", "Ingredientes activos", d.activeIngredients, "")}
+        ${textareaField("ingredient_properties", "Propiedades de los ingredientes", "", 3)}
+        ${textareaField("warnings", "Advertencias", "", 3)}
+      </div>
+    </details>
+
+    <details class="admin-accordion">
+      <summary>8. Fórmula y acabado</summary>
+      <div class="admin-accordion-body">
+        <div class="edit-row">
+          ${textField("texture", "Textura", d.texture, "")}
+          ${textField("formula_type", "Tipo de fórmula", d.formulaType, "")}
+        </div>
+        <div class="edit-row">
+          ${textField("coverage", "Cobertura", d.coverage, "")}
+          ${textField("intensity", "Intensidad", d.intensity, "")}
+        </div>
+        <div class="edit-row">
+          ${textField("finish", "Acabado", d.finish, "")}
+          ${textField("duration", "Duración", d.duration, "")}
+        </div>
+        <div class="edit-row">
+          ${textField("resistance", "Resistencia", d.resistance, "")}
+          ${textField("transfer", "Transferencia", d.transfer, "")}
+        </div>
+      </div>
+    </details>
+
+    <details class="admin-accordion">
+      <summary>9. Tipo de piel</summary>
+      <div class="admin-accordion-body">
+        ${textField("skin_type", "Tipo de piel recomendado", d.skinType, "Ej. Mixta a grasa")}
+        ${textareaField("skin_recommendations", "Recomendaciones específicas", "", 3)}
+      </div>
+    </details>
+
+    <details class="admin-accordion">
+      <summary>10. Información adicional</summary>
+      <div class="admin-accordion-body">
+        ${textareaField("claims", "Claims (uno por línea)", "", 3)}
+        ${textareaField("certifications", "Certificaciones (una por línea)", "", 3)}
+        <div class="edit-row-3">
+          ${triStateField("cruelty_free", "Cruelty-free", d.crueltyFree)}
+          ${triStateField("vegan", "Vegano", d.vegan)}
+          ${triStateField("dermatologically_tested", "Dermatológicamente probado", d.dermatologicallyTested)}
+        </div>
+        <div class="edit-row">
+          ${textField("country_of_manufacture", "País de fabricación", d.countryOfManufacture, "")}
+        </div>
+        ${textareaField("manufacturer_info", "Información del fabricante", "", 3)}
+      </div>
+    </details>
+
+    <details class="admin-accordion">
+      <summary>11. Merchandising VIBE</summary>
+      <div class="admin-accordion-body">
+        <div class="edit-row">
+          ${textField("badge", "Badge", m.badge, "Ej. NUEVO, VIBE PICK... déjalo vacío si no aplica.")}
+          <label>Orden editorial<input type="number" name="editorial_order" value="${m.editorial_order ?? ""}" placeholder="Déjalo vacío si no aplica."></label>
+        </div>
+        <label class="checkbox-field"><input type="checkbox" name="featured" ${m.featured ? "checked" : ""}> Producto destacado</label>
+        ${textareaField("search_keywords", "Palabras clave (una por línea)", "Una palabra o frase clave por línea.", 3)}
+        ${textField("commercial_angle", "Ángulo comercial VIBE", d.commercialAngle, "Nota interna de merchandising — no se muestra en el catálogo público.")}
+        ${textField("usage_occasion", "Momento / ocasión de uso", d.usageOccasion, "Nota interna de merchandising — no se muestra en el catálogo público.")}
+      </div>
+    </details>
+
     <form id="editForm" class="edit-form">
-      <h2>Información del producto</h2>
-      <label>Imagen (ruta o URL)
-        <input name="image" value="${esc(m.image || "")}" placeholder="assets/products/ejemplo.svg">
-        <span class="image-hint">Se actualiza automáticamente al subir una imagen principal arriba. También puedes pegar una ruta o URL manualmente (por ejemplo, una imagen legacy ya existente).</span>
-      </label>
-      <label>Descripción corta
-        <input name="short_description" value="${esc(m.short_description || "")}" placeholder="Si no la conoces, déjala vacía.">
-      </label>
-      <label>Descripción
-        <textarea name="description" rows="5" placeholder="Déjalo vacío si todavía no tienes esta información."></textarea>
-      </label>
-      <label>Beneficios (uno por línea)
-        <textarea name="benefits" rows="5" placeholder="Un beneficio por línea. Déjalo vacío si no lo sabes."></textarea>
-      </label>
-      <label>Ingredientes
-        <textarea name="ingredients" rows="4" placeholder="Déjalo vacío si no lo sabes."></textarea>
-      </label>
-      <label>Modo de uso
-        <textarea name="usage" rows="4" placeholder="Déjalo vacío si no lo sabes."></textarea>
-      </label>
-      <div class="edit-row">
-        <label>Presentación
-          <input name="presentation" value="${esc(m.presentation || "")}" placeholder="Ej. 30ml, set de 5 unidades...">
-        </label>
-        <label>Marca
-          <input name="brand" value="${esc(m.brand || "")}" placeholder="Déjalo vacío si no la conoces.">
-        </label>
-      </div>
-
-      <h2>Clasificación VIBE</h2>
-      <div class="edit-row">
-        <label>Categoría VIBE
-          <select name="category">${renderCategoryOptions(m.category || "")}</select>
-        </label>
-        <label>Subcategoría VIBE
-          <input name="subcategory" list="subcategorySuggestions" value="${esc(m.subcategory || "")}" placeholder="Elige una sugerencia o escribe la tuya">
-        </label>
-      </div>
-      <datalist id="subcategorySuggestions">
-        ${VIBE_SUBCATEGORY_SUGGESTIONS.map((s) => `<option value="${esc(s)}">`).join("")}
-      </datalist>
-      <label>Palabras clave (una por línea)
-        <textarea name="search_keywords" rows="3" placeholder="Una palabra o frase clave por línea."></textarea>
-      </label>
-
-      <h2>Editorial</h2>
-      <div class="edit-row">
-        <label>Badge
-          <input name="badge" value="${esc(m.badge || "")}" placeholder="Ej. NUEVO, VIBE PICK... déjalo vacío si no aplica.">
-        </label>
-        <label>Orden editorial
-          <input type="number" name="editorial_order" value="${m.editorial_order ?? ""}" placeholder="Déjalo vacío si no aplica.">
-        </label>
-      </div>
-      <label class="checkbox-field"><input type="checkbox" name="featured" ${m.featured ? "checked" : ""}> Producto destacado</label>
-
-      <h2>Información adicional</h2>
-      <label>Notas, características u observaciones que no tengan un campo específico
-        <textarea name="additional_info" rows="5" placeholder="Texto libre. No se procesa ni se interpreta automáticamente."></textarea>
-      </label>
-
-      <h2>Publicación</h2>
+      <h2>12. Publicación</h2>
       <label class="checkbox-field"><input type="checkbox" name="published" ${m.published ? "checked" : ""}> Publicado</label>
-
       <div class="save-row">
         <span id="saveStatus" class="save-status"></span>
         <button type="button" id="cancelEdit" class="outline-admin">Cancelar</button>
@@ -380,38 +490,117 @@ async function openEdit(productId) {
     </form>
   `;
 
+  // Fase 34 — el <form> real (#editForm) solo envuelve la sección de
+  // Publicación (así el submit por Enter no queda atado a un acordeón en
+  // particular), pero necesita leer TODOS los campos de arriba en el
+  // submit: se listan explícitamente por name en vez de depender de que
+  // estén dentro de <form> (los <details> viven fuera de él a propósito,
+  // para que cada acordeón se pueda abrir/cerrar sin afectar el formulario).
+  const ALL_FIELD_NAMES = [
+    "image", "commercial_name", "brand", "line", "category", "subcategory", "product_type", "presentation",
+    "net_content", "sku", "tone", "tone_code", "color", "variant", "main_image_alt",
+    "what_is", "short_description", "description", "characteristics",
+    "benefits", "usage", "recommended_amount", "application_area", "recommended_tool", "application_order", "application_tips",
+    "ingredients", "highlighted_ingredients", "active_ingredients", "ingredient_properties", "warnings",
+    "texture", "formula_type", "coverage", "intensity", "finish", "duration", "resistance", "transfer",
+    "skin_type", "skin_recommendations",
+    "claims", "certifications", "cruelty_free", "vegan", "dermatologically_tested", "country_of_manufacture", "manufacturer_info",
+    "badge", "editorial_order", "featured", "search_keywords", "commercial_angle", "usage_occasion",
+  ];
+  function readAllFields() {
+    const out = {};
+    for (const name of ALL_FIELD_NAMES) {
+      const el = document.querySelector(`[name="${name}"]`);
+      if (!el) continue;
+      out[name] = el.type === "checkbox" ? el.checked : el.value;
+    }
+    return out;
+  }
+
   // Los <textarea> se llenan por separado (en vez de interpolarlos en el
   // template de arriba) para no tener que sanitizar contenido largo
   // dentro de atributos/backticks — .value asigna el texto tal cual, sin
   // riesgo de romper el HTML generado.
+  $("textarea[name=what_is]").value = d.whatIs || "";
   $("textarea[name=description]").value = m.description || "";
+  $("textarea[name=characteristics]").value = d.characteristics || "";
   $("textarea[name=benefits]").value = arrayFieldToText(m.benefits);
+  $("textarea[name=application_tips]").value = d.applicationTips || "";
   $("textarea[name=ingredients]").value = m.ingredients || "";
-  $("textarea[name=usage]").value = m.usage || "";
+  $("textarea[name=highlighted_ingredients]").value = arrayFieldToText(d.highlightedIngredients);
+  $("textarea[name=ingredient_properties]").value = d.ingredientProperties || "";
+  $("textarea[name=warnings]").value = d.warnings || "";
+  $("textarea[name=skin_recommendations]").value = d.skinRecommendations || "";
+  $("textarea[name=claims]").value = arrayFieldToText(d.claims);
+  $("textarea[name=certifications]").value = arrayFieldToText(d.certifications);
+  $("textarea[name=manufacturer_info]").value = d.manufacturerInfo || "";
   $("textarea[name=search_keywords]").value = arrayFieldToText(m.search_keywords);
-  $("textarea[name=additional_info]").value = m.additional_info || "";
 
   $("#editForm").addEventListener("submit", async (e) => {
     e.preventDefault();
-    const fd = new FormData(e.currentTarget);
+    const fd = readAllFields();
     const payload = {
       product_id: product.id,
-      image: fd.get("image") || null,
-      category: fd.get("category") || null,
-      subcategory: fd.get("subcategory") || null,
-      brand: fd.get("brand") || null,
-      badge: fd.get("badge") || null,
-      presentation: fd.get("presentation") || null,
-      short_description: fd.get("short_description") || null,
-      description: fd.get("description") || null,
-      benefits: textToArrayField(fd.get("benefits") || ""),
-      ingredients: fd.get("ingredients") || null,
-      usage: fd.get("usage") || null,
-      search_keywords: textToArrayField(fd.get("search_keywords") || ""),
-      featured: fd.get("featured") === "on",
-      editorial_order: fd.get("editorial_order") ? Number(fd.get("editorial_order")) : null,
-      additional_info: fd.get("additional_info") || null,
-      published: fd.get("published") === "on",
+      image: fd.image || null,
+      category: fd.category || null,
+      subcategory: fd.subcategory || null,
+      brand: fd.brand || null,
+      badge: fd.badge || null,
+      presentation: fd.presentation || null,
+      short_description: fd.short_description || null,
+      description: fd.description || null,
+      benefits: textToArrayField(fd.benefits || ""),
+      ingredients: fd.ingredients || null,
+      usage: fd.usage || null,
+      search_keywords: textToArrayField(fd.search_keywords || ""),
+      featured: Boolean(fd.featured),
+      editorial_order: fd.editorial_order ? Number(fd.editorial_order) : null,
+      published: Boolean(fd.published),
+      // Fase 34 — los ~40 campos granulares viajan como un único objeto
+      // estructurado; el servidor lo serializa hacia
+      // catalog_metadata.additional_info (ver api/_lib/editorialDetails.js).
+      additional_info: {
+        commercialName: fd.commercial_name || null,
+        line: fd.line || null,
+        productType: fd.product_type || null,
+        netContent: fd.net_content || null,
+        tone: fd.tone || null,
+        toneCode: fd.tone_code || null,
+        color: fd.color || null,
+        variant: fd.variant || null,
+        sku: fd.sku || null,
+        mainImageAlt: fd.main_image_alt || null,
+        whatIs: fd.what_is || null,
+        characteristics: fd.characteristics || null,
+        recommendedAmount: fd.recommended_amount || null,
+        applicationArea: fd.application_area || null,
+        recommendedTool: fd.recommended_tool || null,
+        applicationOrder: fd.application_order || null,
+        applicationTips: fd.application_tips || null,
+        highlightedIngredients: textToArrayField(fd.highlighted_ingredients || ""),
+        activeIngredients: fd.active_ingredients || null,
+        ingredientProperties: fd.ingredient_properties || null,
+        warnings: fd.warnings || null,
+        texture: fd.texture || null,
+        formulaType: fd.formula_type || null,
+        coverage: fd.coverage || null,
+        intensity: fd.intensity || null,
+        finish: fd.finish || null,
+        duration: fd.duration || null,
+        resistance: fd.resistance || null,
+        transfer: fd.transfer || null,
+        skinType: fd.skin_type || null,
+        skinRecommendations: fd.skin_recommendations || null,
+        claims: textToArrayField(fd.claims || ""),
+        certifications: textToArrayField(fd.certifications || ""),
+        crueltyFree: fd.cruelty_free || null,
+        vegan: fd.vegan || null,
+        dermatologicallyTested: fd.dermatologically_tested || null,
+        countryOfManufacture: fd.country_of_manufacture || null,
+        manufacturerInfo: fd.manufacturer_info || null,
+        commercialAngle: fd.commercial_angle || null,
+        usageOccasion: fd.usage_occasion || null,
+      },
     };
 
     $("#saveStatus").textContent = "Guardando...";
@@ -636,6 +825,16 @@ async function uploadHeroImage(slideId, file, slot, statusEl) {
   const payload = await res.json().catch(() => ({}));
   if (!res.ok) {
     const detail = payload && Array.isArray(payload.details) ? payload.details.join(" ") : null;
+    // Fase 34, sección 12 — el servidor ya reintenta varios segundos
+    // antes de responder esto (ver loadSlidesUntilFound en
+    // api/_lib/heroSlides.js): si aun así llega este error específico,
+    // es casi siempre una demora real de Storage al propagar la
+    // creación del slide, no un id inválido de verdad. Un mensaje claro
+    // y accionable en vez del texto crudo del servidor.
+    if (payload && payload.error === "Ese slide_id no existe.") {
+      statusEl.textContent = "El slide se acaba de crear y Storage todavía no lo detecta. Espera unos segundos y vuelve a intentar la subida.";
+      return null;
+    }
     statusEl.textContent = detail || (payload && payload.error) || "No se pudo subir la imagen.";
     return null;
   }
@@ -643,18 +842,25 @@ async function uploadHeroImage(slideId, file, slot, statusEl) {
   return payload.slide;
 }
 
+// Fase 34, sección 12 — corrige el error real "Ese slide_id no existe.":
+// antes, "+ Nuevo slide" abría el diálogo en un modo intermedio sin
+// slide real (isNew), y solo se creaba la fila al enviar el formulario
+// de contenido; la carga de imagen quedaba oculta hasta ese punto, pero
+// cualquier fricción entre ambos pasos (doble clic, conexión lenta,
+// reabrir el diálogo) podía dejar al Admin intentando subir una imagen
+// para un id que todavía no existía en el manifiesto. Ahora "+ Nuevo
+// slide" crea el draft en el servidor de inmediato (POST vacío, activo:
+// false) y el diálogo de edición SIEMPRE recibe un slide real, con un id
+// real, desde el primer render — nunca hay una ventana donde subir una
+// imagen pueda apuntar a un slide inexistente.
 function openHeroEdit(slide) {
-  const isNew = !slide;
-  const s = slide || { id: null, image: null, mobileImage: null, eyebrow: "", title: "", subtitle: "", ctaText: "", ctaHref: "", alt: "", active: false };
+  const s = slide;
 
   $("#heroEditContent").innerHTML = `
     <div class="edit-images">
-      <h2>${isNew ? "Nuevo slide" : "Editar slide"}</h2>
+      <h2>Editar slide</h2>
       <div id="heroPreviewBox" data-image="${esc(s.image || "")}">${heroPreviewHtml(s)}</div>
-      ${
-        isNew
-          ? `<p class="image-hint">Guarda el slide primero para poder subirle una imagen.</p>`
-          : `<div class="image-block">
+      <div class="image-block">
         <p class="image-block-label">Imagen desktop (horizontal)</p>
         <input type="file" id="heroDesktopInput" accept="image/webp,image/jpeg,image/png">
         <button type="button" id="uploadHeroDesktopBtn" class="button dark">Subir / reemplazar</button>
@@ -665,8 +871,7 @@ function openHeroEdit(slide) {
         <input type="file" id="heroMobileInput" accept="image/webp,image/jpeg,image/png">
         <button type="button" id="uploadHeroMobileBtn" class="button">Subir / reemplazar</button>
         <p id="heroMobileStatus" class="image-status"></p>
-      </div>`
-      }
+      </div>
     </div>
     <form id="heroEditForm" class="edit-form">
       <h2>Contenido (todo opcional — un slide puede ser solo imagen)</h2>
@@ -681,8 +886,8 @@ function openHeroEdit(slide) {
       <label class="checkbox-field"><input type="checkbox" name="active" ${s.active ? "checked" : ""}> Activo (visible en Home)</label>
       <div class="save-row">
         <span id="heroSaveStatus" class="save-status"></span>
-        <button type="button" id="cancelHeroEdit" class="outline-admin">Cancelar</button>
-        <button type="submit" class="button dark">${isNew ? "Crear slide" : "Guardar cambios"}</button>
+        <button type="button" id="cancelHeroEdit" class="outline-admin">Cerrar</button>
+        <button type="submit" class="button dark">Guardar cambios</button>
       </div>
     </form>
   `;
@@ -702,28 +907,6 @@ function openHeroEdit(slide) {
       active: fd.get("active") === "on",
     };
     $("#heroSaveStatus").textContent = "Guardando...";
-    if (isNew) {
-      const res = await adminFetch("/api/admin/hero-slides", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(fields),
-      });
-      if (res.status === 401) {
-        clearToken();
-        showLogin("Token incorrecto o vencido.");
-        return;
-      }
-      const payload = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        $("#heroSaveStatus").textContent = (payload && payload.error) || "Error al crear.";
-        return;
-      }
-      $("#heroSaveStatus").textContent = "Creado. Ahora puedes subirle una imagen.";
-      await loadHeroSlides();
-      $("#heroEditDialog").close();
-      openHeroEdit(payload.slide);
-      return;
-    }
     const saved = await patchSlide(s.id, fields);
     if (!saved) {
       $("#heroSaveStatus").textContent = "Error al guardar.";
@@ -736,39 +919,58 @@ function openHeroEdit(slide) {
 
   $("#cancelHeroEdit").addEventListener("click", () => $("#heroEditDialog").close());
 
-  if (!isNew) {
-    $("#uploadHeroDesktopBtn").addEventListener("click", async () => {
-      const file = $("#heroDesktopInput").files[0];
-      const statusEl = $("#heroDesktopStatus");
-      if (!file) {
-        statusEl.textContent = "Selecciona un archivo primero.";
-        return;
-      }
-      const updated = await uploadHeroImage(s.id, file, "desktop", statusEl);
-      if (updated) {
-        $("#heroPreviewBox").dataset.image = updated.image || "";
-        updateHeroPreview();
-        await loadHeroSlides();
-      }
-    });
-    $("#uploadHeroMobileBtn").addEventListener("click", async () => {
-      const file = $("#heroMobileInput").files[0];
-      const statusEl = $("#heroMobileStatus");
-      if (!file) {
-        statusEl.textContent = "Selecciona un archivo primero.";
-        return;
-      }
-      const updated = await uploadHeroImage(s.id, file, "mobile", statusEl);
-      if (updated) await loadHeroSlides();
-    });
-  }
+  $("#uploadHeroDesktopBtn").addEventListener("click", async () => {
+    const file = $("#heroDesktopInput").files[0];
+    const statusEl = $("#heroDesktopStatus");
+    if (!file) {
+      statusEl.textContent = "Selecciona un archivo primero.";
+      return;
+    }
+    const updated = await uploadHeroImage(s.id, file, "desktop", statusEl);
+    if (updated) {
+      $("#heroPreviewBox").dataset.image = updated.image || "";
+      updateHeroPreview();
+      await loadHeroSlides();
+    }
+  });
+  $("#uploadHeroMobileBtn").addEventListener("click", async () => {
+    const file = $("#heroMobileInput").files[0];
+    const statusEl = $("#heroMobileStatus");
+    if (!file) {
+      statusEl.textContent = "Selecciona un archivo primero.";
+      return;
+    }
+    const updated = await uploadHeroImage(s.id, file, "mobile", statusEl);
+    if (updated) await loadHeroSlides();
+  });
 
   $("#heroEditDialog").showModal();
 }
 
 $("#tabProducts").addEventListener("click", () => switchAdminView("products"));
 $("#tabHero").addEventListener("click", () => switchAdminView("hero"));
-$("#newSlideBtn").addEventListener("click", () => openHeroEdit(null));
+$("#newSlideBtn").addEventListener("click", async () => {
+  // Crea el draft en el servidor ANTES de abrir el diálogo — nunca hay
+  // upload UI para un slide que todavía no existe (ver comentario arriba
+  // de openHeroEdit).
+  const res = await adminFetch("/api/admin/hero-slides", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({}),
+  });
+  if (res.status === 401) {
+    clearToken();
+    showLogin("Token incorrecto o vencido.");
+    return;
+  }
+  const payload = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    alert((payload && payload.error) || "No se pudo crear el slide.");
+    return;
+  }
+  await loadHeroSlides();
+  openHeroEdit(payload.slide);
+});
 $("#closeHeroEdit").addEventListener("click", () => $("#heroEditDialog").close());
 
 $("#heroRows").addEventListener("click", async (e) => {

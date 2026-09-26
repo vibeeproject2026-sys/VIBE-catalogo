@@ -270,11 +270,26 @@ dialog::backdrop{background:#000d}
 .pdp-breadcrumb{margin-bottom:16px}
 .pdp-badge{display:inline-block;position:static;background:var(--pink);color:#fff;font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:4px 10px;border-radius:999px;margin-bottom:10px}
 .pdp-brand{margin:0 0 6px;font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#aaa}
+.pdp-commercial-name{margin:-4px 0 8px;font-size:13px;color:#ccc;font-style:italic}
 .pdp-short-desc{color:#ccc;font-size:14px;margin:0 0 16px}
 .pdp-price{display:flex;align-items:baseline;flex-wrap:wrap;gap:10px;margin:4px 0}
 .pdp-price strong{font-size:30px;font-weight:800}
 .pdp-discount{background:var(--pink);color:#fff;font-size:11px;font-weight:800;padding:3px 9px;border-radius:999px}
 .pdp-promo-text{color:var(--pink);font-size:13px;font-weight:700;margin:0 0 12px}
+
+/* Fase 34 — ficha técnica compacta (tono, acabado, cobertura, etc.):
+   etiqueta/valor, siempre visible (no acordeón, valores demasiado cortos
+   para justificar el clic). Cruelty-free/vegano/certificaciones/claims
+   comparten el mismo lenguaje visual de "pill". */
+.pdp-specs{margin:18px 0;padding:16px 0;border-top:1px solid #292929;border-bottom:1px solid #292929;display:grid;gap:10px}
+.pdp-spec-row{display:flex;justify-content:space-between;gap:16px;font-size:13px}
+.pdp-spec-row dt{margin:0;color:#999}
+.pdp-spec-row dd{margin:0;color:#fff;font-weight:600;text-align:right}
+.pdp-traits{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.pdp-trait{display:inline-block;border:1px solid #333;border-radius:999px;padding:5px 12px;font-size:11px;color:#ccc}
+.pdp-tag-list{margin-bottom:14px}
+.pdp-tag-list-label{margin:0 0 8px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--pink);font-weight:800}
+.pdp-tag{display:inline-block;background:#1a1a1a;border:1px solid #333;border-radius:999px;padding:5px 12px;font-size:11px;color:#eee;margin:0 6px 6px 0}
 
 .pdp-sections{margin-top:22px}
 .pdp-accordion{border-top:1px solid #292929;padding:16px 0}

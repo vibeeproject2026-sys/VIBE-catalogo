@@ -70,6 +70,17 @@ dialog::backdrop{background:#000a}
 
 .edit-images{padding:24px 28px;border-bottom:1px solid #eee;display:grid;gap:20px}
 .edit-images h2{margin:0;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--pink)}
+
+/* Fase 34 — secciones del formulario de producto como acordeones
+   (sección 6 de la fase: 12 bloques, cada campo independiente dentro,
+   nunca agrupados en un solo textarea). */
+.admin-accordion{border-bottom:1px solid #eee}
+.admin-accordion summary{padding:16px 28px;font-size:13px;font-weight:700;letter-spacing:.02em;cursor:pointer;color:#333;list-style:revert}
+.admin-accordion summary:hover{color:var(--pink)}
+.admin-accordion-body{padding:4px 28px 24px;display:grid;gap:16px}
+.admin-accordion-body label{display:grid;gap:6px;font-size:12px;font-weight:700;color:#333}
+.admin-accordion-body input,.admin-accordion-body textarea,.admin-accordion-body select{border:1px solid #ddd;border-radius:8px;padding:9px 11px;font-size:13px;color:#111;background:#fff;font-weight:400}
+.admin-accordion-body textarea{min-height:60px;resize:vertical}
 .image-block{display:grid;gap:8px}
 .image-block-label{margin:0;font-size:12px;font-weight:700;color:#333}
 .image-preview-main{width:160px;aspect-ratio:4/5;border:1px solid #ddd;border-radius:8px;overflow:hidden;display:flex;align-items:center;justify-content:center;background:#fafafa}

@@ -24,6 +24,8 @@ const repoRoot = path.resolve(__dirname, "..");
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "vibe-data-source-test-"));
 fs.writeFileSync(path.join(tmpDir, "package.json"), JSON.stringify({ type: "module" }));
 fs.copyFileSync(path.join(repoRoot, "js", "products.js"), path.join(tmpDir, "products.js"));
+// Fase 34: data-source.js ahora importa taxonomy.js (EDITORIAL_STRING_FIELDS/EDITORIAL_ARRAY_FIELDS).
+fs.copyFileSync(path.join(repoRoot, "js", "taxonomy.js"), path.join(tmpDir, "taxonomy.js"));
 fs.copyFileSync(path.join(repoRoot, "js", "data-source.js"), path.join(tmpDir, "data-source.js"));
 
 let passed = 0;

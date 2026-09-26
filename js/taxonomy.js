@@ -255,21 +255,110 @@ export function pdpGalleryImages(p) {
   return [...new Set(all)];
 }
 
-// Orden editorial fijo de la ficha (sección 12 de la Fase 28). Cada bloque
-// solo aparece si tiene contenido real: nunca "próximamente" ni texto
-// genérico. `benefits` es una lista — solo cuenta como presente si tiene
-// al menos un elemento real.
+// Fase 34 — misma lista de ~40 campos editoriales granulares que
+// api/_lib/editorialDetails.js (el navegador no puede requerir ese
+// módulo de Node, así que se mantiene una copia acá — si se agrega un
+// campo en uno, agregarlo también en el otro). Usada por
+// js/data-source.js para pasar todos estos campos sin tener que
+// escribirlos dos veces (demo + API).
+export const EDITORIAL_STRING_FIELDS = [
+  "commercialName", "line", "productType", "netContent", "tone", "toneCode", "color", "variant", "sku",
+  "whatIs", "characteristics",
+  "recommendedAmount", "applicationArea", "recommendedTool", "applicationOrder", "applicationTips",
+  "activeIngredients", "ingredientProperties", "warnings",
+  "texture", "formulaType", "coverage", "intensity", "finish", "duration", "resistance", "transfer",
+  "skinType", "skinRecommendations",
+  "crueltyFree", "vegan", "dermatologicallyTested", "countryOfManufacture", "manufacturerInfo",
+  "commercialAngle", "usageOccasion",
+  "mainImageAlt",
+];
+export const EDITORIAL_ARRAY_FIELDS = ["highlightedIngredients", "claims", "certifications"];
+
+// Orden editorial fijo de la ficha (sección 12 de la Fase 28, ampliado en
+// la Fase 34). Cada bloque solo aparece si tiene contenido real: nunca
+// "próximamente", "N/A" ni texto genérico. Los campos en ARRAY_SECTION_KEYS
+// solo cuentan como presentes si tienen al menos un elemento real.
+const ARRAY_SECTION_KEYS = new Set(["benefits", "highlightedIngredients"]);
 const PDP_SECTIONS = [
+  { key: "whatIs", label: "Qué es" },
   { key: "description", label: "Descripción" },
+  { key: "characteristics", label: "Características principales" },
   { key: "benefits", label: "Beneficios" },
   { key: "usage", label: "Cómo usar" },
+  // Modo de uso — nunca combinados en un solo campo (sección 4 de la
+  // Fase 34): cada uno es su propia sección independiente.
+  { key: "recommendedAmount", label: "Cantidad recomendada" },
+  { key: "applicationArea", label: "Dónde aplicar" },
+  { key: "recommendedTool", label: "Herramienta recomendada" },
+  { key: "applicationOrder", label: "Orden de aplicación" },
+  { key: "applicationTips", label: "Consejos de aplicación" },
   { key: "ingredients", label: "Ingredientes" },
+  { key: "highlightedIngredients", label: "Ingredientes destacados" },
+  { key: "activeIngredients", label: "Ingredientes activos" },
+  { key: "ingredientProperties", label: "Propiedades de los ingredientes" },
+  { key: "warnings", label: "Advertencias" },
   { key: "presentation", label: "Presentación" },
+  { key: "skinRecommendations", label: "Recomendaciones para tu piel" },
+  { key: "manufacturerInfo", label: "Información del fabricante" },
 ];
 export function pdpContentSections(p) {
   return PDP_SECTIONS.map(({ key, label }) => ({ key, label, content: p[key] })).filter(({ key, content }) =>
-    key === "benefits" ? Array.isArray(content) && content.length > 0 : Boolean(content)
+    ARRAY_SECTION_KEYS.has(key) ? Array.isArray(content) && content.length > 0 : Boolean(content)
   );
+}
+
+// Fase 34 — atributos cortos tipo ficha técnica (tono, acabado,
+// cobertura, etc.): se presentan como una lista compacta de
+// etiqueta/valor en vez de un acordeón por cada uno (evita 15+
+// acordeones de una sola palabra), pero cada fila sigue siendo
+// estrictamente independiente — vacío nunca aparece, nunca "N/A".
+const PDP_SPEC_FIELDS = [
+  { key: "line", label: "Línea" },
+  { key: "productType", label: "Tipo de producto" },
+  { key: "sku", label: "Referencia" },
+  { key: "tone", label: "Tono" },
+  { key: "toneCode", label: "Código de tono" },
+  { key: "color", label: "Color" },
+  { key: "variant", label: "Variante" },
+  { key: "netContent", label: "Contenido neto" },
+  { key: "texture", label: "Textura" },
+  { key: "formulaType", label: "Tipo de fórmula" },
+  { key: "coverage", label: "Cobertura" },
+  { key: "intensity", label: "Intensidad" },
+  { key: "finish", label: "Acabado" },
+  { key: "duration", label: "Duración" },
+  { key: "resistance", label: "Resistencia" },
+  { key: "transfer", label: "Transferencia" },
+  { key: "skinType", label: "Tipo de piel recomendado" },
+  { key: "countryOfManufacture", label: "País de fabricación" },
+];
+export function pdpSpecRows(p) {
+  return PDP_SPEC_FIELDS.map(({ key, label }) => ({ key, label, value: p[key] })).filter((row) => Boolean(row.value));
+}
+
+// Fase 34 — claims/certificaciones: multivalor, se muestran como una
+// lista de etiquetas (pills), no como acordeón.
+const PDP_TAG_LIST_FIELDS = [
+  { key: "claims", label: "Claims" },
+  { key: "certifications", label: "Certificaciones" },
+];
+export function pdpTagLists(p) {
+  return PDP_TAG_LIST_FIELDS.map(({ key, label }) => ({ key, label, items: p[key] })).filter(
+    (row) => Array.isArray(row.items) && row.items.length > 0
+  );
+}
+
+// Fase 34 — cruelty-free/vegano/dermatológicamente probado: texto libre
+// ("Sí"/"No"), nunca un booleano — así "vacío" (no especificado) es un
+// tercer estado real, distinto de "No", y ambos "Sí"/"No" son
+// respuestas explícitas que sí vale la pena mostrar.
+const PDP_TRAIT_FIELDS = [
+  { key: "crueltyFree", label: "Cruelty-free" },
+  { key: "vegan", label: "Vegano" },
+  { key: "dermatologicallyTested", label: "Dermatológicamente probado" },
+];
+export function pdpTraitBadges(p) {
+  return PDP_TRAIT_FIELDS.map(({ key, label }) => ({ key, label, value: p[key] })).filter((row) => Boolean(row.value));
 }
 
 // Breadcrumb del PDP: Inicio / Grupo / Categoría / Producto (sección 3 de

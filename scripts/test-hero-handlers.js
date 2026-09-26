@@ -445,6 +445,42 @@ async function main() {
     });
   });
 
+  console.log("\npropagación retrasada de Storage (Fase 34, sección 12 — corrige 'Ese slide_id no existe.')");
+
+  await test("si el slide recién creado no aparece todavía en la primera lectura, reintenta y el upload igual funciona", async () => {
+    await withEnv(BASE_ENV, async () => {
+      const { fetchImpl, calls } = mockStorage();
+      const originalFetch = global.fetch;
+      let getCount = 0;
+      // Envuelve el mock para que las primeras 2 lecturas de
+      // hero/slides.json devuelvan un manifiesto vacío (como si el
+      // create todavía no se hubiera propagado), y de la 3ra en adelante
+      // sí devuelvan el contenido real ya escrito.
+      global.fetch = async (url, opts = {}) => {
+        const method = opts.method || "GET";
+        if (url.includes("hero/slides.json") && method === "GET") {
+          getCount++;
+          if (getCount <= 2) {
+            return { ok: true, status: 200, arrayBuffer: async () => Buffer.from("[]").buffer.slice(0, 2), text: async () => "[]" };
+          }
+        }
+        return fetchImpl(url, opts);
+      };
+      try {
+        const createRes = mockRes();
+        await adminHandler({ method: "POST", headers: AUTH, body: { title: "X" } }, createRes);
+        const id = createRes.body.slide.id;
+
+        const imgRes = mockRes();
+        await imageHandler({ method: "POST", headers: AUTH, body: { slide_id: id, slot: "desktop", contentType: "image/png", dataBase64: VALID_DESKTOP_PNG_B64 } }, imgRes);
+        assert.equal(imgRes.statusCode, 200, "no debería fallar con 'Ese slide_id no existe.' aunque las primeras lecturas estén desactualizadas");
+        assert.ok(getCount >= 3, "debería haber reintentado al menos una vez");
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
+  });
+
   console.log("\neliminación");
 
   await test("DELETE elimina el slide del manifiesto y limpia sus imágenes propias", async () => {

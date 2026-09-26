@@ -30,11 +30,15 @@ const { sendJson, sendError, methodNotAllowed } = require("./_lib/http");
 // computed `promoActive` boolean server-side (see _lib/merge.js), so the
 // public API surface stays as narrow as everything else it returns.
 const PRODUCT_COLUMNS = "id,name,price,stock,category,promo_active,promo_price,promo_start,promo_end,promo_text";
-// additional_info is deliberately NOT selected here — it stays
-// admin-only (internal notes/provider info), never exposed publicly.
-// See docs/fase22b-ficha-editorial-manual.md.
+// Fase 34 — additional_info ahora SÍ se selecciona: dejó de ser una nota
+// interna de texto libre y pasa a guardar un JSON estructurado con los
+// ~40 campos editoriales granulares de la ficha VIBE (tono, acabado,
+// cobertura, cruelty-free, etc. — ver api/_lib/editorialDetails.js).
+// shapeProduct() nunca expone el blob crudo bajo su nombre de columna:
+// lo parsea, sanitiza contra una whitelist fija, y solo entonces aplana
+// sus campos ya conocidos como propiedades normales del producto.
 const METADATA_COLUMNS =
-  "product_id,category,subcategory,image,images,short_description,description,benefits,ingredients,usage,presentation,brand,badge,featured,editorial_order,published";
+  "product_id,category,subcategory,image,images,short_description,description,benefits,ingredients,usage,presentation,brand,badge,featured,editorial_order,published,additional_info";
 
 module.exports = async function handler(req, res) {
   applyCors(req, res);

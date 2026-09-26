@@ -29,6 +29,11 @@ const {
   pdpBadge,
   pdpGalleryImages,
   pdpContentSections,
+  pdpSpecRows,
+  pdpTagLists,
+  pdpTraitBadges,
+  EDITORIAL_STRING_FIELDS,
+  EDITORIAL_ARRAY_FIELDS,
   breadcrumbForProduct,
   selectRelated,
   clampQuantity,
@@ -440,6 +445,89 @@ test("benefits vacío ([]) cuenta como ausente, igual que null", () => {
   const r = pdpContentSections({ description: null, benefits: [], usage: null, ingredients: null, presentation: null });
   assert.deepEqual(r, []);
 });
+console.log("pdpContentSections (Fase 34 — nuevos campos narrativos granulares)");
+test("whatIs/características/modo de uso granular/ingredientes destacados aparecen cada uno como su propio bloque", () => {
+  const r = pdpContentSections({
+    whatIs: "Un rubor líquido de larga duración.",
+    characteristics: "Textura ligera, acabado natural.",
+    recommendedAmount: "2-3 gotas por mejilla.",
+    applicationArea: "Parte alta de las mejillas.",
+    recommendedTool: "Brocha densa o esponja.",
+    applicationOrder: "Después de base, antes de polvo.",
+    applicationTips: "Difuminar rápido, seca en segundos.",
+    highlightedIngredients: ["Ácido hialurónico", "Vitamina E"],
+    activeIngredients: "Ácido hialurónico 2%",
+    ingredientProperties: "Hidratante, antioxidante.",
+    warnings: "Evitar contacto con los ojos.",
+    skinRecommendations: "Ideal para piel mixta a grasa.",
+    manufacturerInfo: "Fabricado por Kevin&COCO.",
+  });
+  assert.deepEqual(r.map((s) => s.key), [
+    "whatIs",
+    "characteristics",
+    "recommendedAmount",
+    "applicationArea",
+    "recommendedTool",
+    "applicationOrder",
+    "applicationTips",
+    "highlightedIngredients",
+    "activeIngredients",
+    "ingredientProperties",
+    "warnings",
+    "skinRecommendations",
+    "manufacturerInfo",
+  ]);
+});
+test("highlightedIngredients vacío ([]) cuenta como ausente, igual que benefits", () => {
+  const r = pdpContentSections({ highlightedIngredients: [] });
+  assert.deepEqual(r, []);
+});
+test("un producto sin ningún campo nuevo se comporta exactamente igual que antes de la Fase 34", () => {
+  const r = pdpContentSections({ description: "X" });
+  assert.deepEqual(r.map((s) => s.key), ["description"]);
+});
+
+console.log("pdpSpecRows (Fase 34 — ficha técnica compacta: tono, acabado, cobertura, etc.)");
+test("solo muestra los atributos que tienen valor real", () => {
+  const r = pdpSpecRows({ tone: "Coral", finish: "Mate", coverage: null, texture: "" });
+  assert.deepEqual(r.map((row) => row.key), ["tone", "finish"]);
+  assert.equal(r.find((row) => row.key === "tone").value, "Coral");
+});
+test("sin ningún atributo, arreglo vacío (nunca 'N/A')", () => {
+  assert.deepEqual(pdpSpecRows({}), []);
+});
+test("incluye sku/line/productType (referencia, línea, tipo de producto de la ficha real)", () => {
+  const r = pdpSpecRows({ sku: "KC240258", line: "Perfect Cheeks", productType: "Rubor líquido" });
+  assert.deepEqual(r.map((row) => row.key).sort(), ["line", "productType", "sku"]);
+});
+
+console.log("pdpTagLists (Fase 34 — claims/certificaciones como pills, multivalor)");
+test("solo incluye listas con al menos un elemento", () => {
+  const r = pdpTagLists({ claims: ["Cruelty-free", "Vegano"], certifications: [] });
+  assert.deepEqual(r.map((row) => row.key), ["claims"]);
+  assert.deepEqual(r[0].items, ["Cruelty-free", "Vegano"]);
+});
+test("sin claims ni certificaciones, arreglo vacío", () => {
+  assert.deepEqual(pdpTagLists({}), []);
+});
+
+console.log("pdpTraitBadges (Fase 34 — cruelty-free/vegano/dermatológicamente probado: 'Sí'/'No'/ausente)");
+test("un valor explícito 'Sí' o 'No' se muestra; vacío/ausente se oculta (nunca un booleano ni un tercer estado inventado)", () => {
+  const r = pdpTraitBadges({ crueltyFree: "Sí", vegan: "No", dermatologicallyTested: null });
+  assert.deepEqual(r.map((row) => row.key), ["crueltyFree", "vegan"]);
+  assert.equal(r.find((row) => row.key === "vegan").value, "No");
+});
+test("los 3 vacíos -> arreglo vacío", () => {
+  assert.deepEqual(pdpTraitBadges({}), []);
+});
+
+console.log("EDITORIAL_STRING_FIELDS / EDITORIAL_ARRAY_FIELDS (Fase 34 — deben coincidir con api/_lib/editorialDetails.js)");
+test("37 campos string + 3 arreglo = 40 campos editoriales granulares en total", () => {
+  assert.equal(EDITORIAL_STRING_FIELDS.length, 37);
+  assert.equal(EDITORIAL_ARRAY_FIELDS.length, 3);
+  assert.equal(new Set([...EDITORIAL_STRING_FIELDS, ...EDITORIAL_ARRAY_FIELDS]).size, 40);
+});
+
 test("sin ningún campo editorial, arreglo vacío (nunca 'próximamente')", () => {
   assert.deepEqual(pdpContentSections({}), []);
 });

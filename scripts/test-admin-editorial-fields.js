@@ -2,10 +2,16 @@
 //   node scripts/test-admin-editorial-fields.js
 //
 // Fase 22B — ficha editorial manual: verifies every field of the new
-// admin form can be saved independently, can be left empty, and that
-// additional_info (a) round-trips correctly and (b) never reaches the
-// public API. Complements (does not duplicate) the auth/whitelist tests
-// already in test-admin-handlers.js and test-admin-lib.js.
+// admin form can be saved independently and can be left empty.
+// Complements (does not duplicate) the auth/whitelist tests already in
+// test-admin-handlers.js and test-admin-lib.js.
+//
+// additional_info se prueba por separado más abajo (sección propia):
+// desde la Fase 34 dejó de ser una nota de texto libre y pasó a ser un
+// objeto JSON estructurado (~40 campos editoriales granulares, ver
+// api/_lib/editorialDetails.js) — el handler lo serializa/parsea, así
+// que no encaja en el loop genérico de "un valor -> se guarda tal cual"
+// que usan el resto de los campos.
 
 const assert = require("assert/strict");
 
@@ -82,7 +88,6 @@ const FIELD_SAMPLES = {
   badge: "NUEVO",
   featured: true,
   editorial_order: 3,
-  additional_info: "Nota interna: proveedor confirmó stock para reposición en abril.",
   published: true,
 };
 
@@ -147,18 +152,40 @@ async function main() {
     });
   }
 
-  console.log("\nadditional_info");
+  console.log("\nadditional_info (Fase 34 — ~40 campos editoriales granulares, JSON estructurado)");
 
-  await test("additional_info se guarda y se puede volver a leer (GET) tal cual se escribió", async () => {
+  await test("PATCH con additional_info como objeto se serializa a JSON antes de llegar a Supabase", async () => {
     await withEnv(BASE_ENV, async () => {
-      const note = "Observación manual: revisar con proveedor en la próxima reunión.";
+      const { fetchImpl, calls } = mockFetchCapture();
       const originalFetch = global.fetch;
-      global.fetch = async (url, opts = {}) => {
+      global.fetch = fetchImpl;
+      try {
+        const details = { tone: "Rosa nude", finish: "Mate", crueltyFree: "Sí", claims: ["Cruelty-free", "Vegano"] };
+        const req = { method: "PATCH", headers: AUTH, query: {}, body: { product_id: 56, additional_info: details } };
+        const res = mockRes();
+        await catalogMetadataHandler(req, res);
+        assert.equal(res.statusCode, 200);
+        assert.equal(typeof calls[0].additional_info, "string"); // guardado como JSON en la columna text existente
+        const stored = JSON.parse(calls[0].additional_info);
+        assert.equal(stored.tone, "Rosa nude");
+        assert.equal(stored.finish, "Mate");
+        assert.deepEqual(stored.claims, ["Cruelty-free", "Vegano"]);
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
+  });
+
+  await test("additional_info se guarda y se puede volver a leer (GET) como el mismo objeto estructurado", async () => {
+    await withEnv(BASE_ENV, async () => {
+      const storedJson = JSON.stringify({ tone: "Coral", texture: "Ligera" });
+      const originalFetch = global.fetch;
+      global.fetch = async (url) => {
         if (url.includes("/rest/v1/products")) {
           return { ok: true, status: 200, text: async () => JSON.stringify([{ id: 56, name: "Makeup Brush Set", price: 18000, stock: 3, category: "Otro" }]) };
         }
         if (url.includes("/rest/v1/catalog_metadata")) {
-          return { ok: true, status: 200, text: async () => JSON.stringify([{ product_id: 56, additional_info: note, published: true }]) };
+          return { ok: true, status: 200, text: async () => JSON.stringify([{ product_id: 56, additional_info: storedJson, published: true }]) };
         }
         throw new Error("URL inesperada: " + url);
       };
@@ -167,7 +194,53 @@ async function main() {
         const res = mockRes();
         await catalogMetadataHandler(req, res);
         assert.equal(res.statusCode, 200);
-        assert.equal(res.body.metadata.additional_info, note);
+        assert.equal(res.body.metadata.additional_info.tone, "Coral");
+        assert.equal(res.body.metadata.additional_info.texture, "Ligera");
+        // El resto de los ~40 campos vienen en null/[] , nunca undefined —
+        // el Admin puede poblar el formulario completo sin checks extra.
+        assert.equal(res.body.metadata.additional_info.commercialName, null);
+        assert.deepEqual(res.body.metadata.additional_info.claims, []);
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
+  });
+
+  await test("additional_info vacío (sin ningún campo real) se guarda como null, nunca como un JSON de puros vacíos", async () => {
+    await withEnv(BASE_ENV, async () => {
+      const { fetchImpl, calls } = mockFetchCapture();
+      const originalFetch = global.fetch;
+      global.fetch = fetchImpl;
+      try {
+        const req = { method: "PATCH", headers: AUTH, query: {}, body: { product_id: 56, additional_info: { tone: "" } } };
+        const res = mockRes();
+        await catalogMetadataHandler(req, res);
+        assert.equal(res.statusCode, 200);
+        assert.equal(calls[0].additional_info, null);
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
+  });
+
+  await test("un valor no-JSON heredado de antes de la Fase 34 (nota de texto libre) se lee como vacío, nunca rompe el GET", async () => {
+    await withEnv(BASE_ENV, async () => {
+      const originalFetch = global.fetch;
+      global.fetch = async (url) => {
+        if (url.includes("/rest/v1/products")) {
+          return { ok: true, status: 200, text: async () => JSON.stringify([{ id: 56, name: "X", price: 1, stock: 1, category: "Otro" }]) };
+        }
+        if (url.includes("/rest/v1/catalog_metadata")) {
+          return { ok: true, status: 200, text: async () => JSON.stringify([{ product_id: 56, additional_info: "una nota vieja en texto libre", published: true }]) };
+        }
+        throw new Error("URL inesperada: " + url);
+      };
+      try {
+        const req = { method: "GET", headers: AUTH, query: { product_id: "56" } };
+        const res = mockRes();
+        await catalogMetadataHandler(req, res);
+        assert.equal(res.statusCode, 200);
+        assert.equal(res.body.metadata.additional_info.tone, null);
       } finally {
         global.fetch = originalFetch;
       }
@@ -211,16 +284,37 @@ async function main() {
     });
   });
 
-  console.log("\napi pública: additional_info nunca se expone");
+  console.log("\napi pública (Fase 34): el blob crudo nunca se expone, sus campos sanitizados sí");
 
-  await test("shapeProduct nunca incluye additional_info en la salida pública", () => {
+  await test("shapeProduct nunca incluye una clave literal 'additional_info' en la salida pública", () => {
     const { shapeProduct } = require("../api/catalog/_lib/merge");
     const { resolveCategoryGroup } = require("../api/catalog/_lib/categoryGroups");
     const product = { id: 1, name: "X", price: 100, stock: 1, category: "Otro" };
-    const metadata = { published: true, additional_info: "nota interna secreta de prueba", category: "Rostro" };
+    const metadata = { published: true, additional_info: JSON.stringify({ tone: "Coral" }), category: "Rostro" };
     const shaped = shapeProduct(product, metadata, resolveCategoryGroup);
     assert.equal("additional_info" in shaped, false);
     assert.equal(shaped.editorialCategory, "Rostro");
+  });
+
+  await test("los campos estructurados y sanitizados de additional_info sí llegan aplanados a la salida pública", () => {
+    const { shapeProduct } = require("../api/catalog/_lib/merge");
+    const { resolveCategoryGroup } = require("../api/catalog/_lib/categoryGroups");
+    const product = { id: 1, name: "X", price: 100, stock: 1, category: "Otro" };
+    const metadata = { published: true, additional_info: JSON.stringify({ tone: "Coral", finish: "Mate", claims: ["Vegano"] }) };
+    const shaped = shapeProduct(product, metadata, resolveCategoryGroup);
+    assert.equal(shaped.tone, "Coral");
+    assert.equal(shaped.finish, "Mate");
+    assert.deepEqual(shaped.claims, ["Vegano"]);
+  });
+
+  await test("un valor no-JSON heredado (nota de texto libre pre-Fase 34) nunca se filtra a la salida pública", () => {
+    const { shapeProduct } = require("../api/catalog/_lib/merge");
+    const { resolveCategoryGroup } = require("../api/catalog/_lib/categoryGroups");
+    const product = { id: 1, name: "X", price: 100, stock: 1, category: "Otro" };
+    const metadata = { published: true, additional_info: "nota interna secreta de prueba" };
+    const shaped = shapeProduct(product, metadata, resolveCategoryGroup);
+    assert.equal(shaped.tone, null);
+    assert.equal(JSON.stringify(shaped).includes("secreta"), false);
   });
 
   console.log(`\n${passed} passed, ${failed} failed`);

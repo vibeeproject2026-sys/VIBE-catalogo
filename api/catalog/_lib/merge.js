@@ -8,6 +8,8 @@
 // Embedding can be adopted later as an optimization once the schema is
 // live and confirmed.
 
+const { parseDetails } = require("../../_lib/editorialDetails");
+
 // Fase 31 — LEFT JOIN: todo producto del POS se incluye, tenga o no una
 // fila editorial publicada. metadata queda null cuando no existe (o
 // cuando existe pero published !== true — metadataRows ya viene filtrada
@@ -44,6 +46,14 @@ function resolvePromoActive(product, now = new Date()) {
 // cualquier campo así.
 function shapeProduct(product, metadata, resolveCategoryGroup) {
   const m = metadata || {};
+  // Fase 34 — additional_info (columna text existente) guarda un JSON
+  // con los ~40 campos editoriales granulares de la ficha VIBE (ver
+  // api/_lib/editorialDetails.js). parseDetails nunca confía en el
+  // contenido crudo: un valor corrupto, ausente, o heredado de antes de
+  // esta fase (texto libre no-JSON) se degrada a "todo vacío", nunca
+  // rompe la respuesta ni filtra nada fuera de la whitelist. Se aplanan
+  // como campos de primer nivel, igual que shortDescription/ingredients.
+  const details = parseDetails(m.additional_info);
   return {
     id: product.id,
     name: product.name,
@@ -72,6 +82,7 @@ function shapeProduct(product, metadata, resolveCategoryGroup) {
     badge: m.badge ?? null,
     featured: Boolean(m.featured),
     editorialOrder: m.editorial_order === null || m.editorial_order === undefined ? null : Number(m.editorial_order),
+    ...details,
   };
 }
 

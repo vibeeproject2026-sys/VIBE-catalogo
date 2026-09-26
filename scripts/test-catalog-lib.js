@@ -11,6 +11,7 @@ const { resolveCategoryGroup } = require("../api/catalog/_lib/categoryGroups");
 const { pgrestSelect } = require("../api/catalog/_lib/supabaseRead");
 const { getEnv } = require("../api/catalog/_lib/env");
 const { applyCors, DEFAULT_DEV_ORIGINS } = require("../api/catalog/_lib/cors");
+const { ALL_FIELDS: EDITORIAL_DETAIL_FIELDS } = require("../api/_lib/editorialDetails");
 
 let passed = 0;
 let failed = 0;
@@ -116,6 +117,12 @@ async function main() {
         "shortDescription",
         "subcategory",
         "usage",
+        // Fase 34 — los ~40 campos editoriales granulares (tono, acabado,
+        // cruelty-free, etc.) se aplanan aquí también, uno por uno: se
+        // reutiliza la misma whitelist de api/_lib/editorialDetails.js en
+        // vez de escribir los 40 nombres a mano (y quedar desincronizado
+        // si se agrega uno nuevo ahí).
+        ...EDITORIAL_DETAIL_FIELDS,
       ].sort()
     );
   });

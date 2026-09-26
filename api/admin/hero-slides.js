@@ -26,6 +26,7 @@ const { requireAdmin } = require("./_lib/auth");
 const { sendJson, sendError, methodNotAllowed } = require("../catalog/_lib/http");
 const {
   loadSlides,
+  loadSlidesUntilFound,
   saveSlides,
   isSafeCtaHref,
   makeSlideId,
@@ -102,7 +103,10 @@ module.exports = async function handler(req, res) {
 
   let slides;
   try {
-    slides = await loadSlides(env);
+    // Fase 34, sección 12 — mismo reintento que hero-slide-image.js: un
+    // PATCH/DELETE justo después de crear el slide no debe fallar por la
+    // misma propagación no siempre instantánea de Storage.
+    slides = await loadSlidesUntilFound(env, id);
   } catch (e) {
     console.error("[admin/hero-slides] " + (e && e.message ? e.message : e));
     return sendError(res, 502, "No se pudo obtener el listado de slides.");

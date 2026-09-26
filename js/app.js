@@ -17,6 +17,9 @@ import {
   pdpBadge,
   pdpGalleryImages,
   pdpContentSections,
+  pdpSpecRows,
+  pdpTagLists,
+  pdpTraitBadges,
   breadcrumbForProduct,
   selectRelated,
   clampQuantity,
@@ -534,7 +537,9 @@ function pdpGalleryHtml(p) {
     // una ni se usa un emoji — un estado visual propio, deliberado.
     return `<div class="pdp-no-image" aria-hidden="true"><span>VIBE</span></div>`;
   }
-  const main = `<div class="pdp-gallery-main"><img id="pdpMainImage" class="detail-photo" src="${esc(images[0])}" alt="${esc(p.name)}" loading="eager"></div>`;
+  // Fase 34 — mainImageAlt es editorial y opcional: si Ana lo completó,
+  // reemplaza el alt genérico (el nombre del producto), nunca al revés.
+  const main = `<div class="pdp-gallery-main"><img id="pdpMainImage" class="detail-photo" src="${esc(images[0])}" alt="${esc(p.mainImageAlt || p.name)}" loading="eager"></div>`;
   const thumbs =
     images.length > 1
       ? `<div class="pdp-thumbs">${images
@@ -554,10 +559,39 @@ function pdpSectionsHtml(p) {
     .map(
       (s, i) => `<details class="pdp-accordion"${i === 0 ? " open" : ""}>
       <summary>${esc(s.label)}</summary>
-      <div class="pdp-accordion-body">${s.key === "benefits" ? `<ul>${s.content.map((b) => `<li>${esc(b)}</li>`).join("")}</ul>` : `<p>${esc(s.content)}</p>`}</div>
+      <div class="pdp-accordion-body">${Array.isArray(s.content) ? `<ul>${s.content.map((b) => `<li>${esc(b)}</li>`).join("")}</ul>` : `<p>${esc(s.content)}</p>`}</div>
     </details>`
     )
     .join("")}</div>`;
+}
+
+// Fase 34 — ficha técnica compacta (tono, acabado, cobertura, etc.):
+// etiqueta/valor, cada fila solo si el campo tiene contenido real. Se
+// muestra siempre visible (no en acordeón) porque cada valor es corto —
+// un acordeón por cada palabra suelta sería más fricción que ayuda.
+function pdpSpecHtml(p) {
+  const rows = pdpSpecRows(p);
+  if (!rows.length) return "";
+  return `<dl class="pdp-specs">${rows.map((r) => `<div class="pdp-spec-row"><dt>${esc(r.label)}</dt><dd>${esc(r.value)}</dd></div>`).join("")}</dl>`;
+}
+
+// Cruelty-free / vegano / dermatológicamente probado: "Sí"/"No" tal cual
+// se escribió, nunca un ícono ni un booleano inventado.
+function pdpTraitsHtml(p) {
+  const traits = pdpTraitBadges(p);
+  if (!traits.length) return "";
+  return `<div class="pdp-traits">${traits.map((t) => `<span class="pdp-trait">${esc(t.label)}: ${esc(t.value)}</span>`).join("")}</div>`;
+}
+
+// Claims / certificaciones: multivalor, como pills.
+function pdpTagsHtml(p) {
+  const lists = pdpTagLists(p);
+  if (!lists.length) return "";
+  return lists
+    .map(
+      (l) => `<div class="pdp-tag-list"><p class="pdp-tag-list-label">${esc(l.label)}</p>${l.items.map((i) => `<span class="pdp-tag">${esc(i)}</span>`).join("")}</div>`
+    )
+    .join("");
 }
 
 function pdpRelatedHtml() {
@@ -585,6 +619,12 @@ function renderProductDetail(p) {
     ${badgeText ? `<span class="pdp-badge">${esc(badgeText)}</span>` : ""}
     ${p.brand ? `<p class="pdp-brand">${esc(p.brand)}</p>` : ""}
     <h2>${esc(p.name)}</h2>
+    ${
+      // Fase 34 — "Nombre comercial" es editorial y nunca reemplaza el
+      // nombre del POS (el <h2> de arriba): es una línea adicional,
+      // opcional, debajo del nombre operativo.
+      p.commercialName ? `<p class="pdp-commercial-name">${esc(p.commercialName)}</p>` : ""
+    }
     ${p.shortDescription ? `<p class="pdp-short-desc">${esc(p.shortDescription)}</p>` : ""}
     <div class="pdp-price">
       <strong id="detailPrice">${money(currentEffectivePrice())}</strong>
@@ -602,6 +642,9 @@ function renderProductDetail(p) {
       </div>
       <button id="addButton" class="button dark" ${unavailable ? "disabled" : ""}>${unavailable ? "Agotado" : "Agregar al carrito"}</button>
     </div>
+    ${pdpSpecHtml(p)}
+    ${pdpTraitsHtml(p)}
+    ${pdpTagsHtml(p)}
     ${pdpSectionsHtml(p)}
     ${pdpRelatedHtml()}
   </div>`;

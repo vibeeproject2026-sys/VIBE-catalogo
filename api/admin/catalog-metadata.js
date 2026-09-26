@@ -16,6 +16,7 @@ const { getEnv } = require("../catalog/_lib/env");
 const { pgrestSelect } = require("../catalog/_lib/supabaseRead");
 const { upsertCatalogMetadata } = require("./_lib/adminWrite");
 const { pickEditorialFields } = require("./_lib/editorialFields");
+const { parseDetails, serializeDetails } = require("../_lib/editorialDetails");
 const { requireAdmin } = require("./_lib/auth");
 const { sendJson, sendError, methodNotAllowed } = require("../catalog/_lib/http");
 
@@ -53,8 +54,13 @@ module.exports = async function handler(req, res) {
         }),
       ]);
       if (!products.length) return sendError(res, 404, "Producto no encontrado en products.");
+      // Fase 34 — additional_info se guarda como JSON (columna text
+      // existente, ver api/_lib/editorialDetails.js); el Admin siempre
+      // recibe el objeto ya estructurado, nunca el string crudo.
+      const metadata = metadataRows[0] || null;
+      if (metadata) metadata.additional_info = parseDetails(metadata.additional_info);
       res.setHeader("Cache-Control", "no-store");
-      return sendJson(res, 200, { product: products[0], metadata: metadataRows[0] || null });
+      return sendJson(res, 200, { product: products[0], metadata });
     } catch (e) {
       console.error("[admin/catalog-metadata] " + (e && e.message ? e.message : e));
       return sendError(res, 502, "No se pudo obtener el producto.");
@@ -68,9 +74,18 @@ module.exports = async function handler(req, res) {
     return sendError(res, 400, "product_id inválido o ausente.");
   }
   const fields = pickEditorialFields(body);
+  // Fase 34 — el Admin envía additional_info como un objeto (no un
+  // string ya serializado): se serializa aquí, en el único lugar que
+  // sabe qué claves son válidas y descarta cualquier otra cosa. Un
+  // objeto sin ningún campo real completado se guarda como null (nunca
+  // un JSON de puros vacíos).
+  if ("additional_info" in fields) {
+    fields.additional_info = serializeDetails(fields.additional_info);
+  }
 
   try {
     const saved = await upsertCatalogMetadata({ productId, fields, env });
+    if (saved) saved.additional_info = parseDetails(saved.additional_info);
     res.setHeader("Cache-Control", "no-store");
     return sendJson(res, 200, { metadata: saved });
   } catch (e) {

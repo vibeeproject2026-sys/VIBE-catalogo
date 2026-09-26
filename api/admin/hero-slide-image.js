@@ -20,7 +20,7 @@ const { requireAdmin } = require("./_lib/auth");
 const { sendJson, sendError, methodNotAllowed } = require("../catalog/_lib/http");
 const { decodeBase64Image, validateHeroUpload } = require("./_lib/imageValidation");
 const { uploadObject, deleteObject, isOwnedPath, pathFromUrl } = require("./_lib/storage");
-const { loadSlides, saveSlides, buildHeroImagePath } = require("../_lib/heroSlides");
+const { loadSlidesUntilFound, saveSlides, buildHeroImagePath } = require("../_lib/heroSlides");
 
 module.exports = async function handler(req, res) {
   if (req.method !== "POST") return methodNotAllowed(res, ["POST"]);
@@ -46,7 +46,12 @@ module.exports = async function handler(req, res) {
 
   let slides;
   try {
-    slides = await loadSlides(env);
+    // Fase 34, sección 12 — loadSlidesUntilFound reintenta unas pocas
+    // veces si el slide recién creado todavía no aparece (propagación de
+    // Storage, ver comentario en _lib/heroSlides.js): esto es lo que
+    // corrige el error real "Ese slide_id no existe." al subir una
+    // imagen justo después de crear el slide.
+    slides = await loadSlidesUntilFound(env, slideId);
   } catch (e) {
     console.error("[admin/hero-slide-image] " + (e && e.message ? e.message : e));
     return sendError(res, 502, "No se pudo verificar el slide.");
