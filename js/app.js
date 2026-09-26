@@ -656,6 +656,32 @@ function renderProductDetail(p) {
     ${pdpRelatedHtml()}
   </div>`;
   $("#productDetail").scrollTop = 0;
+  applyPdpPhotoRatio();
+}
+
+// Fase estabilización — bug real (solo desktop; ver comentario junto a
+// .detail-img en css/styles.css): el contenedor de la galería asumía
+// aspect-ratio:4/5 fijo, como si toda foto de producto fuera exactamente
+// 1200x1500. Las fotos reales varían (verificado contra Storage: entre
+// 2:3 y 4:5 según el producto), así que ese contenedor fijo dejaba
+// espacio de sobra alrededor de la foto real. En vez de asumir 4:5, se
+// mide la proporción REAL de la imagen principal (una sola vez al abrir
+// el producto, no en cada clic de la galería — mismo criterio que el
+// Hero) y se expone como --pdp-photo-ratio; el CSS solo la usa en
+// desktop (mobile sigue con 4/5 fijo tal cual, sin tocar). object-fit
+// contain sigue intacto: una imagen secundaria con otra proporción
+// todavía puede mostrar letterboxing al navegar, nunca recorte.
+function applyPdpPhotoRatio() {
+  const img = $("#pdpMainImage");
+  const container = $(".detail-img");
+  if (!img || !container) return;
+  const apply = () => {
+    if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+      container.style.setProperty("--pdp-photo-ratio", `${img.naturalWidth} / ${img.naturalHeight}`);
+    }
+  };
+  if (img.complete) apply();
+  else img.addEventListener("load", apply, { once: true });
 }
 
 // Sección 22.B/C de la Fase 28: un id inexistente y un id de un producto

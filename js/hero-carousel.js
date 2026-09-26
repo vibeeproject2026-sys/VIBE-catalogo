@@ -82,6 +82,24 @@ async function initHeroCarousel() {
 
   slidesEl.innerHTML = slides.map(heroSlideHtml).join("");
 
+  // El contenedor mobile asumía aspect-ratio:4/5 fijo (ver css/styles.css),
+  // como si la pieza real siempre fuera exactamente 1080x1350 — cualquier
+  // asset con otra proporción quedaba con bandas dentro de ese marco. En
+  // vez de asumirlo, se mide la proporción REAL de la primera pieza (su
+  // imagen mobile si existe, si no la principal) y se expone como
+  // --hero-mobile-ratio; el CSS mobile la usa con var(...,4/5) como
+  // respaldo mientras esto carga o si la medición falla.
+  const firstSlideImage = slides[0].mobileImage || slides[0].image;
+  if (firstSlideImage) {
+    const probe = new Image();
+    probe.onload = () => {
+      if (probe.naturalWidth > 0 && probe.naturalHeight > 0) {
+        root.style.setProperty("--hero-mobile-ratio", `${probe.naturalWidth} / ${probe.naturalHeight}`);
+      }
+    };
+    probe.src = firstSlideImage;
+  }
+
   dotsEl.innerHTML = slides
     .map((_, i) => `<button type="button" class="hero-dot${i === 0 ? " active" : ""}" data-index="${i}" aria-label="Ir a la pieza ${i + 1}"></button>`)
     .join("");

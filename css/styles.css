@@ -51,8 +51,18 @@ header.scrolled .logo-image{width:126px;height:50px}
 /* Hero banner carousel (Fase Visual 2) — pieza gráfica a pantalla
    completa, sin composición editorial generada por código: el catálogo
    solo exhibe la imagen que llegue en cada slide. Mismos breakpoints de
-   altura que el bloque anterior (.hero-img), como punto de partida. */
-.hero-carousel{position:relative;min-height:500px;border-radius:28px;overflow:hidden;background:#0c0c0c}
+   altura que el bloque anterior (.hero-img), como punto de partida.
+   Fase estabilización — bug real: era min-height, no height. .hero-slides
+   (hijo directo, height:100%) y en cascada .hero-slide/picture/img
+   (position:absolute;inset:0 o herencia de 100%) necesitan que ESTE
+   contenedor tenga una altura explícita para que un porcentaje se
+   resuelva — min-height dejaba el "height" computado en auto, así que
+   %100 nunca resolvía a nada y colapsaba a 0px (confirmado con Playwright:
+   .hero-slides medía 0px de alto pese a que .hero-carousel sí medía
+   500px) — la imagen cargaba bien pero se veía negra porque su propio
+   alto real era 0. height fija resuelve la cascada sin cambiar el alto
+   visual ya usado (nada aquí crece más allá de este valor hoy). */
+.hero-carousel{position:relative;height:500px;border-radius:28px;overflow:hidden;background:#0c0c0c}
 
 .hero-slides{position:relative;width:100%;height:100%}
 .hero-slide{position:absolute;inset:0;display:block;opacity:0;transition:opacity 1s ease}
@@ -261,8 +271,16 @@ dialog::backdrop{background:#000d}
    1199×1499px reales en producción, desbordando el diálogo y la
    ventana. width:100% + min-width:0 fuerzan que el ancho SIEMPRE venga
    de la columna del grid (429px reales), y aspect-ratio entonces deriva
-   la altura a partir de ESE ancho, nunca al revés. */
-.detail-img{aspect-ratio:4/5;width:100%;min-width:0;max-width:100%;background:#111;display:grid;place-items:center;text-align:center;color:#aaa;padding:0;overflow:hidden}
+   la altura a partir de ESE ancho, nunca al revés.
+   Fase estabilización (solo desktop — mobile abajo sigue con 4/5 fijo,
+   sin tocar) — bug real: 4/5 fijo asumía que toda foto de producto es
+   exactamente 1200x1500; las fotos reales varían (verificado contra
+   Storage: producto 122 va de 2:3 a 4:5 entre sus 4 fotos), así que el
+   contenedor quedaba más alto que la foto real, dejando espacio de
+   sobra. js/app.js mide la proporción REAL de la foto principal al abrir
+   el producto y la expone como --pdp-photo-ratio; 4/5 queda solo como
+   respaldo mientras esa medición no ha llegado o falla. */
+.detail-img{aspect-ratio:var(--pdp-photo-ratio, 4/5);width:100%;min-width:0;max-width:100%;background:#111;display:grid;place-items:center;text-align:center;color:#aaa;padding:0;overflow:hidden}
 /* Fase 35 — la foto de producto debe verse completa, nunca recortada:
    object-fit:contain (no cover). .detail-img conserva su fondo oscuro
    (#111) para el letterboxing cuando la proporción real de la foto no
@@ -283,7 +301,15 @@ dialog::backdrop{background:#000d}
    por una columna (imagen principal + thumbnails), reutilizando .detail-
    img/.detail-photo tal cual para el tamaño/recorte de la imagen
    principal (misma regla mobile que ya existía en @media(max-width:640px)). */
-.pdp-gallery{display:flex;flex-direction:column;height:100%}
+/* align-items:stretch explícito — bug real encontrado con Playwright:
+   .detail-img trae place-items:center (pensado para cuando centraba una
+   sola foto, antes de esta galería); ese "center" se traduce en
+   align-items:center, y aunque .pdp-gallery cambia display a flex, NADA
+   volvía a fijar align-items, así que el center seguía aplicando sobre
+   este contenedor flex. Con align-items:center, .pdp-gallery-main/
+   .pdp-thumbs se encogían a su ancho de contenido (medido: 383px/268px
+   dentro de una columna de 429px) en vez de ocupar el ancho completo. */
+.pdp-gallery{display:flex;flex-direction:column;height:100%;align-items:stretch}
 .pdp-gallery-main{flex:1;min-height:0;position:relative;overflow:hidden}
 /* Fase 35.1 — flechas de navegación manual del PDP (sección 4): mismo
    lenguaje visual que .hero-arrow, pero con área táctil de 44px (mínimo
@@ -413,7 +439,7 @@ footer small{letter-spacing:.25em;font-size:7px}
 @media(max-width:900px){
   .grid{grid-template-columns:repeat(2,1fr)}
   .hero-grid{grid-template-columns:1fr}
-  .hero-carousel{min-height:340px}
+  .hero-carousel{height:340px}
   .heading{align-items:flex-start;flex-direction:column}
   .values-grid{grid-template-columns:repeat(2,1fr)}
   .cta-final-inner{flex-direction:column;align-items:flex-start}
@@ -442,15 +468,20 @@ footer small{letter-spacing:.25em;font-size:7px}
      abandonó height:calc(100svh - ...), que en la Fase 1.1 hacía el
      Hero casi de pantalla completa: demasiado grande según la
      visualización real). Ahora el alto se deriva de la proporción real
-     de la creatividad (aspect-ratio:4/5, el formato editorial oficial
-     de estas piezas — 1080x1350px), sobre el ancho completo del
-     viewport (el carrusel sigue rompiendo el gutter de .wrap para
-     llegar borde a borde). En ~390px de ancho esto da ~488px de alto:
-     un banner protagonista, no la pantalla entera — y como no depende
-     de ninguna unidad de viewport, tampoco puede sufrir el problema de
-     reflow-durante-scroll que sí tenía 100dvh. */
+     de la creatividad, sobre el ancho completo del viewport (el
+     carrusel sigue rompiendo el gutter de .wrap para llegar borde a
+     borde) — y como no depende de ninguna unidad de viewport, tampoco
+     puede sufrir el problema de reflow-durante-scroll que sí tenía
+     100dvh.
+     Fase estabilización — bug real: 4/5 fijo asumía que la pieza
+     siempre sería exactamente 1080x1350; cualquier asset con otra
+     proporción real se veía con bandas (el contenedor no coincidía con
+     la imagen, y object-fit:contain deja huecos cuando no coinciden).
+     hero-carousel.js mide la proporción REAL de la primera pieza al
+     cargar y la expone como --hero-mobile-ratio; 4/5 queda solo como
+     respaldo mientras esa medición no ha llegado o falla. */
   .hero-carousel{
-    aspect-ratio:4/5;
+    aspect-ratio:var(--hero-mobile-ratio, 4/5);
     height:auto;
     min-height:0;
     margin-left:-14px;

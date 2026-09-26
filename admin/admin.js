@@ -27,6 +27,20 @@ function readFileAsDataUrl(file) {
   });
 }
 
+// Fase estabilización — bug reportado: un upload guardado-con-warning
+// ("peso sobre el objetivo de 300KB") y uno realmente rechazado se veían
+// EXACTAMENTE igual (mismo texto gris neutro, .image-status), así que no
+// quedaba claro si la imagen se guardó o no. 300KB sigue siendo solo un
+// objetivo — nunca bloquea el guardado (confirmado contra el handler
+// real) — pero ahora ÉXITO/WARNING/ERROR tienen texto y color distintos
+// para que la diferencia sea obvia de un vistazo, no solo de la lectura.
+function setImageStatus(el, kind, text) {
+  if (!el) return;
+  el.textContent = text;
+  el.classList.remove("status-ok", "status-warn", "status-error", "status-pending");
+  if (kind) el.classList.add(`status-${kind}`);
+}
+
 // Uploads one image (slot: "main" | "secondary") via
 // POST /api/admin/product-images. Returns the parsed response payload on
 // success, or null (after writing a message into statusEl) on failure —
@@ -34,19 +48,23 @@ function readFileAsDataUrl(file) {
 // above already passed.
 async function uploadProductImage(productId, file, slot, statusEl) {
   if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
-    statusEl.textContent = "Tipo de archivo no permitido. Usa WebP, JPEG o PNG.";
+    setImageStatus(statusEl, "error", "No se guardó la imagen. Motivo: tipo de archivo no permitido (usa WebP, JPEG o PNG).");
     return null;
   }
   if (file.size > MAX_UPLOAD_BYTES) {
-    statusEl.textContent = `El archivo pesa ${(file.size / 1024 / 1024).toFixed(1)}MB; el máximo es ${(MAX_UPLOAD_BYTES / 1024 / 1024).toFixed(1)}MB.`;
+    setImageStatus(
+      statusEl,
+      "error",
+      `No se guardó la imagen. Motivo: pesa ${(file.size / 1024 / 1024).toFixed(1)}MB; el máximo permitido es ${(MAX_UPLOAD_BYTES / 1024 / 1024).toFixed(1)}MB.`
+    );
     return null;
   }
-  statusEl.textContent = "Subiendo...";
+  setImageStatus(statusEl, "pending", "Subiendo...");
   let dataUrl;
   try {
     dataUrl = await readFileAsDataUrl(file);
   } catch {
-    statusEl.textContent = "No se pudo leer el archivo.";
+    setImageStatus(statusEl, "error", "No se guardó la imagen. Motivo: no se pudo leer el archivo.");
     return null;
   }
   const res = await adminFetch("/api/admin/product-images", {
@@ -62,10 +80,17 @@ async function uploadProductImage(productId, file, slot, statusEl) {
   const payload = await res.json().catch(() => ({}));
   if (!res.ok) {
     const detail = payload && Array.isArray(payload.details) ? payload.details.join(" ") : null;
-    statusEl.textContent = detail || (payload && payload.error) || "No se pudo subir la imagen.";
+    setImageStatus(statusEl, "error", "No se guardó la imagen. Motivo: " + (detail || (payload && payload.error) || "error desconocido."));
     return null;
   }
-  statusEl.textContent = payload.warnings && payload.warnings.length ? "Guardada, con avisos: " + payload.warnings.join(" ") : "Imagen guardada.";
+  if (payload.warnings && payload.warnings.length) {
+    // 300KB es un objetivo, nunca un límite duro (confirmado contra el
+    // handler real: un archivo de 498KB responde 200 y se guarda) — el
+    // texto lo deja explícito para que nunca se lea como un rechazo.
+    setImageStatus(statusEl, "warn", "Imagen guardada correctamente. Advertencia: " + payload.warnings.join(" "));
+  } else {
+    setImageStatus(statusEl, "ok", "Imagen guardada correctamente.");
+  }
   return payload;
 }
 
@@ -82,7 +107,7 @@ async function deleteSecondaryImage(productId, url, statusEl) {
   }
   const payload = await res.json().catch(() => ({}));
   if (!res.ok) {
-    if (statusEl) statusEl.textContent = (payload && payload.error) || "No se pudo eliminar la imagen.";
+    if (statusEl) setImageStatus(statusEl, "error", "No se eliminó la imagen. Motivo: " + ((payload && payload.error) || "error desconocido."));
     return null;
   }
   return payload;
@@ -505,7 +530,7 @@ async function openEdit(productId) {
     "texture", "formula_type", "coverage", "intensity", "finish", "duration", "resistance", "transfer",
     "skin_type", "skin_recommendations",
     "claims", "certifications", "cruelty_free", "vegan", "dermatologically_tested", "country_of_manufacture", "manufacturer_info",
-    "badge", "editorial_order", "featured", "search_keywords", "commercial_angle", "usage_occasion",
+    "badge", "editorial_order", "featured", "published", "search_keywords", "commercial_angle", "usage_occasion",
   ];
   function readAllFields() {
     const out = {};
@@ -629,7 +654,7 @@ async function openEdit(productId) {
     const file = $("#mainImageInput").files[0];
     const statusEl = $("#mainImageStatus");
     if (!file) {
-      statusEl.textContent = "Selecciona un archivo primero.";
+      setImageStatus(statusEl, "error", "No se guardó la imagen. Motivo: selecciona un archivo primero.");
       return;
     }
     const result = await uploadProductImage(product.id, file, "main", statusEl);
@@ -644,7 +669,7 @@ async function openEdit(productId) {
     const file = $("#secondaryImageInput").files[0];
     const statusEl = $("#secondaryImageStatus");
     if (!file) {
-      statusEl.textContent = "Selecciona un archivo primero.";
+      setImageStatus(statusEl, "error", "No se guardó la imagen. Motivo: selecciona un archivo primero.");
       return;
     }
     const result = await uploadProductImage(product.id, file, "secondary", statusEl);
@@ -663,7 +688,7 @@ async function openEdit(productId) {
     const result = await deleteSecondaryImage(product.id, btn.dataset.url, statusEl);
     if (result) {
       $("#secondaryList").innerHTML = renderSecondaryThumbs(result.images);
-      statusEl.textContent = "Imagen eliminada.";
+      setImageStatus(statusEl, "ok", "Imagen eliminada correctamente.");
       await loadProducts();
     }
   });
@@ -846,19 +871,23 @@ function updateHeroPreview() {
 
 async function uploadHeroImage(slideId, file, slot, statusEl) {
   if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
-    statusEl.textContent = "Tipo de archivo no permitido. Usa WebP, JPEG o PNG.";
+    setImageStatus(statusEl, "error", "No se guardó la imagen. Motivo: tipo de archivo no permitido (usa WebP, JPEG o PNG).");
     return null;
   }
   if (file.size > MAX_UPLOAD_BYTES) {
-    statusEl.textContent = `El archivo pesa ${(file.size / 1024 / 1024).toFixed(1)}MB; el máximo es ${(MAX_UPLOAD_BYTES / 1024 / 1024).toFixed(1)}MB.`;
+    setImageStatus(
+      statusEl,
+      "error",
+      `No se guardó la imagen. Motivo: pesa ${(file.size / 1024 / 1024).toFixed(1)}MB; el máximo permitido es ${(MAX_UPLOAD_BYTES / 1024 / 1024).toFixed(1)}MB.`
+    );
     return null;
   }
-  statusEl.textContent = "Subiendo...";
+  setImageStatus(statusEl, "pending", "Subiendo...");
   let dataUrl;
   try {
     dataUrl = await readFileAsDataUrl(file);
   } catch {
-    statusEl.textContent = "No se pudo leer el archivo.";
+    setImageStatus(statusEl, "error", "No se guardó la imagen. Motivo: no se pudo leer el archivo.");
     return null;
   }
   const res = await adminFetch("/api/admin/hero-slide-image", {
@@ -881,13 +910,20 @@ async function uploadHeroImage(slideId, file, slot, statusEl) {
     // creación del slide, no un id inválido de verdad. Un mensaje claro
     // y accionable en vez del texto crudo del servidor.
     if (payload && payload.error === "Ese slide_id no existe.") {
-      statusEl.textContent = "El slide se acaba de crear y Storage todavía no lo detecta. Espera unos segundos y vuelve a intentar la subida.";
+      setImageStatus(statusEl, "error", "No se guardó la imagen. Motivo: el slide se acaba de crear y Storage todavía no lo detecta. Espera unos segundos y vuelve a intentar la subida.");
       return null;
     }
-    statusEl.textContent = detail || (payload && payload.error) || "No se pudo subir la imagen.";
+    setImageStatus(statusEl, "error", "No se guardó la imagen. Motivo: " + (detail || (payload && payload.error) || "error desconocido."));
     return null;
   }
-  statusEl.textContent = payload.warnings && payload.warnings.length ? "Guardada, con avisos: " + payload.warnings.join(" ") : "Imagen guardada.";
+  if (payload.warnings && payload.warnings.length) {
+    // 300KB es un objetivo, nunca un límite duro (confirmado contra el
+    // handler real: un archivo de 498KB responde 200 y se guarda) — el
+    // texto lo deja explícito para que nunca se lea como un rechazo.
+    setImageStatus(statusEl, "warn", "Imagen guardada correctamente. Advertencia: " + payload.warnings.join(" "));
+  } else {
+    setImageStatus(statusEl, "ok", "Imagen guardada correctamente.");
+  }
   return payload.slide;
 }
 
@@ -973,7 +1009,7 @@ function openHeroEdit(slide) {
     const file = $("#heroDesktopInput").files[0];
     const statusEl = $("#heroDesktopStatus");
     if (!file) {
-      statusEl.textContent = "Selecciona un archivo primero.";
+      setImageStatus(statusEl, "error", "No se guardó la imagen. Motivo: selecciona un archivo primero.");
       return;
     }
     e.currentTarget.disabled = true;
@@ -992,7 +1028,7 @@ function openHeroEdit(slide) {
     const file = $("#heroMobileInput").files[0];
     const statusEl = $("#heroMobileStatus");
     if (!file) {
-      statusEl.textContent = "Selecciona un archivo primero.";
+      setImageStatus(statusEl, "error", "No se guardó la imagen. Motivo: selecciona un archivo primero.");
       return;
     }
     e.currentTarget.disabled = true;
