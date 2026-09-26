@@ -35,8 +35,22 @@ header.scrolled .logo-image{width:126px;height:50px}
 .mobile-nav a{padding:16px 20px;border-bottom:1px solid var(--line);font-size:14px;color:#ddd}
 .mobile-nav a:last-child{border-bottom:0}
 
-.hero{padding:76px 0 92px;overflow:hidden;background:radial-gradient(circle at 80% 45%,#430020 0,#050505 46%)}
-.hero-grid{display:grid;grid-template-columns:1fr 1fr;gap:58px;align-items:center}
+.hero{padding:56px 0 72px;overflow:hidden;background:radial-gradient(circle at 80% 45%,#430020 0,#050505 46%)}
+/* Fase 35.3 — bug/pedido reportado: la pieza ya se mostraba completa
+   (sin crop) pero se sentía chica dentro del Hero, con demasiado
+   espacio vacío alrededor. Dos cambios, ninguno toca object-fit ni la
+   proporción real (--hero-desktop-ratio sigue intacta en .hero-carousel,
+   ver más abajo): (1) grid-template-columns 2fr/3fr en vez de 1fr/1fr —
+   la columna de imagen pasa de 50% a 60% del ancho disponible; (2)
+   width:min(1440px,...) en vez de heredar el --max de .wrap (1180px,
+   compartido con el resto del sitio) — solo el Hero se permite un
+   contenedor más ancho. Con más ancho Y más proporción relativa, la
+   imagen crece en ambas dimensiones (aspect-ratio la mantiene
+   completa, nunca la recorta) — no es "más alto con más aire", es la
+   pieza misma más grande. min() seguido degrada igual que antes en
+   mobile/tablet (el cap de 1440px nunca compite ahí), así que esto no
+   toca esos breakpoints. */
+.hero-grid{display:grid;grid-template-columns:2fr 3fr;gap:48px;align-items:center;width:min(1440px,calc(100% - 40px));margin:0 auto}
 .hero h1{font-size:clamp(58px,8vw,98px);line-height:.88;letter-spacing:-.055em;margin:0;font-weight:800}
 .hero h1 span{color:var(--pink)}
 .lead{max-width:450px;color:#bdbdbd;font-size:17px;line-height:1.55;margin:30px 0}
