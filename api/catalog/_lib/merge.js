@@ -80,6 +80,10 @@ function shapeProduct(product, metadata, resolveCategoryGroup) {
     presentation: m.presentation ?? null,
     brand: m.brand ?? null,
     badge: m.badge ?? null,
+    // Fase 36 — antes solo se whitelisteaba para Admin; el público nunca
+    // lo recibía, así que la búsqueda del sitio no podía usarlo aunque
+    // existiera cargado.
+    searchKeywords: Array.isArray(m.search_keywords) ? m.search_keywords : [],
     featured: Boolean(m.featured),
     editorialOrder: m.editorial_order === null || m.editorial_order === undefined ? null : Number(m.editorial_order),
     ...details,
@@ -105,7 +109,9 @@ function applyFilters(items, { category, subcategory, featured, search } = {}) {
     if (featured === true && item.featured !== true) return false;
     if (search) {
       const q = search.toLowerCase();
-      const haystack = [item.name, item.shortDescription, item.category, item.subcategory]
+      // Fase 36 — misma ampliación que el buscador del sitio (js/taxonomy.js):
+      // brand y searchKeywords ya viajan en el producto pero no se buscaban.
+      const haystack = [item.name, item.shortDescription, item.category, item.subcategory, item.brand, ...(item.searchKeywords || [])]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();

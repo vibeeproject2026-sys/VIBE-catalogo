@@ -121,7 +121,7 @@ function productCard(p) {
       <span class="price">${money(showPromo ? p.promoPrice : p.price)}</span>
       ${showPromo ? `<span class="old">${money(p.price)}</span>` : p.oldPrice ? `<span class="old">${money(p.oldPrice)}</span>` : ""}
       ${p.available === false ? `<span class="availability-badge">Agotado</span>` : ""}
-      <button class="button dark" data-product="${p.id}">Ver producto</button>
+      <button class="button outline" data-product="${p.id}">Ver producto</button>
     </div>
   </article>`;
 }
@@ -356,7 +356,18 @@ function renderDiscoverLanding() {
   const backLink = `<a class="button outline" href="#catalogo">Volver al catálogo</a>`;
 
   if (!published.length) {
-    $("#discoverContent").innerHTML = hero + backLink;
+    // Fase 36 — antes esto simplemente omitía todo lo demás en silencio
+    // (hero + link de vuelta, nada más): correcto en el sentido de "nunca
+    // inventar contenido", pero se sentía como una página cortada a la
+    // mitad, no como un espacio editorial con intención. Este bloque no
+    // promete fecha ni contenido ficticio — describe qué es Discover,
+    // nunca "Próximamente" (ver nota de sección 6/18 arriba).
+    const emptyState = `<div class="discover-empty">
+      <p class="eyebrow accent">VIBE STORIES</p>
+      <h3>Un espacio en construcción, con el mismo cuidado que cada producto VIBE</h3>
+      <p class="discover-empty-copy">Aquí vivirán los rituales, las tendencias y la forma en la que entendemos la belleza — nada inventado, solo lo que valga la pena contar.</p>
+    </div>`;
+    $("#discoverContent").innerHTML = hero + emptyState + backLink;
     return;
   }
 
@@ -647,7 +658,7 @@ function renderProductDetail(p) {
         <input id="detailQty" type="number" min="1" value="1" aria-label="Cantidad" ${unavailable ? "disabled" : ""}>
         <button type="button" data-q="1" ${unavailable ? "disabled" : ""}>+</button>
       </div>
-      <button id="addButton" class="button dark" ${unavailable ? "disabled" : ""}>${unavailable ? "Agotado" : "Agregar al carrito"}</button>
+      <button id="addButton" class="button dark pdp-buy-button" ${unavailable ? "disabled" : ""}>${unavailable ? "Agotado" : "Agregar al carrito"}</button>
     </div>
     ${pdpSpecHtml(p)}
     ${pdpTraitsHtml(p)}

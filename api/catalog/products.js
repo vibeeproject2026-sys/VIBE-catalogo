@@ -37,8 +37,12 @@ const PRODUCT_COLUMNS = "id,name,price,stock,category,promo_active,promo_price,p
 // shapeProduct() nunca expone el blob crudo bajo su nombre de columna:
 // lo parsea, sanitiza contra una whitelist fija, y solo entonces aplana
 // sus campos ya conocidos como propiedades normales del producto.
+// Fase 36 — search_keywords se capturaba en Admin (ver
+// api/admin/_lib/editorialFields.js) pero nunca salía del todo hacia el
+// catálogo público: faltaba en esta lista de columnas, así que la
+// búsqueda del sitio nunca podía usarlo aunque Ana lo hubiera cargado.
 const METADATA_COLUMNS =
-  "product_id,category,subcategory,image,images,short_description,description,benefits,ingredients,usage,presentation,brand,badge,featured,editorial_order,published,additional_info";
+  "product_id,category,subcategory,image,images,short_description,description,benefits,ingredients,usage,presentation,brand,badge,featured,editorial_order,published,search_keywords,additional_info";
 
 module.exports = async function handler(req, res) {
   applyCors(req, res);

@@ -114,6 +114,9 @@ async function main() {
         "promoActive",
         "promoPrice",
         "promoText",
+        // Fase 36 — expuesto públicamente por primera vez (antes solo
+        // llegaba hasta Admin); usado por la búsqueda del catálogo.
+        "searchKeywords",
         "shortDescription",
         "subcategory",
         "usage",
@@ -203,6 +206,7 @@ async function main() {
         badge: shaped.badge,
         featured: shaped.featured,
         editorialOrder: shaped.editorialOrder,
+        searchKeywords: shaped.searchKeywords,
       },
       {
         editorialCategory: null,
@@ -219,8 +223,19 @@ async function main() {
         badge: null,
         featured: false,
         editorialOrder: null,
+        searchKeywords: [],
       }
     );
+  });
+  await test("Fase 36 — search_keywords (Admin/Storage) sale como searchKeywords (público), array real -> pasa tal cual", () => {
+    const shaped = shapeProduct(sampleProduct, { ...sampleMetadata, search_keywords: ["glow", "hidratante"] }, resolveCategoryGroup);
+    assert.deepEqual(shaped.searchKeywords, ["glow", "hidratante"]);
+  });
+  await test("Fase 36 — search_keywords ausente o corrupto (no-array) nunca rompe ni inventa: cae a []", () => {
+    const missing = shapeProduct(sampleProduct, sampleMetadata, resolveCategoryGroup);
+    assert.deepEqual(missing.searchKeywords, []);
+    const corrupt = shapeProduct(sampleProduct, { ...sampleMetadata, search_keywords: "not-an-array" }, resolveCategoryGroup);
+    assert.deepEqual(corrupt.searchKeywords, []);
   });
   await test("promociones del POS siguen funcionando aunque el producto no tenga ninguna ficha editorial", () => {
     const shaped = shapeProduct({ ...sampleProduct, promo_active: true, promo_price: 45000, promo_text: "-20%" }, null, resolveCategoryGroup);
@@ -273,6 +288,14 @@ async function main() {
     const r = applyFilters(filterFixture, { search: "color" });
     assert.equal(r.length, 1);
     assert.equal(r[0].name, "Lipstick");
+  });
+  await test("Fase 36 — filters by search across brand and searchKeywords too", () => {
+    const fixtureWithBrand = [
+      { name: "Cleanser", brand: "GlowLab", searchKeywords: ["hidratante"] },
+      { name: "Lipstick", brand: "VIBE Beauty", searchKeywords: ["mate", "larga duración"] },
+    ];
+    assert.deepEqual(applyFilters(fixtureWithBrand, { search: "glowlab" }).map((i) => i.name), ["Cleanser"]);
+    assert.deepEqual(applyFilters(fixtureWithBrand, { search: "larga duración" }).map((i) => i.name), ["Lipstick"]);
   });
 
   console.log("pgrestSelect (mocked fetch, no network)");

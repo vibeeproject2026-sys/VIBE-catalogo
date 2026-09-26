@@ -18,8 +18,19 @@ header.scrolled .nav{height:68px}
 header.scrolled .logo-image{width:126px;height:50px}
 .logo-image img{width:100%;height:100%;object-fit:contain;display:block}
 .logo small{font-size:6px;letter-spacing:.31em;color:#fff;white-space:nowrap}
-.nav-links{display:flex;gap:30px;color:#b7b7b7;font-size:13px}
+.nav-links{display:flex;gap:30px;color:#b7b7b7;font-size:13px;font-weight:700;letter-spacing:.02em}
+/* Fase 36 — antes solo cambiaba de color en hover; un subrayado que
+   crece desde el centro (en vez de un salto de color plano) es el
+   mismo tipo de microinteracción "premium = control + suavidad" ya
+   usada en otras partes del sitio (.category-card, .hero-arrow). */
+.nav-links a{position:relative;padding-bottom:2px;transition:color .2s ease}
+.nav-links a::after{content:"";position:absolute;left:50%;right:50%;bottom:-2px;height:1px;background:var(--pink);transition:left .2s ease,right .2s ease}
 .nav-links a:hover{color:#fff}
+.nav-links a:hover::after{left:0;right:0}
+@media(prefers-reduced-motion:reduce){
+  .nav-links a{transition:none}
+  .nav-links a::after{transition:none}
+}
 .nav-actions{display:flex;align-items:center;gap:14px}
 .cart-btn{border:1px solid #fff;background:transparent;color:#fff;border-radius:999px;padding:9px 13px 9px 16px}
 .cart-btn b{display:inline-grid;place-items:center;min-width:22px;height:22px;margin-left:7px;border-radius:50%;background:var(--pink);color:#fff;font-size:12px}
@@ -32,7 +43,9 @@ header.scrolled .logo-image{width:126px;height:50px}
 
 .mobile-nav{display:none;flex-direction:column;background:#070707;border-top:1px solid var(--line);overflow:hidden;max-height:0;transition:max-height .25s ease}
 .mobile-nav.open{max-height:220px}
-.mobile-nav a{padding:16px 20px;border-bottom:1px solid var(--line);font-size:14px;color:#ddd}
+.mobile-nav a{padding:16px 20px;border-bottom:1px solid var(--line);font-size:14px;font-weight:700;letter-spacing:.02em;color:#ddd;transition:color .2s ease,background .2s ease}
+.mobile-nav a:active{color:#fff;background:#111}
+@media(prefers-reduced-motion:reduce){.mobile-nav a{transition:none}}
 .mobile-nav a:last-child{border-bottom:0}
 
 .hero{padding:56px 0 72px;overflow:hidden;background:radial-gradient(circle at 80% 45%,#430020 0,#050505 46%)}
@@ -58,8 +71,9 @@ header.scrolled .logo-image{width:126px;height:50px}
 .dark{background:var(--pink);color:#fff;box-shadow:0 0 28px #FF007A44}
 .dark:hover{background:var(--pink2)}
 .button:disabled{opacity:.45;cursor:not-allowed;box-shadow:none}
-.outline{background:transparent;color:var(--pink)}
+.outline{background:transparent;color:var(--pink);transition:background .2s ease,color .2s ease}
 .outline:hover{background:var(--pink);color:#fff}
+@media(prefers-reduced-motion:reduce){.outline{transition:none}}
 .full{width:100%}
 
 /* Hero banner carousel (Fase Visual 2) — pieza gráfica a pantalla
@@ -135,8 +149,12 @@ header.scrolled .logo-image{width:126px;height:50px}
 .explore{background:#fff;color:#111;padding:82px 0 20px}
 .explore .eyebrow{color:var(--pink)}
 .category-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:18px}
-.category-card{display:block;width:100%;text-align:left;font:inherit;border:1px solid #e6e6e6;border-radius:var(--radius);padding:26px;background:linear-gradient(150deg,#fff,#fdf3f8);transition:border-color .2s ease,transform .2s ease}
-.category-card:hover{border-color:var(--pink);transform:translateY(-3px)}
+.category-card{display:block;width:100%;text-align:left;font:inherit;border:1px solid #e6e6e6;border-radius:var(--radius);padding:26px;background:linear-gradient(150deg,#fff,#fdf3f8);transition:border-color .2s ease,transform .2s ease,box-shadow .2s ease}
+.category-card:hover{border-color:var(--pink);transform:translateY(-3px);box-shadow:0 16px 32px -18px rgba(255,0,122,.45)}
+@media(prefers-reduced-motion:reduce){
+  .category-card{transition:border-color .2s ease}
+  .category-card:hover{transform:none}
+}
 .category-card span{font-size:11px;color:var(--pink);letter-spacing:.14em;text-transform:uppercase;font-weight:800}
 .category-card h3{margin:6px 0 0;font-size:19px}
 .category-card .arrow{display:block;margin-top:16px;font-size:20px;color:#111;letter-spacing:normal;text-transform:none}
@@ -180,9 +198,20 @@ header.scrolled .logo-image{width:126px;height:50px}
 
 .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:22px}
 .card{min-width:0}
-.card-img{aspect-ratio:4/5;border:0;border-radius:var(--radius);background:#f2f2f2;display:grid;place-items:center;width:100%;position:relative;overflow:hidden;padding:0}
+/* Fase 36 — la card ganó una elevación sutil en hover (foto completa
+   levantándose con una sombra suave), el mismo lenguaje que ya usaba
+   .category-card, para que se sienta una pieza de merchandising y no
+   una fila de base de datos. Guard de prefers-reduced-motion porque es
+   una animación nueva (antes .card-img no tenía transition propio, solo
+   la foto interior). */
+.card-img{aspect-ratio:4/5;border:0;border-radius:var(--radius);background:#f2f2f2;display:grid;place-items:center;width:100%;position:relative;overflow:hidden;padding:0;transition:transform .25s ease,box-shadow .25s ease}
+.card:hover .card-img{transform:translateY(-4px);box-shadow:0 16px 32px -14px rgba(0,0,0,.3)}
 .product-photo{width:100%;height:100%;object-fit:cover;display:block;transition:transform .35s ease,opacity .25s ease}
 .card-img:hover .product-photo{transform:scale(1.035)}
+@media(prefers-reduced-motion:reduce){
+  .card-img{transition:none}
+  .card:hover .card-img{transform:none}
+}
 .card-badge{position:absolute;top:10px;left:10px;z-index:2;background:var(--pink);color:#fff;font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:4px 10px;border-radius:999px}
 .card-body{padding:15px 3px}
 .product-category{font-size:9px;color:var(--pink);letter-spacing:.18em;text-transform:uppercase;font-weight:800;margin:0 0 6px}
@@ -191,6 +220,12 @@ header.scrolled .logo-image{width:126px;height:50px}
 .price{font-size:14px;font-weight:800}
 .old{text-decoration:line-through;color:#777;font-weight:400;margin-left:7px}
 .availability-badge{display:inline-block;margin-left:8px;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#b91c4a}
+/* Fase 36 — antes el CTA de card era .button.dark (barra sólida rosa,
+   siempre al máximo peso visual, "poco discreto"). Reusa .button.outline
+   (ya existe, ya usado en "Ver catálogo completo") para un CTA liviano
+   por defecto que gana peso en hover/focus (fill sólido) — en mobile,
+   sin hover real, sigue siendo perfectamente legible (borde+texto rosa
+   sobre blanco), tal como pide el brief ("CTA claro, no sobrecargar"). */
 .card .button{width:100%;margin-top:13px;min-height:42px;font-size:13px}
 .empty{text-align:center;padding:60px;color:#777}
 
@@ -209,6 +244,13 @@ header.scrolled .logo-image{width:126px;height:50px}
 .discover-featured{margin-bottom:36px}
 .discover-featured .article-card{display:grid;grid-template-columns:1.1fr 1fr;gap:32px;align-items:center}
 .discover-featured .article-card-img{aspect-ratio:16/11}
+/* Fase 36 — estado vacío editorial (0 artículos publicados hoy): mismo
+   lenguaje visual oscuro+acento rosa que .pdp-no-image/.article-no-image
+   para los demás vacíos "reales" del sitio, pero como una pieza propia
+   (nunca un emoji, nunca "Próximamente" — ver comentario en app.js). */
+.discover-empty{margin:0 0 40px;padding:64px 32px;border-radius:var(--radius);background:linear-gradient(160deg,#151515,#0b0b0b);text-align:center}
+.discover-empty h3{color:#fff;font-size:clamp(22px,3vw,32px);line-height:1.2;margin:10px 0 16px;font-weight:800}
+.discover-empty-copy{color:#ccc;max-width:520px;margin:0 auto;font-size:15px;line-height:1.6}
 
 .article-card{min-width:0}
 .article-card-img{display:block;width:100%;aspect-ratio:4/5;border:0;border-radius:var(--radius);background:#f2f2f2;overflow:hidden;padding:0;position:relative}
@@ -301,6 +343,19 @@ dialog::backdrop{background:#000d}
 .variant{border:1px solid #333;background:transparent;color:#fff;border-radius:999px;padding:9px 13px;font-size:12px}
 .variant.selected{background:var(--pink);border-color:var(--pink)}
 .detail-actions{display:grid;grid-template-columns:120px 1fr;gap:10px;margin-top:24px}
+/* Fase 36 — pedido explícito: "el CTA de compra debe tener mucha más
+   presencia". Antes usaba exactamente .button.dark, la misma clase que
+   cualquier botón del sitio (nav, "Explorar catálogo", etc.) — el
+   momento de decisión de compra no se distinguía visualmente de nada
+   más. Se mantiene la forma de pastilla y la paleta de marca (nada
+   nuevo, solo más peso): más alto, texto más grande, sombra más
+   marcada, con una elevación sutil en hover/focus. */
+.pdp-buy-button{min-height:58px;font-size:15px;letter-spacing:.02em;box-shadow:0 10px 32px #ff007a55;transition:transform .15s ease,box-shadow .15s ease,background .15s ease}
+.pdp-buy-button:hover:not(:disabled),.pdp-buy-button:focus-visible:not(:disabled){transform:translateY(-2px);box-shadow:0 14px 38px #ff007a70}
+@media(prefers-reduced-motion:reduce){
+  .pdp-buy-button{transition:none}
+  .pdp-buy-button:hover:not(:disabled),.pdp-buy-button:focus-visible:not(:disabled){transform:none}
+}
 .quantity{display:flex;border:1px solid #333;border-radius:999px;overflow:hidden}
 .quantity button{border:0;background:transparent;color:#fff;width:35px}
 .quantity button:disabled{opacity:.4}

@@ -132,6 +132,24 @@ test("busca por subcategoría (no solo nombre/descripción)", () => {
   assert.equal(r.length, 1);
   assert.equal(r[0].id, "lip");
 });
+test("Fase 36 — busca por marca (ya venía en el shape del producto pero no se buscaba)", () => {
+  const fixture = [
+    { id: "a", name: "Producto A", brand: "GlowLab", searchKeywords: [] },
+    { id: "b", name: "Producto B", brand: "VIBE Beauty", searchKeywords: [] },
+  ];
+  assert.deepEqual(filterProducts(fixture, { search: "glowlab" }).map((p) => p.id), ["a"]);
+});
+test("Fase 36 — busca por search_keywords editorial (campo ahora expuesto públicamente)", () => {
+  const fixture = [
+    { id: "a", name: "Producto A", searchKeywords: ["hidratante", "piel seca"] },
+    { id: "b", name: "Producto B", searchKeywords: ["mate"] },
+  ];
+  assert.deepEqual(filterProducts(fixture, { search: "piel seca" }).map((p) => p.id), ["a"]);
+});
+test("Fase 36 — sin searchKeywords en el producto (campo ausente), la búsqueda sigue funcionando sin lanzar", () => {
+  const fixture = [{ id: "a", name: "Producto A" }];
+  assert.deepEqual(filterProducts(fixture, { search: "producto" }).map((p) => p.id), ["a"]);
+});
 
 console.log("filterProducts — combinaciones");
 test("búsqueda + categoría combinadas", () => {

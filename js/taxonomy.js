@@ -57,7 +57,16 @@ export function filterProducts(products, { group, category, subcategory, search,
     if (newOnly === true && p.badge !== "Nuevo") return false;
     if (brand && p.brand !== brand) return false;
     if (q) {
-      const haystack = [p.name, categoryOf(p), p.subcategory, p.shortDescription].filter(Boolean).join(" ").toLowerCase();
+      // Fase 36 — brand ya estaba en el shape del producto pero nunca se
+      // buscaba; searchKeywords es contenido editorial real (curado en
+      // Admin) que existía en la base de datos pero nunca llegaba al
+      // público (ver api/catalog/_lib/merge.js) — ahora sí se puede
+      // encontrar un producto por su marca o por una palabra clave
+      // editorial, no solo por nombre/categoría/descripción corta.
+      const haystack = [p.name, categoryOf(p), p.subcategory, p.shortDescription, p.brand, ...(p.searchKeywords || [])]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
       if (!haystack.includes(q)) return false;
     }
     return true;
