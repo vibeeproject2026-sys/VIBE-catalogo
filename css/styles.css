@@ -252,8 +252,17 @@ dialog::backdrop{background:#000d}
    docs/fase35-estandar-imagenes.md) le da a la columna de imagen una
    altura predecible basada en su propio ancho, en vez de min-height
    fijo (que ignoraba la proporción real y era la otra mitad del origen
-   de las franjas). */
-.detail-img{aspect-ratio:4/5;background:#111;display:grid;place-items:center;text-align:center;color:#aaa;padding:0;overflow:hidden}
+   de las franjas).
+   Fase 35.2 — bug real encontrado con un navegador headless real: sin
+   width:100%/min-width:0 explícitos, este ítem de grid con aspect-ratio
+   y sin ancho definido terminaba calculando su ancho A PARTIR de una
+   altura enorme e indefinida (heredada de .detail-copy, ahora muy larga
+   con toda la ficha editorial), en vez de al revés — se medió
+   1199×1499px reales en producción, desbordando el diálogo y la
+   ventana. width:100% + min-width:0 fuerzan que el ancho SIEMPRE venga
+   de la columna del grid (429px reales), y aspect-ratio entonces deriva
+   la altura a partir de ESE ancho, nunca al revés. */
+.detail-img{aspect-ratio:4/5;width:100%;min-width:0;max-width:100%;background:#111;display:grid;place-items:center;text-align:center;color:#aaa;padding:0;overflow:hidden}
 /* Fase 35 — la foto de producto debe verse completa, nunca recortada:
    object-fit:contain (no cover). .detail-img conserva su fondo oscuro
    (#111) para el letterboxing cuando la proporción real de la foto no
