@@ -206,6 +206,112 @@ async function main() {
         delete process.env.SUPABASE_SERVICE_ROLE_KEY;
       }
     });
+
+    if (label === "products") {
+      // Fase 35 — regresión end-to-end: un producto con additional_info
+      // lleno y published:true debe llegar COMPLETO a la API pública
+      // (esto es lo que realmente rompió en el caso real del producto
+      // 122 — no por un bug de código, sino porque la fila tenía
+      // published:false. Este test cubre el camino de código; el caso
+      // real está documentado en docs/fase35-... y en el reporte de la
+      // fase).
+      await test("producto con additional_info lleno y published:true expone todos sus campos editoriales", async () => {
+        process.env.SUPABASE_URL = "https://example.supabase.co";
+        process.env.SUPABASE_SERVICE_ROLE_KEY = "test-key-not-real";
+        const originalFetch = global.fetch;
+        global.fetch = async (url) => {
+          if (url.includes("/rest/v1/products")) {
+            return {
+              ok: true,
+              status: 200,
+              text: async () => JSON.stringify([{ id: 122, name: "Rubor líquido", price: 20800, stock: 2, category: "Rostro" }]),
+            };
+          }
+          if (url.includes("/rest/v1/catalog_metadata")) {
+            return {
+              ok: true,
+              status: 200,
+              text: async () =>
+                JSON.stringify([
+                  {
+                    product_id: 122,
+                    subcategory: "Rubor",
+                    image: "https://x/main.png",
+                    images: ["https://x/01.png"],
+                    short_description: null,
+                    description: "d",
+                    benefits: ["b"],
+                    ingredients: null,
+                    usage: null,
+                    presentation: null,
+                    brand: "Kevin&COCO",
+                    badge: null,
+                    featured: false,
+                    editorial_order: null,
+                    published: true,
+                    additional_info: JSON.stringify({ commercialName: "Blusher Lotion", sku: "KC240258", netContent: "5 gr" }),
+                  },
+                ]),
+            };
+          }
+          throw new Error("unexpected URL in test: " + url);
+        };
+        try {
+          const req = { method: "GET", headers: {}, query: {} };
+          const res = mockRes();
+          await handler(req, res);
+          const p = res.body.products.find((x) => x.id === 122);
+          assert.equal(p.brand, "Kevin&COCO");
+          assert.equal(p.image, "https://x/main.png");
+          assert.equal(p.commercialName, "Blusher Lotion");
+          assert.equal(p.sku, "KC240258");
+          assert.equal(p.netContent, "5 gr");
+        } finally {
+          global.fetch = originalFetch;
+          delete process.env.SUPABASE_URL;
+          delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+        }
+      });
+
+      // Fase 35 — comportamiento esperado (NO es un bug): una fila con
+      // published:false, aunque tenga contenido real completo, se trata
+      // exactamente igual que "sin ficha" — el producto sigue apareciendo
+      // (Fase 31) pero solo con los datos del POS.
+      await test("producto con ficha completa pero published:false se muestra SOLO con datos del POS (comportamiento esperado)", async () => {
+        process.env.SUPABASE_URL = "https://example.supabase.co";
+        process.env.SUPABASE_SERVICE_ROLE_KEY = "test-key-not-real";
+        const originalFetch = global.fetch;
+        global.fetch = async (url) => {
+          if (url.includes("/rest/v1/products")) {
+            return {
+              ok: true,
+              status: 200,
+              text: async () => JSON.stringify([{ id: 122, name: "Rubor líquido", price: 20800, stock: 2, category: "Rostro" }]),
+            };
+          }
+          if (url.includes("/rest/v1/catalog_metadata")) {
+            // El backend ya filtra published=eq.true en la consulta —
+            // una fila published:false nunca llega en la respuesta real.
+            return { ok: true, status: 200, text: async () => JSON.stringify([]) };
+          }
+          throw new Error("unexpected URL in test: " + url);
+        };
+        try {
+          const req = { method: "GET", headers: {}, query: {} };
+          const res = mockRes();
+          await handler(req, res);
+          const p = res.body.products.find((x) => x.id === 122);
+          assert.equal(p.name, "Rubor líquido");
+          assert.equal(p.brand, null);
+          assert.equal(p.commercialName, null);
+          assert.equal(p.image, null);
+        } finally {
+          global.fetch = originalFetch;
+          delete process.env.SUPABASE_URL;
+          delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+        }
+      });
+    }
   }
 
   console.log(`\n${passed} passed, ${failed} failed`);
