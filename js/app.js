@@ -539,7 +539,14 @@ function pdpGalleryHtml(p) {
   }
   // Fase 34 — mainImageAlt es editorial y opcional: si Ana lo completó,
   // reemplaza el alt genérico (el nombre del producto), nunca al revés.
-  const main = `<div class="pdp-gallery-main"><img id="pdpMainImage" class="detail-photo" src="${esc(images[0])}" alt="${esc(p.mainImageAlt || p.name)}" loading="eager"></div>`;
+  // Fase 35.1 — navegación manual con flechas (sección 4): solo se
+  // renderizan si hay más de una imagen; nunca autoplay, nunca hover.
+  const arrows =
+    images.length > 1
+      ? `<button type="button" class="pdp-arrow pdp-arrow-prev" data-gallery-nav="-1" aria-label="Imagen anterior">‹</button>
+         <button type="button" class="pdp-arrow pdp-arrow-next" data-gallery-nav="1" aria-label="Imagen siguiente">›</button>`
+      : "";
+  const main = `<div class="pdp-gallery-main"><img id="pdpMainImage" class="detail-photo" src="${esc(images[0])}" alt="${esc(p.mainImageAlt || p.name)}" loading="eager">${arrows}</div>`;
   const thumbs =
     images.length > 1
       ? `<div class="pdp-thumbs">${images
@@ -705,12 +712,88 @@ function selectGalleryThumb(thumb) {
   document.querySelectorAll(".pdp-thumb").forEach((t) => t.classList.toggle("active", t === thumb));
 }
 
+// Fase 35.1 — mueve la galería del PDP `delta` posiciones (flechas y
+// flechas de teclado comparten esta misma lógica que ya usaba el swipe:
+// límites acotados, no circular — ver nota de la sección 4 de la fase).
+// Delega en selectGalleryThumb (vía thumb.click()) para no duplicar el
+// estado de "cuál está activa".
+function moveGalleryBy(delta) {
+  if (!state.product) return;
+  const images = pdpGalleryImages(state.product);
+  if (images.length < 2) return;
+  const thumbs = [...document.querySelectorAll(".pdp-thumb")];
+  const current = thumbs.findIndex((t) => t.classList.contains("active"));
+  const nextIndex = Math.max(0, Math.min(images.length - 1, (current === -1 ? 0 : current) + delta));
+  if (thumbs[nextIndex]) thumbs[nextIndex].click();
+}
+
 function bindProductGrid(id) {
   $(id).addEventListener("click", e => {
     const b = e.target.closest("[data-product]");
     if (b) openProduct(b.dataset.product);
   });
 }
+
+// Fase 35.1 (sección 2/3) — preview automático de imágenes al hacer
+// hover sobre una card, SOLO desktop (matchMedia("hover: hover") excluye
+// touch, donde no existe un verdadero hover — sección 3 lo prohíbe
+// explícitamente en mobile). Delegado sobre document en vez de un
+// listener por grid: las cards aparecen en varios contenedores
+// (catálogo, destacados, relacionados dentro del PDP) y así se cubren
+// todos sin registrar el listener una vez por sección. mouseover/mouseout
+// + comprobación de relatedTarget emulan mouseenter/mouseleave (que no
+// burbujean) sin necesitar un listener por card individual.
+const CARD_HOVER_DELAY_MS = 500;
+const CARD_HOVER_STEP_MS = 1350;
+const cardHoverState = new WeakMap();
+
+function stopCardHover(card) {
+  const s = cardHoverState.get(card);
+  if (!s) return;
+  clearTimeout(s.timeoutId);
+  clearInterval(s.intervalId);
+  if (s.img) {
+    s.img.style.opacity = "1";
+    s.img.src = s.images[0]; // siempre vuelve a la imagen principal
+  }
+  cardHoverState.delete(card);
+}
+
+function startCardHover(card) {
+  if (cardHoverState.has(card)) return;
+  if (!window.matchMedia || !window.matchMedia("(hover: hover)").matches) return;
+  const img = card.querySelector(".product-photo");
+  if (!img) return; // sin foto real (placeholder) -> nada que animar
+  const p = findProduct(state.products, card.dataset.product);
+  if (!p) return;
+  const images = pdpGalleryImages(p);
+  if (images.length < 2) return; // una sola imagen -> sin animación (sección 2)
+  // Precarga las adicionales solo ahora (intención real de ver la card),
+  // nunca al renderizar el grid completo -> evita requests innecesarios.
+  images.slice(1).forEach(src => { new Image().src = src; });
+  const state_ = { images, img, intervalId: null };
+  state_.timeoutId = setTimeout(() => {
+    let i = 0;
+    state_.intervalId = setInterval(() => {
+      i = (i + 1) % images.length;
+      img.style.opacity = "0";
+      setTimeout(() => {
+        img.src = images[i];
+        img.style.opacity = "1";
+      }, 250);
+    }, CARD_HOVER_STEP_MS);
+  }, CARD_HOVER_DELAY_MS);
+  cardHoverState.set(card, state_);
+}
+
+document.addEventListener("mouseover", e => {
+  const card = e.target.closest(".card-img");
+  if (card) startCardHover(card);
+});
+document.addEventListener("mouseout", e => {
+  const card = e.target.closest(".card-img");
+  if (card && !card.contains(e.relatedTarget)) stopCardHover(card);
+});
 
 $("#groupTabs").addEventListener("click", e => {
   const b = e.target.closest("[data-group]");
@@ -868,6 +951,12 @@ $("#productDialog").addEventListener("click", e => {
     return;
   }
 
+  const navBtn = e.target.closest("[data-gallery-nav]");
+  if (navBtn) {
+    moveGalleryBy(Number(navBtn.dataset.galleryNav));
+    return;
+  }
+
   // Un producto relacionado (sección "También te puede interesar") usa
   // el mismo atributo data-product que cualquier tarjeta del catálogo —
   // reabre el PDP sobre el propio diálogo, sin cerrar/reabrir, en vez de
@@ -906,6 +995,17 @@ $("#productDialog").addEventListener("click", e => {
     $("#productDialog").close();
     openCart();
   }
+});
+
+// Fase 35.1 — accesibilidad por teclado (sección 4): flechas ← / →
+// mueven la galería mientras el PDP está abierto, salvo que el foco
+// esté en un campo de formulario (ej. el input de cantidad), donde las
+// flechas deben seguir su comportamiento nativo de edición de texto.
+$("#productDialog").addEventListener("keydown", (e) => {
+  if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+  const tag = document.activeElement && document.activeElement.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+  moveGalleryBy(e.key === "ArrowLeft" ? -1 : 1);
 });
 
 // Swipe táctil de la galería del PDP — mismo patrón ya usado en el Hero

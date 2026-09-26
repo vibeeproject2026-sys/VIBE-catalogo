@@ -165,7 +165,7 @@ header.scrolled .logo-image{width:126px;height:50px}
 .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:22px}
 .card{min-width:0}
 .card-img{aspect-ratio:4/5;border:0;border-radius:var(--radius);background:#f2f2f2;display:grid;place-items:center;width:100%;position:relative;overflow:hidden;padding:0}
-.product-photo{width:100%;height:100%;object-fit:cover;display:block;transition:transform .35s ease}
+.product-photo{width:100%;height:100%;object-fit:cover;display:block;transition:transform .35s ease,opacity .25s ease}
 .card-img:hover .product-photo{transform:scale(1.035)}
 .card-badge{position:absolute;top:10px;left:10px;z-index:2;background:var(--pink);color:#fff;font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:4px 10px;border-radius:999px}
 .card-body{padding:15px 3px}
@@ -240,13 +240,25 @@ header.scrolled .logo-image{width:126px;height:50px}
 dialog{border:1px solid #333;border-radius:22px;padding:0;width:min(860px,calc(100% - 28px));max-height:calc(100dvh - 28px);overflow:auto;background:#0b0b0b;color:#fff;box-shadow:0 20px 60px #000b}
 dialog::backdrop{background:#000d}
 .dialog-x{position:absolute;right:15px;top:15px;z-index:2}
-#productDetail{display:grid;grid-template-columns:1fr 1fr}
-.detail-img{min-height:520px;background:#111;display:grid;place-items:center;text-align:center;color:#aaa;padding:0;overflow:hidden}
+/* Fase 35.1 — align-items:start evita que la columna de imagen se
+   estire para igualar el alto de .detail-copy (que ahora puede ser muy
+   larga con toda la ficha editorial): esa estirada era la causa real de
+   las franjas enormes arriba/abajo de la foto (el contenedor de imagen
+   terminaba mucho más alto que ancho, y object-fit:contain dejaba la
+   foto pequeña en el medio). Con align-items:start, la columna de
+   imagen conserva su propia altura (definida por aspect-ratio abajo). */
+#productDetail{display:grid;grid-template-columns:1fr 1fr;align-items:start}
+/* aspect-ratio:4/5 (el estándar recomendado de foto de producto, ver
+   docs/fase35-estandar-imagenes.md) le da a la columna de imagen una
+   altura predecible basada en su propio ancho, en vez de min-height
+   fijo (que ignoraba la proporción real y era la otra mitad del origen
+   de las franjas). */
+.detail-img{aspect-ratio:4/5;background:#111;display:grid;place-items:center;text-align:center;color:#aaa;padding:0;overflow:hidden}
 /* Fase 35 — la foto de producto debe verse completa, nunca recortada:
    object-fit:contain (no cover). .detail-img conserva su fondo oscuro
    (#111) para el letterboxing cuando la proporción real de la foto no
    llena la caja exactamente. */
-.detail-photo{width:100%;height:100%;min-height:520px;object-fit:contain;display:block}
+.detail-photo{width:100%;height:100%;object-fit:contain;display:block}
 .detail-copy{padding:45px 38px}
 .detail-copy h2{font-size:38px;line-height:1;margin:0 0 10px}
 .variants{display:flex;gap:8px;flex-wrap:wrap;margin:20px 0}
@@ -264,7 +276,15 @@ dialog::backdrop{background:#000d}
    principal (misma regla mobile que ya existía en @media(max-width:640px)). */
 .pdp-gallery{display:flex;flex-direction:column;height:100%}
 .pdp-gallery-main{flex:1;min-height:0;position:relative;overflow:hidden}
-.pdp-no-image{width:100%;height:100%;min-height:520px;display:grid;place-items:center;background:linear-gradient(160deg,#151515,#0b0b0b);color:var(--pink);font-weight:800;letter-spacing:.16em;font-size:14px}
+/* Fase 35.1 — flechas de navegación manual del PDP (sección 4): mismo
+   lenguaje visual que .hero-arrow, pero con área táctil de 44px (mínimo
+   recomendado para mobile) en vez de 38px. Nunca autoplay, nunca hover
+   para cambiar de imagen — solo click/tap/teclado. */
+.pdp-arrow{position:absolute;top:50%;transform:translateY(-50%);z-index:2;width:44px;height:44px;border-radius:50%;border:1px solid #ffffff33;background:#00000055;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);color:#fff;font-size:20px;line-height:1;display:grid;place-items:center;opacity:.7;transition:opacity .2s ease,background .2s ease}
+.pdp-arrow:hover,.pdp-arrow:focus-visible{opacity:1;background:#00000088}
+.pdp-arrow-prev{left:10px}
+.pdp-arrow-next{right:10px}
+.pdp-no-image{width:100%;height:100%;display:grid;place-items:center;background:linear-gradient(160deg,#151515,#0b0b0b);color:var(--pink);font-weight:800;letter-spacing:.16em;font-size:14px}
 .pdp-thumbs{display:flex;gap:8px;padding:10px;overflow-x:auto;background:#0d0d0d;scrollbar-width:none}
 .pdp-thumbs::-webkit-scrollbar{display:none}
 .pdp-thumb{flex:0 0 56px;width:56px;height:56px;border-radius:10px;overflow:hidden;border:2px solid transparent;padding:0;background:#111;cursor:pointer}
@@ -458,8 +478,7 @@ footer small{letter-spacing:.25em;font-size:7px}
   .detail-copy{padding:30px 24px}
   .detail-actions{grid-template-columns:1fr}
   #productDetail{grid-template-columns:1fr}
-  .detail-img,.detail-photo{min-height:330px}
-  .pdp-no-image{min-height:330px}
+  .detail-img{aspect-ratio:4/5;min-height:0}
   .pdp-price strong{font-size:24px}
   .pdp-related .grid{grid-template-columns:1fr 1fr;gap:12px}
   .checkout-summary{padding:20px 20px 0}
