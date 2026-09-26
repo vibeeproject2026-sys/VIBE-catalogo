@@ -128,6 +128,14 @@ dialog::backdrop{background:#000a}
 .hero-preview{background:#0c0c0c;border-radius:10px;overflow:hidden;position:relative;aspect-ratio:16/9;display:flex;align-items:flex-end}
 .hero-preview img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .hero-preview .no-image{position:relative;width:100%;color:#777}
+
+/* Fase 36.1 — bug reportado: un <img> roto sobre el fondo oscuro de
+   .hero-preview/.hero-thumb se veía como un "preview negro" silencioso,
+   indistinguible de un fallo real. "error" no burbujea en <img>, así que
+   se escucha en fase de captura (ver admin.js) y se reemplaza por este
+   estado visible en vez de dejar el fondo oscuro vacío. */
+.hero-img-error{position:relative;z-index:2;display:flex;align-items:center;justify-content:center;gap:6px;width:100%;height:100%;color:#ff8a8a;background:#2a0d0d;font-size:12px;font-weight:600;text-align:center;padding:8px}
+.hero-thumb .hero-img-error{font-size:10px;padding:4px}
 .hero-preview-copy{position:relative;z-index:1;padding:16px 18px;color:#fff;background:linear-gradient(0deg,#000000b3 0%,#00000000 80%);width:100%}
 .hero-preview-copy p{margin:0 0 4px;font-size:11px;color:var(--pink);text-transform:uppercase;letter-spacing:.1em;font-weight:800}
 .hero-preview-copy h3{margin:0 0 4px;font-size:18px}

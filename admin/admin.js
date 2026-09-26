@@ -747,6 +747,30 @@ function renderHeroTable() {
     : `<tr><td colspan="5"><span class="section-hint">Todavía no hay ningún slide. Crea el primero con "+ Nuevo slide".</span></td></tr>`;
 }
 
+// Fase 36.1 — bug reportado: cuando la URL de una imagen del Hero no
+// carga (objeto borrado, red, URL corrupta, etc.), el <img> roto se veía
+// simplemente como el fondo oscuro de .hero-thumb/.hero-preview — un
+// "preview negro" indistinguible de un error real, exactamente lo que se
+// pidió evitar (nunca un fallback silencioso). El evento "error" de <img>
+// no burbujea, así que se escucha una sola vez en fase de captura sobre
+// todo el documento (cubre tabla y diálogo de edición sin listeners por
+// fila) y se reemplaza la imagen rota por un estado de error visible.
+document.addEventListener(
+  "error",
+  (e) => {
+    const img = e.target;
+    if (!img || img.tagName !== "IMG") return;
+    const container = img.closest(".hero-thumb, .hero-preview");
+    if (!container || container.querySelector(".hero-img-error")) return;
+    img.remove();
+    const notice = document.createElement("span");
+    notice.className = "hero-img-error";
+    notice.textContent = "⚠ No se pudo cargar la imagen";
+    container.appendChild(notice);
+  },
+  true
+);
+
 async function patchSlide(id, fields) {
   const res = await adminFetch("/api/admin/hero-slides", {
     method: "PATCH",
@@ -893,6 +917,7 @@ function openHeroEdit(slide) {
       </div>
       <div class="image-block">
         <p class="image-block-label">Imagen mobile (opcional, 4:5)</p>
+        <div class="hero-thumb" id="heroMobileThumb">${s.mobileImage ? `<img src="${esc(s.mobileImage)}" alt="">` : `<span class="no-image">Sin imagen</span>`}</div>
         <input type="file" id="heroMobileInput" accept="image/webp,image/jpeg,image/png">
         <button type="button" id="uploadHeroMobileBtn" class="button">Subir / reemplazar</button>
         <p id="heroMobileStatus" class="image-status"></p>
@@ -973,7 +998,14 @@ function openHeroEdit(slide) {
     e.currentTarget.disabled = true;
     try {
       const updated = await uploadHeroImage(s.id, file, "mobile", statusEl);
-      if (updated) await loadHeroSlides();
+      if (updated) {
+        // Fase 36.1 — antes esta miniatura no existía: subir la imagen
+        // mobile no tenía NINGÚN efecto visible en el diálogo (el preview
+        // grande siempre muestra la imagen desktop), lo que podía leerse
+        // como "el upload no hizo nada" o confundirse con el de otro slide.
+        $("#heroMobileThumb").innerHTML = updated.mobileImage ? `<img src="${esc(updated.mobileImage)}" alt="">` : `<span class="no-image">Sin imagen</span>`;
+        await loadHeroSlides();
+      }
     } finally {
       e.currentTarget.disabled = false;
     }
@@ -1065,17 +1097,24 @@ $("#heroRows").addEventListener("click", async (e) => {
       return;
     }
     // moveBtn
+    // Fase 36.1 — bug real reportado: un slide creado antes de que
+    // existiera el campo `order` (o cualquier otro sin un número real)
+    // hace que a.order/b.order lleguen undefined/null; el backend los
+    // rechaza (correctamente — "reorder inválido"). En vez de confiar en
+    // los valores crudos de `order` de los dos slides que se intercambian
+    // (que pueden no existir todavía), se recalculan de cero para TODA la
+    // lista visible a partir de su posición actual ya ordenada — siempre
+    // números enteros reales — y se envían todos juntos. Esto además
+    // autocorrige cualquier slide viejo con `order` ausente la primera
+    // vez que algo se reordena, sin necesitar una migración aparte.
     const id = moveBtn.dataset.id;
     const dir = moveBtn.dataset.move;
     const index = heroState.slides.findIndex((s) => s.id === id);
     const swapWith = dir === "up" ? index - 1 : index + 1;
     if (swapWith < 0 || swapWith >= heroState.slides.length) return;
-    const a = heroState.slides[index];
-    const b = heroState.slides[swapWith];
-    const saved = await reorderSlides([
-      { id: a.id, order: b.order },
-      { id: b.id, order: a.order },
-    ]);
+    const reordered = heroState.slides.slice();
+    [reordered[index], reordered[swapWith]] = [reordered[swapWith], reordered[index]];
+    const saved = await reorderSlides(reordered.map((s, i) => ({ id: s.id, order: i + 1 })));
     if (saved) await loadHeroSlides();
   } finally {
     rowButtons.forEach((b) => (b.disabled = false));
