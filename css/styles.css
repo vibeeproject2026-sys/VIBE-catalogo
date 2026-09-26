@@ -7,7 +7,16 @@ button,a{cursor:pointer}
 a{color:inherit;text-decoration:none}
 .wrap{width:min(var(--max),calc(100% - 40px));margin:auto}
 .hidden{display:none!important}
-.eyebrow{font-size:11px;letter-spacing:.2em;font-weight:800;color:var(--muted);margin:0 0 14px}
+/* Fase 36.1 — pedido explícito: "cada bloque debe sentirse como una
+   sección editorial independiente". Mismo dash de acento que ya usaba
+   .value-mark, ahora delante de CUALQUIER eyebrow del sitio — marca de
+   apertura consistente para cada bloque, en vez de solo un texto chico.
+   inline-flex (no position:absolute) para que el dash quede PEGADO al
+   texto y el conjunto se alinee como una sola unidad — funciona igual
+   en contextos alineados a la izquierda que centrados (ej.
+   .discover-empty), sin asumir la alineación del contenedor. */
+.eyebrow{display:inline-flex;align-items:center;gap:10px;font-size:11px;letter-spacing:.2em;font-weight:800;color:var(--muted);margin:0 0 14px}
+.eyebrow::before{content:"";display:block;flex-shrink:0;width:26px;height:2px;background:var(--pink)}
 .accent{color:var(--pink)}
 
 header{position:sticky;top:0;z-index:20;background:#050505ee;border-bottom:1px solid var(--line);backdrop-filter:blur(14px)}
@@ -27,6 +36,12 @@ header.scrolled .logo-image{width:126px;height:50px}
 .nav-links a::after{content:"";position:absolute;left:50%;right:50%;bottom:-2px;height:1px;background:var(--pink);transition:left .2s ease,right .2s ease}
 .nav-links a:hover{color:#fff}
 .nav-links a:hover::after{left:0;right:0}
+/* Fase 36.1 — antes el único indicador de sección activa era el
+   subrayado en HOVER (desaparecía al alejar el mouse). .nav-active se
+   aplica desde JS (ver updateHeaderNavActive) mientras ese filtro siga
+   vigente — mismo lenguaje visual que el hover, pero persistente. */
+.nav-links a.nav-active{color:#fff}
+.nav-links a.nav-active::after{left:0;right:0}
 @media(prefers-reduced-motion:reduce){
   .nav-links a{transition:none}
   .nav-links a::after{transition:none}
@@ -45,6 +60,7 @@ header.scrolled .logo-image{width:126px;height:50px}
 .mobile-nav.open{max-height:220px}
 .mobile-nav a{padding:16px 20px;border-bottom:1px solid var(--line);font-size:14px;font-weight:700;letter-spacing:.02em;color:#ddd;transition:color .2s ease,background .2s ease}
 .mobile-nav a:active{color:#fff;background:#111}
+.mobile-nav a.nav-active{color:var(--pink);border-left:3px solid var(--pink);padding-left:17px}
 @media(prefers-reduced-motion:reduce){.mobile-nav a{transition:none}}
 .mobile-nav a:last-child{border-bottom:0}
 
@@ -142,28 +158,47 @@ header.scrolled .logo-image{width:126px;height:50px}
 .value p{margin:0;font-size:13px;color:#e6e6e6;letter-spacing:.01em}
 .value-mark{display:block;width:26px;height:2px;background:var(--pink);margin-bottom:14px}
 
-.heading{display:flex;justify-content:space-between;align-items:end;gap:20px;margin-bottom:32px}
+.heading{display:flex;justify-content:space-between;align-items:end;gap:20px;margin-bottom:40px}
 .heading h2{font-size:58px;letter-spacing:-.045em;margin:0}
 .heading>p{color:#6e6e6e;font-size:13px}
 
-.explore{background:#fff;color:#111;padding:82px 0 20px}
+.explore{background:#fff;color:#111;padding:100px 0 24px}
 .explore .eyebrow{color:var(--pink)}
-.category-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:18px}
-.category-card{display:block;width:100%;text-align:left;font:inherit;border:1px solid #e6e6e6;border-radius:var(--radius);padding:26px;background:linear-gradient(150deg,#fff,#fdf3f8);transition:border-color .2s ease,transform .2s ease,box-shadow .2s ease}
-.category-card:hover{border-color:var(--pink);transform:translateY(-3px);box-shadow:0 16px 32px -18px rgba(255,0,122,.45)}
+/* Fase 36.1 — pedido explícito: "las categorías deben sentirse como
+   mundos VIBE, no como botones administrativos". Sin fotografías reales
+   por mundo (no se inventan), la protagonista es la composición: cards
+   grandes, oscuras, con degradé propio por posición (nunca la misma
+   pieza plana blanca de antes) y tipografía a gran escala. */
+.category-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px}
+.category-card{display:flex;flex-direction:column;justify-content:space-between;width:100%;min-height:230px;text-align:left;font:inherit;border:0;border-radius:var(--radius);padding:32px;color:#fff;background:linear-gradient(155deg,#1c1c1c,#0b0b0b);transition:transform .25s ease,box-shadow .25s ease}
+.category-card:nth-of-type(3n+2){background:linear-gradient(155deg,#420021,#150009)}
+.category-card:nth-of-type(3n+3){background:linear-gradient(155deg,#2a0016,#0b0b0b)}
+.category-card:hover{transform:translateY(-6px);box-shadow:0 24px 48px -20px rgba(255,0,122,.5)}
 @media(prefers-reduced-motion:reduce){
-  .category-card{transition:border-color .2s ease}
+  .category-card{transition:none}
   .category-card:hover{transform:none}
 }
-.category-card span{font-size:11px;color:var(--pink);letter-spacing:.14em;text-transform:uppercase;font-weight:800}
-.category-card h3{margin:6px 0 0;font-size:19px}
-.category-card .arrow{display:block;margin-top:16px;font-size:20px;color:#111;letter-spacing:normal;text-transform:none}
+.category-card span{font-size:12px;color:var(--pink);letter-spacing:.16em;text-transform:uppercase;font-weight:800}
+.category-card h3{margin:14px 0 0;font-size:clamp(26px,3vw,32px);font-weight:800;letter-spacing:-.02em;line-height:1.05}
+.category-card .arrow{display:inline-flex;align-items:center;justify-content:center;margin-top:22px;width:40px;height:40px;border-radius:50%;border:1px solid #ffffff44;font-size:18px;color:#fff;letter-spacing:normal;text-transform:none;transition:background .2s ease,border-color .2s ease}
+.category-card:hover .arrow{background:var(--pink);border-color:var(--pink)}
+@media(prefers-reduced-motion:reduce){.category-card .arrow{transition:none}}
 
-.featured{background:#fff;color:#111;padding:56px 0 20px}
+.featured{background:#fff;color:#111;padding:88px 0 24px}
 .featured .eyebrow{color:var(--pink)}
 .featured .wrap>.button{margin-top:8px}
+/* Fase 36.1 — pedido explícito: "cada bloque debe sentirse como una
+   sección editorial independiente" — Novedades/Destacados/Promociones
+   compartían literalmente la misma clase .featured (nombre histórico,
+   no el flag `featured` de JS) y se veían idénticas entre sí. Un acento
+   de color propio por sección (nunca inventando datos, solo tratamiento
+   visual) para que cada una se lea como su propio momento comercial:
+   Novedades = frescura, Promociones = urgencia de compra. */
+#novedades{background:linear-gradient(180deg,#fff7fb,#fff)}
+#promociones{background:linear-gradient(180deg,#fff0f6,#fff)}
+#promociones .eyebrow::before{background:#111}
 
-.catalog{background:#fff;color:#111;padding:56px 0 110px}
+.catalog{background:#fff;color:#111;padding:88px 0 110px}
 .catalog .eyebrow{color:var(--pink)}
 /* Fase 27 — PLP: breadcrumb, contador + Filter & Sort, chips de filtros
    activos y aviso de "todo agotado" (compacto, sin ocupar demasiado
@@ -196,7 +231,11 @@ header.scrolled .logo-image{width:126px;height:50px}
 .tabs-sub .tab.active{background:#111;color:#fff;border-color:#111}
 #searchInput{width:260px;border:1px solid #ddd;border-radius:999px;padding:11px 16px;background:#fafafa;outline:0}
 
-.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:22px}
+/* Fase 36.1 — 4 columnas hacía que cada foto de producto fuera chica
+   (pedido explícito: "aumentar perceptiblemente tamaño de fotografía/
+   área visual" en las cards). 3 columnas en desktop = ~33% más ancho
+   por card, misma cantidad de aire (gap sin cambiar). */
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:26px}
 .card{min-width:0}
 /* Fase 36 — la card ganó una elevación sutil en hover (foto completa
    levantándose con una sombra suave), el mismo lenguaje que ya usaba
@@ -205,28 +244,41 @@ header.scrolled .logo-image{width:126px;height:50px}
    una animación nueva (antes .card-img no tenía transition propio, solo
    la foto interior). */
 .card-img{aspect-ratio:4/5;border:0;border-radius:var(--radius);background:#f2f2f2;display:grid;place-items:center;width:100%;position:relative;overflow:hidden;padding:0;transition:transform .25s ease,box-shadow .25s ease}
-.card:hover .card-img{transform:translateY(-4px);box-shadow:0 16px 32px -14px rgba(0,0,0,.3)}
+.card:hover .card-img{transform:translateY(-4px);box-shadow:0 20px 40px -16px rgba(0,0,0,.35)}
 .product-photo{width:100%;height:100%;object-fit:cover;display:block;transition:transform .35s ease,opacity .25s ease}
 .card-img:hover .product-photo{transform:scale(1.035)}
+/* Fase 36.1 — la mayoría del catálogo real todavía no tiene foto
+   cargada (flujo aparte, no se inventa ninguna aquí): antes esto era
+   texto plano sobre gris #f2f2f2, se leía como una imagen rota. Mismo
+   lenguaje oscuro+wordmark rosa que .pdp-no-image/.discover-empty en
+   vez de un vacío técnico — presencia editorial incluso sin foto. */
+.card-img:has(.card-img-empty){background:linear-gradient(160deg,#151515,#0b0b0b)}
+.card-img-empty{color:var(--pink);font-weight:800;letter-spacing:.16em;font-size:13px;text-transform:uppercase}
 @media(prefers-reduced-motion:reduce){
   .card-img{transition:none}
   .card:hover .card-img{transform:none}
 }
 .card-badge{position:absolute;top:10px;left:10px;z-index:2;background:var(--pink);color:#fff;font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:4px 10px;border-radius:999px}
-.card-body{padding:15px 3px}
-.product-category{font-size:9px;color:var(--pink);letter-spacing:.18em;text-transform:uppercase;font-weight:800;margin:0 0 6px}
-.card h3{margin:0 0 5px;font-size:16px}
+.card-body{padding:18px 4px}
+.product-category{font-size:10px;color:var(--pink);letter-spacing:.18em;text-transform:uppercase;font-weight:800;margin:0 0 7px}
+.card h3{margin:0 0 4px;font-size:19px;letter-spacing:-.01em}
+.card-brand{margin:0 0 6px;font-size:12px;color:#888;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
 .desc{font-size:12px;color:#777;margin:0 0 10px}
-.price{font-size:14px;font-weight:800}
-.old{text-decoration:line-through;color:#777;font-weight:400;margin-left:7px}
+.price{font-size:17px;font-weight:800}
+.old{text-decoration:line-through;color:#777;font-weight:400;margin-left:7px;font-size:13px}
 .availability-badge{display:inline-block;margin-left:8px;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#b91c4a}
-/* Fase 36 — antes el CTA de card era .button.dark (barra sólida rosa,
-   siempre al máximo peso visual, "poco discreto"). Reusa .button.outline
-   (ya existe, ya usado en "Ver catálogo completo") para un CTA liviano
-   por defecto que gana peso en hover/focus (fill sólido) — en mobile,
-   sin hover real, sigue siendo perfectamente legible (borde+texto rosa
-   sobre blanco), tal como pide el brief ("CTA claro, no sobrecargar"). */
-.card .button{width:100%;margin-top:13px;min-height:42px;font-size:13px}
+/* Fase 36.1 — bug/pedido explícito: el outline de Fase 36 se percibió
+   "demasiado discreto", casi invisible. Pill sólida negra (lenguaje de
+   beauty premium — alto contraste, nunca la barra rosa plana de antes)
+   que se llena de rosa en hover/focus: se nota de inmediato, sin volver
+   a ser el bloque de máximo peso que ya se había descartado. */
+.card .button{width:100%;margin-top:14px;min-height:44px;font-size:13px}
+.card-cta{background:#111;color:#fff;border-color:#111;letter-spacing:.06em;text-transform:uppercase;font-size:12px;transition:background .2s ease,border-color .2s ease,transform .2s ease}
+.card-cta:hover,.card-cta:focus-visible{background:var(--pink);border-color:var(--pink);color:#fff;transform:translateY(-1px)}
+@media(prefers-reduced-motion:reduce){
+  .card-cta{transition:background .2s ease,border-color .2s ease}
+  .card-cta:hover,.card-cta:focus-visible{transform:none}
+}
 .empty{text-align:center;padding:60px;color:#777}
 
 /* Fase 30 — Discover / Editorial VIBE. Misma familia visual que .card
@@ -338,11 +390,17 @@ dialog::backdrop{background:#000d}
    llena la caja exactamente. */
 .detail-photo{width:100%;height:100%;object-fit:contain;display:block}
 .detail-copy{padding:45px 38px}
-.detail-copy h2{font-size:38px;line-height:1;margin:0 0 10px}
+.detail-copy h2{font-size:42px;line-height:1.02;letter-spacing:-.01em;margin:0 0 10px}
 .variants{display:flex;gap:8px;flex-wrap:wrap;margin:20px 0}
 .variant{border:1px solid #333;background:transparent;color:#fff;border-radius:999px;padding:9px 13px;font-size:12px}
 .variant.selected{background:var(--pink);border-color:var(--pink)}
-.detail-actions{display:grid;grid-template-columns:120px 1fr;gap:10px;margin-top:24px}
+/* Fase 36.1 — pedido explícito: "el CTA principal debe ser visualmente
+   inequívoco". Antes el botón compartía fila con el selector de
+   cantidad (grid 120px 1fr), limitado a lo que sobraba de esa columna.
+   Apilado: la cantidad queda arriba con su ancho natural (compacto), el
+   botón de compra ocupa TODO el ancho de la columna debajo — el cambio
+   de tamaño más directo posible sin tocar la galería/ratio del PDP. */
+.detail-actions{display:flex;flex-direction:column;gap:14px;margin-top:24px}
 /* Fase 36 — pedido explícito: "el CTA de compra debe tener mucha más
    presencia". Antes usaba exactamente .button.dark, la misma clase que
    cualquier botón del sitio (nav, "Explorar catálogo", etc.) — el
@@ -350,7 +408,7 @@ dialog::backdrop{background:#000d}
    más. Se mantiene la forma de pastilla y la paleta de marca (nada
    nuevo, solo más peso): más alto, texto más grande, sombra más
    marcada, con una elevación sutil en hover/focus. */
-.pdp-buy-button{min-height:58px;font-size:15px;letter-spacing:.02em;box-shadow:0 10px 32px #ff007a55;transition:transform .15s ease,box-shadow .15s ease,background .15s ease}
+.pdp-buy-button{width:100%;min-height:60px;font-size:16px;letter-spacing:.02em;box-shadow:0 10px 32px #ff007a55;transition:transform .15s ease,box-shadow .15s ease,background .15s ease}
 .pdp-buy-button:hover:not(:disabled),.pdp-buy-button:focus-visible:not(:disabled){transform:translateY(-2px);box-shadow:0 14px 38px #ff007a70}
 @media(prefers-reduced-motion:reduce){
   .pdp-buy-button{transition:none}
@@ -403,7 +461,7 @@ dialog::backdrop{background:#000d}
 
 .pdp-breadcrumb{margin-bottom:16px}
 .pdp-badge{display:inline-block;position:static;background:var(--pink);color:#fff;font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:4px 10px;border-radius:999px;margin-bottom:10px}
-.pdp-brand{margin:0 0 6px;font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#aaa}
+.pdp-brand{margin:0 0 6px;font-size:13px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--pink)}
 .pdp-commercial-name{margin:-4px 0 8px;font-size:13px;color:#ccc;font-style:italic}
 .pdp-short-desc{color:#ccc;font-size:14px;margin:0 0 16px}
 .pdp-price{display:flex;align-items:baseline;flex-wrap:wrap;gap:10px;margin:4px 0}
@@ -593,7 +651,6 @@ footer small{letter-spacing:.25em;font-size:7px}
   .editorial{padding:70px 0}
   .cta-final{padding:50px 0}
   .detail-copy{padding:30px 24px}
-  .detail-actions{grid-template-columns:1fr}
   #productDetail{grid-template-columns:1fr}
   /* Restaura exactamente el patrón mobile de siempre (sin tocarlo): el
      contenedor OUTER vuelve a fijar la proporción (4/5) y el área de la

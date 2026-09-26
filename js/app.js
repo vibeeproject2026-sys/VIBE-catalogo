@@ -74,9 +74,25 @@ function tabButton(label, active, dataAttr) {
   return `<button class="tab ${active ? "active" : ""}" data-${dataAttr}="${esc(label)}">${esc(label)}</button>`;
 }
 
+// Fase 36.1 — pedido explícito: "el estado activo de la sección actual
+// debe ser mucho más evidente que un simple color". Antes .nav-links no
+// reflejaba en absoluto qué filtro estaba aplicado — el subrayado de
+// Fase 36 solo aparecía en hover. Ahora, además, la sección
+// efectivamente seleccionada (mundo/Novedades/Promociones) queda con
+// una marca persistente (.nav-active, ver CSS) mientras siga aplicada,
+// sin depender de que el mouse esté encima.
+function updateHeaderNavActive() {
+  document.querySelectorAll(".nav-links a[data-group], #mobileNav a[data-group]").forEach((a) => {
+    a.classList.toggle("nav-active", state.group !== "Todos" && a.dataset.group === state.group);
+  });
+  document.querySelectorAll("#navNovedades, #mobileNavNovedades").forEach((a) => a.classList.toggle("nav-active", state.newOnly === true));
+  document.querySelectorAll("#navPromociones, #mobileNavPromociones").forEach((a) => a.classList.toggle("nav-active", state.promo === true));
+}
+
 function renderNav() {
   const groups = ["Todos", ...getGroups(state.products)];
   $("#groupTabs").innerHTML = groups.map(g => tabButton(g, state.group === g, "group")).join("");
+  updateHeaderNavActive();
 
   const categoriesHere = getCategoriesInGroup(state.products, state.group);
   const showCategoryRow = state.group !== "Todos" && categoriesHere.length > 1;
@@ -97,7 +113,15 @@ function renderNav() {
 }
 
 function productImage(p, cls = "product-photo") {
-  return p.image ? `<img class="${cls}" src="${p.image}" alt="${esc(p.name)}" loading="lazy">` : `<span>${esc(p.imageLabel)}</span>`;
+  // Fase 36.1 — antes, sin foto real, esto era un <span> plano (texto
+  // "VIBE" sin ningún tratamiento) sobre un cuadro gris #f2f2f2: se veía
+  // como una imagen rota, no como una decisión de diseño. La mayoría del
+  // catálogo real hoy no tiene foto cargada todavía (eso NO cambia
+  // aquí — es un flujo de carga aparte), así que este es el estado que
+  // ve la usuaria en la mayoría de las cards. Ahora reutiliza el mismo
+  // lenguaje oscuro+wordmark rosa que .pdp-no-image/.discover-empty
+  // (.card-img-empty en CSS) — con presencia editorial en vez de vacío.
+  return p.image ? `<img class="${cls}" src="${p.image}" alt="${esc(p.name)}" loading="lazy">` : `<span class="card-img-empty">${esc(p.imageLabel)}</span>`;
 }
 
 function productCard(p) {
@@ -117,11 +141,12 @@ function productCard(p) {
     <div class="card-body">
       <p class="product-category">${esc(p.category)}</p>
       <h3>${esc(p.name)}</h3>
+      ${p.brand ? `<p class="card-brand">${esc(p.brand)}</p>` : ""}
       ${p.shortDescription ? `<p class="desc">${esc(p.shortDescription)}</p>` : ""}
       <span class="price">${money(showPromo ? p.promoPrice : p.price)}</span>
       ${showPromo ? `<span class="old">${money(p.price)}</span>` : p.oldPrice ? `<span class="old">${money(p.oldPrice)}</span>` : ""}
       ${p.available === false ? `<span class="availability-badge">Agotado</span>` : ""}
-      <button class="button outline" data-product="${p.id}">Ver producto</button>
+      <button class="button card-cta" data-product="${p.id}">Ver producto</button>
     </div>
   </article>`;
 }
@@ -281,8 +306,10 @@ function renderCategoryShowcase() {
   $("#categoryShowcase").innerHTML = groups.map(g => {
     const count = state.products.filter(p => (p.categoryGroup || p.category) === g).length;
     return `<button class="category-card" data-group="${esc(g)}">
-      <span>${count} producto${count === 1 ? "" : "s"}</span>
-      <h3>${esc(g)}</h3>
+      <div>
+        <span>${count} producto${count === 1 ? "" : "s"}</span>
+        <h3>${esc(g)}</h3>
+      </div>
       <span class="arrow">→</span>
     </button>`;
   }).join("");
@@ -364,8 +391,8 @@ function renderDiscoverLanding() {
     // nunca "Próximamente" (ver nota de sección 6/18 arriba).
     const emptyState = `<div class="discover-empty">
       <p class="eyebrow accent">VIBE STORIES</p>
-      <h3>Un espacio en construcción, con el mismo cuidado que cada producto VIBE</h3>
-      <p class="discover-empty-copy">Aquí vivirán los rituales, las tendencias y la forma en la que entendemos la belleza — nada inventado, solo lo que valga la pena contar.</p>
+      <h3>Este espacio crece contigo</h3>
+      <p class="discover-empty-copy">Rituales, tendencias y la forma en la que entendemos la belleza — nada inventado todavía, solo lo que de verdad valga la pena contar.</p>
     </div>`;
     $("#discoverContent").innerHTML = hero + emptyState + backLink;
     return;
