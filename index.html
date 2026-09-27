@@ -74,10 +74,61 @@
   </div>
 </section>
 
+
+<!-- Fase 38 — "Shop VIBE": puerta de marca, no de datos. A diferencia de
+     Shop by Category (abajo, con conteos reales por grupo), esto NUNCA
+     depende de que existan productos/fotos/badges — son 3 categorías
+     reales (mismas de siempre: Maquillaje/Skincare/Accesorios, mismos
+     nombres que ya usa el nav) presentadas como una decisión de marca,
+     no de inventario. Reutiliza goToFilter() vía data-group, igual que
+     el resto del sitio. -->
+<section class="shop-vibe">
+  <div class="wrap">
+    <div class="heading">
+      <div><p class="eyebrow">SHOP VIBE</p><h2>¿Qué quieres descubrir hoy?</h2></div>
+    </div>
+    <div class="shop-vibe-grid">
+      <button type="button" class="shop-door shop-door-makeup" data-group="Maquillaje">
+        <span class="shop-door-label">MAQUILLAJE</span>
+        <span class="shop-door-desc">Color, textura y actitud.</span>
+        <span class="shop-door-cta">Explorar <span class="arrow">→</span></span>
+      </button>
+      <button type="button" class="shop-door shop-door-skincare" data-group="Skincare">
+        <span class="shop-door-label">SKINCARE</span>
+        <span class="shop-door-desc">Rituales que de verdad se notan.</span>
+        <span class="shop-door-cta">Explorar <span class="arrow">→</span></span>
+      </button>
+      <button type="button" class="shop-door shop-door-accessories" data-group="Accesorios">
+        <span class="shop-door-label">ACCESORIOS</span>
+        <span class="shop-door-desc">Los detalles que completan tu VIBE.</span>
+        <span class="shop-door-cta">Explorar <span class="arrow">→</span></span>
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- Fase 38 — "Editorial Beauty Moment": rompe la monotonía de grillas
+     con una pieza puramente de marca (copy + composición gráfica del
+     propio sistema VIBE — rosa/negro/degradados/tipografía), sin foto
+     ni dato de producto. -->
+<section class="editorial-moment">
+  <div class="wrap editorial-moment-inner">
+    <div class="editorial-moment-copy">
+      <p class="eyebrow">VIBRANT ICONIC BEAUTY ESSENTIALS</p>
+      <h2>Tu beauty.<br>Tu VIBE.</h2>
+      <p class="editorial-moment-lead">Descubre productos que se sienten tan poderosos como tú.</p>
+      <a class="button dark" href="#catalogo">Explorar VIBE</a>
+    </div>
+    <div class="editorial-moment-graphic" aria-hidden="true">
+      <span class="editorial-moment-word">VIBE</span>
+    </div>
+  </div>
+</section>
+
 <section class="explore">
   <div class="wrap">
     <div class="heading">
-      <div><p class="eyebrow">DESCUBRE</p><h2>Explora tu VIBE</h2></div>
+      <div><p class="eyebrow">DESCUBRE</p><h2>Shop by Category</h2></div>
       <p>Cada categoría es una forma distinta de vivir tu ritual de belleza.</p>
     </div>
     <div id="categoryShowcase" class="category-grid"></div>
@@ -113,11 +164,18 @@
   </div>
 </section>
 
-<section class="featured">
+<!-- Fase 38 — "Product Discovery": a diferencia de Novedades/Promociones
+     (ocultas sin dato real), esta sección SIEMPRE muestra productos
+     reales — usa featured si existe curaduría (selectFeatured), y si no
+     (nuestro caso hoy: 0 featured), cae a una muestra real del catálogo
+     disponible (ver renderFeatured() en app.js). Nunca inventa Nuevo/
+     Best Seller/reviews/rating/promo — cada card sigue mostrando solo
+     lo que ese producto realmente tiene. -->
+<section id="productDiscovery" class="featured">
   <div class="wrap">
     <div class="heading">
-      <div><p class="eyebrow">SELECCIÓN</p><h2>Destacados VIBE</h2></div>
-      <p>Lo que el equipo VIBE elige para ti.</p>
+      <div><p class="eyebrow">PRODUCT DISCOVERY</p><h2>Descubre VIBE</h2></div>
+      <p>Una muestra real de lo que puedes encontrar hoy en tu ritual VIBE.</p>
     </div>
     <div id="featuredGrid" class="grid"></div>
     <a class="button outline" href="#catalogo">Ver catálogo completo</a>
@@ -135,19 +193,28 @@
   </div>
 </section>
 
-<!-- Fase 37 — pedido explícito: Discover no debe sentirse como "una
-     sección al final". Antes vivía después del catálogo completo, casi
-     pegada al footer; ahora es un beat de descubrimiento ANTES de la
-     grilla de "explorar todo", entre las colecciones curadas y la PLP —
-     misma disciplina de siempre (oculto sin artículos publicados). -->
-<section id="discoverHome" class="featured hidden">
+<!-- Fase 37/38 — Discover no debe sentirse como "una sección al final"
+     ni, ahora, como un hueco que desaparece sin artículos. Con contenido
+     real publicado, muestra la grilla de siempre; sin ninguno (nuestro
+     caso hoy), en vez de ocultarse por completo se convierte en una
+     invitación de marca (#discoverHomeEmpty) — nunca "no hay artículos",
+     nunca un artículo inventado. Ver renderDiscoverHome() en app.js. -->
+<section id="discoverHome" class="discover-vibe">
   <div class="wrap">
-    <div class="heading">
-      <div><p class="eyebrow">DISCOVER</p><h2>Vive tu VIBE</h2></div>
-      <p>Historias, rituales e inspiración para tu ritual de belleza.</p>
+    <div id="discoverHomeEmpty" class="discover-vibe-empty hidden">
+      <p class="eyebrow accent">DISCOVER VIBE</p>
+      <h2>Beauty. Self-care.<br>Inspiration.</h2>
+      <p class="discover-vibe-empty-copy">El contenido editorial de VIBE está en camino — rituales, tendencias y la forma en la que entendemos la belleza real.</p>
+      <a class="button outline light" href="#discover">Entrar a Discover</a>
     </div>
-    <div id="discoverHomeGrid" class="grid"></div>
-    <a class="button outline" href="#discover">Ver Discover completo</a>
+    <div id="discoverHomeContent" class="hidden">
+      <div class="heading">
+        <div><p class="eyebrow accent">DISCOVER</p><h2>Vive tu VIBE</h2></div>
+        <p>Historias, rituales e inspiración para tu ritual de belleza.</p>
+      </div>
+      <div id="discoverHomeGrid" class="grid"></div>
+      <a class="button outline light" href="#discover">Ver Discover completo</a>
+    </div>
   </div>
 </section>
 
@@ -187,10 +254,21 @@
   </div>
 </section>
 
-<section class="cta-final">
-  <div class="wrap cta-final-inner">
-    <h2>Sigue descubriendo tu VIBE.</h2>
-    <a class="button dark" href="#catalogo">Ver todo el catálogo</a>
+<!-- Fase 38 — "Community/Newsletter": cierre fuerte de marca. Sin
+     backend de suscripción todavía, el formulario queda visualmente
+     preparado pero deshabilitado (nunca una captura que finge funcionar
+     y no envía nada a ningún lado) — nota honesta en vez de silencio. -->
+<section class="community">
+  <div class="wrap community-inner">
+    <p class="eyebrow accent">COMMUNITY</p>
+    <h2>Entra en la VIBE.</h2>
+    <p class="community-copy">Sé la primera en enterarte de lanzamientos, rituales y todo lo nuevo en tu ritual VIBE.</p>
+    <form class="community-form">
+      <input type="email" placeholder="Tu correo electrónico" aria-label="Correo electrónico" disabled>
+      <button type="submit" class="button dark" disabled>Unirme</button>
+    </form>
+    <p class="community-note">Muy pronto — estamos preparando esta experiencia.</p>
+    <a class="button outline light community-secondary" href="#catalogo">Ver todo el catálogo</a>
   </div>
 </section>
 

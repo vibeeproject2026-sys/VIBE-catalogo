@@ -267,14 +267,20 @@ function removeFilter(key) {
   applyFiltersAndRender();
 }
 
+// Fase 38 — "Descubre VIBE" (Product Discovery): el brief pide que esta
+// sección SIEMPRE tenga productos reales, sin depender de curaduría que
+// hoy no existe (0 featured en producción). selectFeatured() sigue
+// siendo la fuente cuando SÍ hay curaduría real (Fase 24, sin cambios);
+// solo cuando no hay ninguno se cae a una muestra real de catálogo
+// disponible — nunca "los primeros N" disfrazados de destacados: el
+// encabezado ("Descubre VIBE") ya no promete curaduría editorial como
+// "Destacados" sí hacía, así que mostrar catálogo real aquí no es
+// inventar nada. Cada card sigue mostrando solo badge/precio/
+// disponibilidad reales — nunca "Nuevo"/"Best Seller" fabricados.
+const PRODUCT_DISCOVERY_FALLBACK_SIZE = 8;
 function renderFeatured() {
-  // Fase 24: destacados reales — solo featured === true, nunca "los
-  // primeros N" del listado. Si todavía no hay ningún producto marcado
-  // como destacado (curaduría en progreso), se muestra un estado vacío
-  // en vez de inventar una selección. A diferencia de Novedades/
-  // Promociones, esta sección permanece siempre visible (Fase 25/26):
-  // el vacío es una invitación editorial a curar, no un error.
-  const list = selectFeatured(state.products);
+  const curated = selectFeatured(state.products);
+  const list = curated.length ? curated : state.products.filter((p) => p.available !== false).slice(0, PRODUCT_DISCOVERY_FALLBACK_SIZE);
   $("#featuredGrid").innerHTML = list.length
     ? list.map(productCard).join("")
     : `<p class="empty">Estamos preparando la selección VIBE.</p>`;
@@ -394,14 +400,20 @@ function articleCard(a) {
   </article>`;
 }
 
-// Sección 4/18.A/B — la franja de Home sigue exactamente el mismo
-// principio ya establecido por Novedades/Promociones (Fase 26): sin
-// contenido publicado, ausencia total (nunca "Próximamente" ni un
-// artículo inventado).
+// Fase 38 — pedido explícito: Discover ya no debe desaparecer del Home
+// sin artículos publicados (el principio de Novedades/Promociones de la
+// Fase 26 — "sin dato real, ausencia total" — aplicaba bien a colecciones
+// de PRODUCTO, pero para la marca Discover el brief pide una invitación
+// editorial visible en vez de un hueco). La SECCIÓN (#discoverHome)
+// ahora siempre se muestra; lo que cambia es cuál de sus dos estados
+// internos se ve: #discoverHomeContent (grilla real) si hay artículos
+// publicados, #discoverHomeEmpty (invitación de marca, nunca un
+// artículo inventado ni "Próximamente") si no.
 function renderDiscoverHome() {
   const list = getPublishedArticles(editorialArticles).slice(0, 3);
   const hasContent = list.length > 0;
-  $("#discoverHome").classList.toggle("hidden", !hasContent);
+  $("#discoverHomeContent").classList.toggle("hidden", !hasContent);
+  $("#discoverHomeEmpty").classList.toggle("hidden", hasContent);
   if (hasContent) $("#discoverHomeGrid").innerHTML = list.map(articleCard).join("");
 }
 
