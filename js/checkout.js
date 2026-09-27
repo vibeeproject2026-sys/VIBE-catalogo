@@ -1,13 +1,16 @@
-// Fase 29 — lógica pura del checkout: cálculo del resumen del pedido,
-// validación del formulario y construcción del mensaje/enlace de
-// WhatsApp. Misma disciplina que js/taxonomy.js y js/url-state.js: sin
-// DOM, sin localStorage, sin red — app.js es el único que toca cart.js,
-// el <dialog> y window.open(). Nada aquí persiste datos del cliente en
-// ningún lado; solo transforma lo que ya está en memoria.
-
-function money(n) {
-  return new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(n);
-}
+// Fase 29 — lógica pura del checkout: cálculo del resumen del pedido y
+// validación del formulario. Misma disciplina que js/taxonomy.js y
+// js/url-state.js: sin DOM, sin localStorage, sin red — app.js es el
+// único que toca cart.js y el <dialog>. Nada aquí persiste datos del
+// cliente en ningún lado; solo transforma lo que ya está en memoria.
+//
+// Fase 39 — el pedido ahora se envía a /api/orders/create (ver
+// js/app.js) en vez de abrir WhatsApp desde el navegador:
+// buildWhatsAppMessage/buildWhatsAppUrl se retiraron de este archivo (ya
+// no tienen ningún llamador) — el mensaje de aviso a VIBE ahora se arma
+// server-side, en api/orders/_lib/whatsappNotify.js, con una audiencia y
+// un contenido distintos (aviso ENTRANTE a VIBE, no un mensaje en
+// primera persona del cliente).
 
 // Fase 29, sección 3: el total del pedido excluye cualquier línea marcada
 // como no disponible (chequeo fresco de disponibilidad, hecho por
@@ -34,64 +37,30 @@ export function validatePhone(raw) {
   return digitsOnly.length >= PHONE_MIN_DIGITS && digitsOnly.length <= PHONE_MAX_DIGITS;
 }
 
-// Campos obligatorios (sección 4/6): nombre, WhatsApp, ciudad y
-// dirección — lo mínimo real para coordinar una entrega. Observaciones
-// es el único campo opcional. Devuelve un mensaje por campo, nunca un
-// error genérico, para que la UI pueda mostrarlo junto al input exacto.
-export function validateCheckoutForm({ name, phone, city, address } = {}) {
+function isValidEmail(raw) {
+  const value = String(raw || "").trim();
+  if (!value || value.length > 254) return false;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+// Campos obligatorios (sección 1/2/3 del brief de Fase 39): nombre,
+// WhatsApp, email, ciudad y dirección — lo mínimo real para coordinar
+// una entrega y enviar la confirmación. Observaciones es el único campo
+// opcional. `contactConsent` es la autorización de contacto (sección 3
+// — exclusiva para gestionar ESTE pedido, nunca marketing/newsletter):
+// debe llegar explícitamente en `true`, nunca asumida por ausencia.
+// Devuelve un mensaje por campo, nunca un error genérico, para que la
+// UI pueda mostrarlo junto al input exacto.
+export function validateCheckoutForm({ name, phone, email, city, address, contactConsent } = {}) {
   const errors = {};
   if (!String(name || "").trim()) errors.name = "Ingresa tu nombre completo.";
   if (!String(phone || "").trim()) errors.phone = "Ingresa tu número de WhatsApp.";
   else if (!validatePhone(phone)) errors.phone = "Ingresa un número de WhatsApp válido.";
+  if (!String(email || "").trim()) errors.email = "Ingresa tu correo electrónico.";
+  else if (!isValidEmail(email)) errors.email = "Ingresa un correo electrónico válido.";
   if (!String(city || "").trim()) errors.city = "Ingresa tu ciudad.";
   if (!String(address || "").trim()) errors.address = "Ingresa tu dirección de entrega.";
+  if (contactConsent !== true) errors.contactConsent = "Autoriza el contacto para poder enviar tu pedido.";
   return { valid: Object.keys(errors).length === 0, errors };
 }
 
-function lineLabel(l) {
-  const hasRealVariant = l.variantName && l.variantName !== "Único" && l.variantName !== "Default";
-  return hasRealVariant ? `${l.name} — ${l.variantName}` : l.name;
-}
-
-// Sección 8 — el mensaje se arma siempre a partir de `summary` (ya
-// calculado por computeOrderSummary desde el carrito real) y `customer`
-// (lo que la clienta escribió en el formulario): nunca hay un producto,
-// precio, cantidad o total fijo en este archivo. Las líneas no
-// disponibles quedan fuera del mensaje — no tiene sentido pedir algo que
-// la propia UI ya le pidió a la clienta que quitara.
-export function buildWhatsAppMessage(summary, customer) {
-  const availableLines = summary.lines.filter((l) => !l.unavailable);
-  const productBlocks = availableLines
-    .map((l) => `*${lineLabel(l)}*\nCantidad: ${l.quantity}\nPrecio: ${money(l.price)}\nSubtotal: ${money(l.lineSubtotal)}`)
-    .join("\n\n");
-  const notes = String((customer && customer.notes) || "").trim();
-
-  return [
-    "Hola VIBE ✨",
-    "",
-    "Quiero realizar el siguiente pedido:",
-    "",
-    productBlocks,
-    "",
-    `*TOTAL: ${money(summary.total)}*`,
-    "",
-    "Datos de entrega:",
-    `Nombre: ${customer.name}`,
-    `WhatsApp: ${customer.phone}`,
-    `Ciudad: ${customer.city}`,
-    `Dirección: ${customer.address}`,
-    "",
-    "Observaciones:",
-    notes || "Ninguna",
-    "",
-    "Gracias 💗",
-  ].join("\n");
-}
-
-// Sección 10 — mecanismo estándar wa.me (funciona en desktop y mobile sin
-// ninguna librería nueva). Solo dígitos en el número: wa.me no acepta
-// espacios, +, guiones ni paréntesis.
-export function buildWhatsAppUrl(whatsappNumber, message) {
-  const digits = String(whatsappNumber || "").replace(/\D/g, "");
-  return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
-}

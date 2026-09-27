@@ -708,11 +708,15 @@ let heroState = { slides: [], loaded: false };
 
 function switchAdminView(view) {
   const isHero = view === "hero";
-  $("#tabProducts").classList.toggle("active", !isHero);
+  const isOrders = view === "orders";
+  $("#tabProducts").classList.toggle("active", !isHero && !isOrders);
   $("#tabHero").classList.toggle("active", isHero);
-  $("#app").classList.toggle("hidden", isHero);
+  $("#tabOrders").classList.toggle("active", isOrders);
+  $("#app").classList.toggle("hidden", isHero || isOrders);
   $("#heroApp").classList.toggle("hidden", !isHero);
+  $("#ordersApp").classList.toggle("hidden", !isOrders);
   if (isHero && !heroState.loaded) loadHeroSlides();
+  if (isOrders && !ordersState.loaded) loadOrders();
 }
 
 async function loadHeroSlides() {
@@ -1050,8 +1054,68 @@ function openHeroEdit(slide) {
   $("#heroEditDialog").showModal();
 }
 
+// ==========================================================================
+// Fase 39 — pestaña "Pedidos", de solo lectura. Habla únicamente con
+// /api/admin/orders (GET) — nunca con /api/orders/create (ese es el
+// endpoint público del checkout) ni con products/hero-slides. Sin
+// acciones: no hay edición de estado ni reenvío de notificaciones acá.
+// ==========================================================================
+
+let ordersState = { orders: [], loaded: false };
+
+async function loadOrders() {
+  $("#ordersLoadError").classList.add("hidden");
+  const res = await adminFetch("/api/admin/orders");
+  if (res.status === 401) {
+    clearToken();
+    showLogin("Token incorrecto o vencido.");
+    return;
+  }
+  if (!res.ok) {
+    $("#ordersLoadError").textContent = "No se pudo cargar el listado de pedidos. Intenta de nuevo.";
+    $("#ordersLoadError").classList.remove("hidden");
+    return;
+  }
+  const data = await res.json();
+  ordersState.orders = data.orders || [];
+  ordersState.loaded = true;
+  renderOrdersTable();
+}
+
+function formatOrderDate(iso) {
+  try {
+    return new Intl.DateTimeFormat("es-CO", { dateStyle: "medium", timeStyle: "short", timeZone: "America/Bogota" }).format(new Date(iso));
+  } catch {
+    return iso;
+  }
+}
+
+const ORDER_STATUS_LABELS = { received: "Recibido", confirmed: "Confirmado", cancelled: "Cancelado" };
+
+function renderOrdersTable() {
+  const list = ordersState.orders;
+  $("#ordersRows").innerHTML = list.length
+    ? list
+        .map(
+          (o) => `<tr>
+        <td>${esc(formatOrderDate(o.created_at))}</td>
+        <td>${esc(o.customer_name)}</td>
+        <td>${esc(o.customer_phone)}</td>
+        <td>${esc(o.customer_email)}</td>
+        <td>${esc(o.customer_city)}</td>
+        <td>${money(Number(o.total))}</td>
+        <td>${esc(ORDER_STATUS_LABELS[o.status] || o.status)}</td>
+        <td>${o.email_sent ? "Sí" : "No"}</td>
+        <td>${o.whatsapp_notified ? "Sí" : "No"}</td>
+      </tr>`
+        )
+        .join("")
+    : `<tr><td colspan="9"><span class="section-hint">Todavía no hay ningún pedido registrado.</span></td></tr>`;
+}
+
 $("#tabProducts").addEventListener("click", () => switchAdminView("products"));
 $("#tabHero").addEventListener("click", () => switchAdminView("hero"));
+$("#tabOrders").addEventListener("click", () => switchAdminView("orders"));
 $("#newSlideBtn").addEventListener("click", async (e) => {
   if (e.currentTarget.disabled) return;
   e.currentTarget.disabled = true;

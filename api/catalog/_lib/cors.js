@@ -29,7 +29,12 @@ function isVercelPreview(origin) {
   return typeof origin === "string" && /^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(origin);
 }
 
-function applyCors(req, res) {
+// Fase 39 — `methods` se vuelve parametrizable (antes hardcodeado a
+// "GET, OPTIONS") para que api/orders/create.js pueda reusar este mismo
+// helper con ["POST","OPTIONS"] en vez de duplicar el archivo entero
+// por un único método distinto. El default se mantiene igual que antes
+// para cada llamador existente que no pasa el tercer argumento.
+function applyCors(req, res, methods = ["GET", "OPTIONS"]) {
   const origin = req.headers && req.headers.origin;
   const allowed = getAllowedOrigins();
   const isAllowed = Boolean(origin) && (allowed.includes(origin) || isVercelPreview(origin));
@@ -38,7 +43,7 @@ function applyCors(req, res) {
     res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader("Vary", "Origin");
   }
-  res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", methods.join(", "));
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
   return isAllowed;

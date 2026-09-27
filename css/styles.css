@@ -621,6 +621,13 @@ dialog .article-date{color:#999}
 #checkoutForm input[aria-invalid="true"]{border-color:#e0527a}
 #checkoutForm .field-error{color:#ff6b93;font-size:11px;font-weight:600;min-height:14px}
 #checkoutSubmit:disabled{opacity:.45;cursor:not-allowed}
+/* Fase 39 — copy de ayuda bajo el campo de WhatsApp (sección 2 del
+   brief: deja claro que ese número es el canal real de contacto) y el
+   checkbox de autorización de contacto (sección 3 — nunca mezclado con
+   marketing/newsletter). */
+#checkoutForm .field-help{font-size:11px;color:#999;line-height:1.5;margin:-8px 0 0;font-weight:400}
+#checkoutForm .checkbox-field{display:flex;align-items:flex-start;gap:8px;font-size:12px;font-weight:400;color:#ccc}
+#checkoutForm .checkbox-field input{width:16px;height:16px;margin-top:2px;flex-shrink:0}
 
 /* Fase 29 — carrito: marca (opcional) y precio unitario con el
    promocional tachado cuando aplica, encima del stepper de cantidad. */
@@ -648,11 +655,13 @@ dialog .article-date{color:#999}
 .checkout-line-right{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
 .checkout-summary .total{padding-top:4px}
 
-/* Fase 29, sección 12 — confirmación: nunca afirma compra/pago, solo que
-   el pedido está listo para continuarse por WhatsApp. */
+/* Fase 39 — confirmación: el pedido queda REGISTRADO en VIBE (no solo
+   "listo para enviar por WhatsApp"); nunca afirma pago/confirmación,
+   solo que fue recibido. */
 .checkout-confirmation{padding:40px 28px 32px;text-align:center}
 .checkout-confirmation h3{font-size:22px;margin:6px 0 12px}
 .checkout-confirmation p{color:#aaa;font-size:13px}
+.checkout-confirmation-number{color:#fff !important;font-weight:700;font-size:14px !important}
 .checkout-confirmation-actions{display:flex;gap:10px;justify-content:center;margin-top:22px;flex-wrap:wrap}
 
 footer{padding:40px 0;border-top:1px solid #292929;color:#aaa;font-size:11px;background:var(--bg)}

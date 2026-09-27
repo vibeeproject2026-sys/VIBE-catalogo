@@ -20,8 +20,14 @@ const { requireAdmin } = require("./_lib/auth");
 const { sendJson, sendError, methodNotAllowed } = require("../catalog/_lib/http");
 
 const PRODUCT_COLUMNS = "id,name,price,stock,category";
+// Fase 39 — se agrega `category` (columna editorial, distinta de la
+// `category` del POS): sin esto, el listado de Admin no puede exponer
+// editorialCategory, y el selector de "Categoría" del destino de Hero
+// (que debe reflejar exactamente lo que el público ve vía
+// taxonomy.js#categoryOf) quedaría ciego a cualquier corrección
+// editorial ya cargada (ver migración 0002).
 const METADATA_COLUMNS =
-  "product_id,image,images,short_description,description,benefits,ingredients,usage,presentation,subcategory,brand,badge,search_keywords,featured,editorial_order,published";
+  "product_id,category,image,images,short_description,description,benefits,ingredients,usage,presentation,subcategory,brand,badge,search_keywords,featured,editorial_order,published";
 
 module.exports = async function handler(req, res) {
   if (req.method !== "GET") return methodNotAllowed(res, ["GET"]);
@@ -53,6 +59,10 @@ module.exports = async function handler(req, res) {
         stock: Number(p.stock),
         available: Number(p.stock) > 0,
         hasMetadata: Boolean(m),
+        // Mismo campo y misma precedencia que shapeProduct() en la API
+        // pública (api/catalog/_lib/merge.js) — nunca inferido del
+        // category del POS, null hasta que un admin lo asigne.
+        editorialCategory: m ? m.category ?? null : null,
         subcategory: m ? m.subcategory ?? null : null,
         image: m ? m.image ?? null : null,
         badge: m ? m.badge ?? null : null,

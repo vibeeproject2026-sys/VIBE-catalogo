@@ -25,7 +25,7 @@ import {
   clampQuantity,
 } from "./taxonomy.js";
 import { readStateFromSearch, buildUrl } from "./url-state.js";
-import { computeOrderSummary, validateCheckoutForm, buildWhatsAppMessage, buildWhatsAppUrl } from "./checkout.js";
+import { computeOrderSummary, validateCheckoutForm } from "./checkout.js";
 import {
   getPublishedArticles,
   getArticleBySlug,
@@ -35,10 +35,6 @@ import {
 } from "./editorial.js";
 import { articles as editorialArticles } from "./editorial-content.js";
 
-// Fase 29.1 — número oficial de WhatsApp de VIBE (provisto por Ana:
-// +57 314 349 0825), normalizado al formato que exige wa.me: solo
-// dígitos, con el indicativo de país al frente, sin +/espacios/guiones.
-const WHATSAPP_NUMBER = "573143490825";
 // Fase 27: se agregan los filtros/orden de la PLP. Todos arrancan
 // "apagados" — ningún filtro activo por defecto, igual que antes.
 const DEFAULT_FILTERS = {
@@ -1317,15 +1313,24 @@ function checkoutSummaryHtml(availabilityStale) {
   </div>`;
 }
 
+// Fase 39 — se agregan email y la autorización de contacto (checkbox
+// obligatorio, exclusivo para gestionar ESTE pedido — nunca marketing).
+// El CTA pasa a decir literalmente que se envía el pedido (ya no
+// depende de que el cliente tenga WhatsApp abierto para completarlo).
 function checkoutFormHtml() {
   return `<form id="checkoutForm" novalidate>
     <label>Nombre completo
       <input name="name" autocomplete="name" aria-describedby="err-name">
       <span class="field-error" id="err-name" role="alert"></span>
     </label>
-    <label>WhatsApp
-      <input name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="Ej. 300 123 4567" aria-describedby="err-phone">
+    <label>WhatsApp / celular
+      <input name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="Ej. 300 123 4567" aria-describedby="err-phone phone-help">
       <span class="field-error" id="err-phone" role="alert"></span>
+    </label>
+    <p class="field-help" id="phone-help">📲 Este será nuestro canal de contacto<br>Verifica que el número sea correcto y que esté habilitado para recibir mensajes por WhatsApp. VIBE se comunicará contigo por este medio para confirmar tu pedido, disponibilidad, envío y forma de pago.</p>
+    <label>Correo electrónico
+      <input name="email" type="email" autocomplete="email" aria-describedby="err-email">
+      <span class="field-error" id="err-email" role="alert"></span>
     </label>
     <label>Ciudad
       <input name="city" autocomplete="address-level2" aria-describedby="err-city">
@@ -1336,21 +1341,36 @@ function checkoutFormHtml() {
       <span class="field-error" id="err-address" role="alert"></span>
     </label>
     <label>Observaciones (opcional)<textarea name="notes" rows="3"></textarea></label>
-    <button type="submit" id="checkoutSubmit" class="button dark full">Enviar pedido por WhatsApp</button>
-    <small>Tu pedido se envía por WhatsApp — nada se cobra ni se confirma desde el catálogo.</small>
+    <label class="checkbox-field">
+      <input type="checkbox" name="contactConsent" aria-describedby="err-contactConsent">
+      Autorizo a VIBE a contactarme por WhatsApp al número registrado para gestionar y finalizar mi pedido.
+    </label>
+    <span class="field-error" id="err-contactConsent" role="alert"></span>
+    <button type="submit" id="checkoutSubmit" class="button dark full">ENVIAR PEDIDO</button>
+    <p class="field-error" id="checkoutSubmitError" role="alert"></p>
+    <small>Tu pedido queda registrado en VIBE. Nuestro equipo te contactará por WhatsApp para confirmar disponibilidad, envío y forma de pago.</small>
   </form>`;
 }
 
-// Sección 12 — nunca afirma pedido/pago confirmado: WhatsApp es donde
-// continúa la coordinación real. Sección 13 — no toca el carrito;
-// vaciarlo queda como acción manual y explícita de la clienta.
-function checkoutConfirmationHtml() {
+// Fase 39 — pantalla de confirmación propia de VIBE (ya no "se abrió
+// WhatsApp"): el pedido queda REGISTRADO acá, WhatsApp es un canal de
+// aviso posterior, no una dependencia del checkout. `order` viene de la
+// respuesta real de /api/orders/create — emailSent refleja lo que de
+// verdad ocurrió en este intento; nunca se afirma un envío que no pasó.
+// El carrito ya se vació en el momento en que se llama a esta función
+// (ver el submit handler), así que no hace falta un botón manual de
+// "Vaciar carrito".
+function checkoutConfirmationHtml(order) {
+  const emailNote = order.emailSent
+    ? `Hemos enviado el resumen de tu pedido a ${esc(order.customerEmail)}.`
+    : "Tu pedido quedó registrado correctamente en VIBE.";
   return `<div class="checkout-confirmation">
     <p class="eyebrow">VIBE</p>
-    <h3>Tu pedido está listo para enviar por WhatsApp</h3>
-    <p>Se abrió WhatsApp con tu pedido armado. Continúa la conversación allí para coordinar el pago y la entrega.</p>
+    <h3>¡Listo! Tu pedido llegó a VIBE 💗</h3>
+    <p class="checkout-confirmation-number">Pedido #${esc(order.id)} · Total ${money(order.total)}</p>
+    <p>${emailNote}</p>
+    <p>Nuestro equipo se pondrá en contacto contigo por WhatsApp al número terminado en ${esc(order.customerPhoneLast4)} para confirmar disponibilidad, envío y forma de pago.</p>
     <div class="checkout-confirmation-actions">
-      <button type="button" class="button outline" id="checkoutClearCart">Vaciar carrito</button>
       <button type="button" class="button dark" id="checkoutKeepShopping">Seguir explorando</button>
     </div>
   </div>`;
@@ -1394,23 +1414,27 @@ $("#checkoutDialog").addEventListener("click", (e) => {
     renderCheckoutForm();
     return;
   }
-  if (e.target.id === "checkoutClearCart") {
-    clearCart();
-    renderCart();
-    $("#checkoutDialog").close();
-    return;
-  }
   if (e.target.id === "checkoutKeepShopping") {
     $("#checkoutDialog").close();
   }
 });
 
-$("#checkoutDialog").addEventListener("submit", (e) => {
+// Fase 39 — reemplaza la apertura de WhatsApp desde el navegador por un
+// pedido real: POST a /api/orders/create, que revalida
+// disponibilidad/precio server-side, persiste el pedido en Supabase, e
+// intenta (sin bloquear ni fingir éxito) el email de confirmación y el
+// aviso por WhatsApp Business a VIBE. El carrito solo se vacía en la
+// rama de éxito — antes nada estaba realmente confirmado así que vaciar
+// era una acción manual; ahora el pedido queda persistido de verdad en
+// el primer intento exitoso.
+$("#checkoutDialog").addEventListener("submit", async (e) => {
   if (!e.target.closest("#checkoutForm")) return;
   e.preventDefault();
 
   const form = e.target;
-  const data = Object.fromEntries(new FormData(form));
+  const fd = new FormData(form);
+  const data = Object.fromEntries(fd);
+  data.contactConsent = fd.get("contactConsent") === "on";
   const { valid, errors } = validateCheckoutForm(data);
 
   form.querySelectorAll(".field-error").forEach((el) => (el.textContent = ""));
@@ -1431,24 +1455,50 @@ $("#checkoutDialog").addEventListener("submit", (e) => {
     return;
   }
 
-  if (WHATSAPP_NUMBER.includes("X")) {
-    alert("Configura el número de WhatsApp de VIBE en js/app.js antes de publicar.");
-    return;
-  }
-
   const lines = cartLinesWithAvailability();
   if (lines.some((l) => l.unavailable)) return; // el botón ya está deshabilitado en este caso — guarda extra.
 
-  const summary = computeOrderSummary(lines);
-  const message = buildWhatsAppMessage(summary, data);
-  const url = buildWhatsAppUrl(WHATSAPP_NUMBER, message);
-  window.open(url, "_blank");
+  const submitBtn = $("#checkoutSubmit");
+  const errorEl = $("#checkoutSubmitError");
+  if (errorEl) errorEl.textContent = "";
+  // Protección de doble-submit: el flujo anterior era síncrono y no
+  // tenía este riesgo; el nuevo flujo async introduce una ventana real
+  // entre el click y la respuesta del servidor.
+  submitBtn.disabled = true;
+  submitBtn.textContent = "Enviando...";
 
-  renderCheckoutConfirmation();
+  try {
+    const res = await fetch("/api/orders/create", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        customer: { name: data.name, phone: data.phone, email: data.email, city: data.city, address: data.address, notes: data.notes },
+        contactConsent: data.contactConsent,
+        items: lines.map((l) => ({ productId: l.productId, variantId: l.variantId, variantName: l.variantName, sku: l.sku, quantity: l.quantity })),
+      }),
+    });
+    const payload = await res.json().catch(() => null);
+
+    if (!res.ok) {
+      if (errorEl) errorEl.textContent = (payload && payload.error) || "No se pudo enviar tu pedido. Intenta de nuevo.";
+      submitBtn.disabled = false;
+      submitBtn.textContent = "ENVIAR PEDIDO";
+      return;
+    }
+
+    clearCart();
+    renderCart();
+    renderCheckoutConfirmation(payload);
+  } catch (err) {
+    console.error("[VIBE] Error de red al enviar el pedido.", err);
+    if (errorEl) errorEl.textContent = "No se pudo enviar tu pedido. Revisa tu conexión e intenta de nuevo.";
+    submitBtn.disabled = false;
+    submitBtn.textContent = "ENVIAR PEDIDO";
+  }
 });
 
-function renderCheckoutConfirmation() {
-  $("#checkoutBody").innerHTML = checkoutConfirmationHtml();
+function renderCheckoutConfirmation(order) {
+  $("#checkoutBody").innerHTML = checkoutConfirmationHtml(order);
 }
 
 $("#menuToggle").addEventListener("click", () => {

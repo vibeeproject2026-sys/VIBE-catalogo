@@ -30,6 +30,7 @@
   <nav class="admin-tabs" id="adminTabs">
     <button type="button" class="admin-tab active" id="tabProducts" data-view="products">Productos</button>
     <button type="button" class="admin-tab" id="tabHero" data-view="hero">Carrusel Hero</button>
+    <button type="button" class="admin-tab" id="tabOrders" data-view="orders">Pedidos</button>
   </nav>
   <button id="logoutButton" class="button outline-admin">Salir</button>
 </header>
@@ -91,6 +92,37 @@
         </tr>
       </thead>
       <tbody id="heroRows"></tbody>
+    </table>
+  </div>
+</main>
+
+<!-- Fase 39 — pestaña de solo lectura: mientras no exista una
+     credencial real de email/WhatsApp Business, este es el único lugar
+     donde Ana puede ver los pedidos entrantes sin entrar directo al
+     Table Editor de Supabase. Sin acciones, sin edición de estado. -->
+<main id="ordersApp" class="admin-main hidden">
+  <section class="toolbar">
+    <p class="hero-admin-hint">Pedidos recibidos, más reciente primero. Sin edición de estado — la gestión sigue siendo por WhatsApp.</p>
+  </section>
+
+  <p id="ordersLoadError" class="login-error hidden"></p>
+
+  <div class="table-wrap">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>Fecha</th>
+          <th>Cliente</th>
+          <th>WhatsApp</th>
+          <th>Email</th>
+          <th>Ciudad</th>
+          <th>Total</th>
+          <th>Estado</th>
+          <th>Email enviado</th>
+          <th>WhatsApp enviado</th>
+        </tr>
+      </thead>
+      <tbody id="ordersRows"></tbody>
     </table>
   </div>
 </main>
