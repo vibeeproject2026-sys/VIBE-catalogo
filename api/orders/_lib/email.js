@@ -120,7 +120,15 @@ async function sendEmail({ to, subject, html, text }, fetchImpl = fetch) {
       body: JSON.stringify({ from, to, subject, html, text }),
     });
     if (!res.ok) {
-      console.error("[orders/email] Resend respondió " + res.status + " al intentar enviar la confirmación.");
+      // Diagnóstico Fase 39.1 — antes solo se logueaba el status HTTP.
+      // Resend siempre devuelve un JSON {name, message} explicando la
+      // causa exacta del rechazo (dominio no verificado, remitente no
+      // permitido, etc.) — nunca contiene la API key ni ningún secreto,
+      // así que es seguro loguearlo completo para poder diagnosticar sin
+      // adivinar. Nunca se expone en la respuesta al cliente, solo en
+      // los logs del servidor.
+      const body = typeof res.text === "function" ? await res.text().catch(() => "") : "";
+      console.error("[orders/email] Resend respondió " + res.status + " al intentar enviar la confirmación: " + body.slice(0, 500));
       return { sent: false, reason: "EMAIL_SEND_FAILED" };
     }
     return { sent: true };

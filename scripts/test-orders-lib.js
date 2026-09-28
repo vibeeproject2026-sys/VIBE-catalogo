@@ -204,6 +204,27 @@ async function main() {
       assert.deepEqual(result, { sent: false, reason: "EMAIL_SEND_FAILED" });
     });
   });
+  await test("un fallo de Resend sin método .text() en la respuesta no rompe el diagnóstico (mock defensivo)", async () => {
+    await withEnv({ RESEND_API_KEY: "re_test", EMAIL_FROM_ADDRESS: "pedidos@vibe.test" }, async () => {
+      const result = await sendEmail({ to: "a@b.com", subject: "x", html: "x", text: "x" }, async () => ({ ok: false, status: 403 }));
+      assert.deepEqual(result, { sent: false, reason: "EMAIL_SEND_FAILED" });
+    });
+  });
+  await test("el cuerpo del error real de Resend (403 dominio no verificado) se lee para diagnóstico, sin romper el flujo", async () => {
+    await withEnv({ RESEND_API_KEY: "re_test", EMAIL_FROM_ADDRESS: "onboarding@resend.dev" }, async () => {
+      const resendErrorBody = JSON.stringify({
+        statusCode: 403,
+        message: "You can only send testing emails to your own email address (owner@example.com). To send emails to other recipients, please verify a domain at resend.com/domains, and change the `from` address to an email using this domain.",
+        name: "validation_error",
+      });
+      const result = await sendEmail({ to: "cliente-real@gmail.com", subject: "x", html: "x", text: "x" }, async () => ({
+        ok: false,
+        status: 403,
+        text: async () => resendErrorBody,
+      }));
+      assert.deepEqual(result, { sent: false, reason: "EMAIL_SEND_FAILED" });
+    });
+  });
 
   console.log("\nbuildOrderNotificationMessage — aviso a VIBE (Fase 39, sección 7)");
   test("incluye el encabezado, número de pedido, datos del cliente e instrucción de contactar", () => {
