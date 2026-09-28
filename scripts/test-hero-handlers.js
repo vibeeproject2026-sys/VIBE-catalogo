@@ -225,6 +225,99 @@ async function main() {
     });
   });
 
+  console.log("\nDestino de clic — linkType/linkTarget (Fase 39)");
+
+  await test("POST persiste linkType/linkTarget (guarda de regresión: el literal del POST no hace spread, se olvidó una vez)", async () => {
+    await withEnv(BASE_ENV, async () => {
+      const { fetchImpl } = mockStorage();
+      const originalFetch = global.fetch;
+      global.fetch = fetchImpl;
+      try {
+        const res = mockRes();
+        await adminHandler({ method: "POST", headers: AUTH, body: { title: "X", linkType: "category", linkTarget: "Rostro" } }, res);
+        assert.equal(res.statusCode, 200);
+        assert.equal(res.body.slide.linkType, "category");
+        assert.equal(res.body.slide.linkTarget, "Rostro");
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
+  });
+
+  await test("linkType inválido -> 400, no se crea el slide", async () => {
+    await withEnv(BASE_ENV, async () => {
+      const { fetchImpl, calls } = mockStorage();
+      const originalFetch = global.fetch;
+      global.fetch = fetchImpl;
+      try {
+        const res = mockRes();
+        await adminHandler({ method: "POST", headers: AUTH, body: { title: "X", linkType: "algo-invalido" } }, res);
+        assert.equal(res.statusCode, 400);
+        assert.equal(calls.uploads.length, 0);
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
+  });
+
+  await test("linkType 'category' sin linkTarget -> 400 (linkTarget no corresponde con el linkType elegido)", async () => {
+    await withEnv(BASE_ENV, async () => {
+      const { fetchImpl, calls } = mockStorage();
+      const originalFetch = global.fetch;
+      global.fetch = fetchImpl;
+      try {
+        const res = mockRes();
+        await adminHandler({ method: "POST", headers: AUTH, body: { title: "X", linkType: "category" } }, res);
+        assert.equal(res.statusCode, 400);
+        assert.equal(calls.uploads.length, 0);
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
+  });
+
+  await test("PATCH actualiza linkType/linkTarget de un slide existente (el PATCH ya hace spread, sigue funcionando)", async () => {
+    await withEnv(BASE_ENV, async () => {
+      const { fetchImpl } = mockStorage();
+      const originalFetch = global.fetch;
+      global.fetch = fetchImpl;
+      try {
+        const created = mockRes();
+        await adminHandler({ method: "POST", headers: AUTH, body: { title: "X" } }, created);
+        const id = created.body.slide.id;
+
+        const patched = mockRes();
+        await adminHandler({ method: "PATCH", headers: AUTH, body: { id, linkType: "product", linkTarget: "122" } }, patched);
+        assert.equal(patched.statusCode, 200);
+        assert.equal(patched.body.slide.linkType, "product");
+        assert.equal(patched.body.slide.linkTarget, "122");
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
+  });
+
+  await test("linkType/linkTarget reales se reflejan en el endpoint público una vez el slide está activo", async () => {
+    await withEnv(BASE_ENV, async () => {
+      const { fetchImpl } = mockStorage();
+      const originalFetch = global.fetch;
+      global.fetch = fetchImpl;
+      try {
+        const created = mockRes();
+        await adminHandler({ method: "POST", headers: AUTH, body: { title: "X", linkType: "section", linkTarget: "discover" } }, created);
+        const id = created.body.slide.id;
+        await adminHandler({ method: "PATCH", headers: AUTH, body: { id, active: true } }, mockRes());
+
+        const res = mockRes();
+        await publicHandler({ method: "GET", headers: {}, query: {} }, res);
+        assert.equal(res.body.slides[0].linkType, "section");
+        assert.equal(res.body.slides[0].linkTarget, "discover");
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
+  });
+
   console.log("\nCTA (sección 7)");
 
   await test("ctaHref peligroso (javascript:) -> 400, no se crea el slide", async () => {

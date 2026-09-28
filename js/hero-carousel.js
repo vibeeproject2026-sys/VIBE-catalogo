@@ -15,6 +15,7 @@
 // vacío en su primera sección. Un solo slide real activo ya reemplaza
 // por completo al fallback (no se mezclan).
 import { getHeroSlides } from "./hero-source.js";
+import { buildSlideHref } from "./hero-links.js";
 
 const FALLBACK_HERO_SLIDES = [
   { image: "assets/hero/slide-1.svg", alt: "Nueva colección VIBE", ctaHref: "#catalogo", order: 1, active: true },
@@ -33,11 +34,21 @@ const esc = (s) => String(s ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt
 // overlay). El overlay solo aparece si el admin cargó al menos uno de
 // estos campos. mobileImage también es opcional: si no existe, se usa
 // la misma imagen en todos los tamaños (comportamiento actual).
+//
+// Fase 39 — destino de clic configurable (linkType/linkTarget, ver
+// js/hero-links.js#buildSlideHref): sin linkType (slides existentes)
+// cae al comportamiento de siempre (ctaHref || "#catalogo"). Con
+// linkType==="none", el resultado es null y el slide se renderiza como
+// un contenedor no interactivo (nunca un <a>) — "si no tiene enlace →
+// no navegar", sin convertir los casos CON enlace en un div con
+// onClick (esos siguen siendo un <a> real, con foco de teclado nativo).
 function heroSlideHtml(s, i) {
-  const href = s.ctaHref || "#catalogo";
+  const href = buildSlideHref(s);
   const hasMobileVariant = s.mobileImage && s.mobileImage !== s.image;
   const hasCopy = s.eyebrow || s.title || s.subtitle || s.ctaText;
-  return `<a class="hero-slide${i === 0 ? " active" : ""}" href="${esc(href)}" data-index="${i}">
+  const tag = href ? "a" : "div";
+  const hrefAttr = href ? ` href="${esc(href)}"` : "";
+  return `<${tag} class="hero-slide${i === 0 ? " active" : ""}"${hrefAttr} data-index="${i}">
     <picture>
       ${hasMobileVariant ? `<source media="(max-width: 640px)" srcset="${esc(s.mobileImage)}">` : ""}
       <img src="${esc(s.image)}" alt="${esc(s.alt || "")}" loading="${i === 0 ? "eager" : "lazy"}">
@@ -52,7 +63,7 @@ function heroSlideHtml(s, i) {
     </div>`
         : ""
     }
-  </a>`;
+  </${tag}>`;
 }
 
 async function resolveSlides() {

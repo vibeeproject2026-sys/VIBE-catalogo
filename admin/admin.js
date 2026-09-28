@@ -1,11 +1,23 @@
 // VIBE — Panel editorial (frontend). Talks only to /api/admin/*,
 // never to /api/catalog/* and never imports js/app.js or
-// js/data-source.js — completely separate from the public catalog.
+// js/data-source.js — completely separate from the public catalog's
+// state/rendering machinery.
+//
+// Fase 39 — única excepción deliberada: importa dos funciones PURAS de
+// js/taxonomy.js (getCategoriesInGroup/getSubcategories — sin DOM, sin
+// red, sin estado del catálogo) para poblar los selects de destino del
+// editor de Hero con los mismos valores reales que ya usa el sitio
+// público, y js/hero-links.js (igual de puro) para no duplicar cómo se
+// calcula un href/preview de destino entre el editor y el carrusel
+// real.
 //
 // The admin token is entered once and kept in sessionStorage (cleared
 // when the tab closes) — never in localStorage, never hardcoded, never
 // sent anywhere except as the Authorization header on /api/admin/*
 // requests.
+
+import { getCategoriesInGroup, getSubcategories } from "../js/taxonomy.js";
+import { SECTION_DESTINATIONS, describeSlideDestination } from "../js/hero-links.js";
 
 const TOKEN_KEY = "vibe_admin_token";
 const $ = (s) => document.querySelector(s);
@@ -844,6 +856,128 @@ async function reorderSlides(updates) {
   return payload;
 }
 
+// Fase 39 — construye las opciones de cada sub-selector del destino de
+// Hero a partir de state.products (los mismos productos ya cargados
+// para la pestaña Productos) — nunca un enum inventado, así que el
+// editor de Hero nunca puede ofrecer un valor que el catálogo público
+// no reconocería.
+function heroLinkCategoryOptions(selected) {
+  return getCategoriesInGroup(state.products)
+    .map((c) => `<option value="${esc(c)}" ${selected === c ? "selected" : ""}>${esc(c)}</option>`)
+    .join("");
+}
+
+function heroLinkSubcategoryOptions(selected) {
+  const pairs = [];
+  getCategoriesInGroup(state.products).forEach((c) => {
+    getSubcategories(state.products, undefined, c).forEach((sub) => pairs.push({ category: c, subcategory: sub }));
+  });
+  return pairs
+    .map((p) => {
+      const value = `${p.category}::${p.subcategory}`;
+      return `<option value="${esc(value)}" ${selected === value ? "selected" : ""}>${esc(p.category)} › ${esc(p.subcategory)}</option>`;
+    })
+    .join("");
+}
+
+function heroLinkProductOptions(selected) {
+  return state.products
+    .slice()
+    .sort((a, b) => a.name.localeCompare(b.name, "es"))
+    .map((p) => `<option value="${p.id}" ${String(selected) === String(p.id) ? "selected" : ""}>#${p.id} — ${esc(p.name)}</option>`)
+    .join("");
+}
+
+function heroLinkSectionOptions(selected) {
+  return Object.entries(SECTION_DESTINATIONS)
+    .map(([id, label]) => `<option value="${id}" ${selected === id ? "selected" : ""}>${esc(label)}</option>`)
+    .join("");
+}
+
+// Fase 39 — un slide sin linkType configurado (legado, previo a esta
+// fase) se representa acá como "internal_route" (reusa ctaHref, que es
+// exactamente lo que ese slide ya hace hoy) en vez de "Sin enlace" — si
+// el admin abre un slide legado y lo guarda por otro motivo (ej. solo
+// cambiar el orden/activo) sin tocar este fieldset nuevo, el resultado
+// debe seguir siendo el mismo comportamiento de siempre, nunca un slide
+// que de repente deja de navegar a ningún lado.
+function heroLinkFieldsetHtml(s) {
+  const linkType = s.linkType || "internal_route";
+  const selectedCategory = linkType === "category" ? s.linkTarget || "" : "";
+  const selectedSubcategoryValue = linkType === "subcategory" && s.linkTarget ? `${s.linkTarget.category}::${s.linkTarget.subcategory}` : "";
+  const selectedProduct = linkType === "product" ? s.linkTarget || "" : "";
+  const selectedSection = linkType === "section" ? s.linkTarget || "" : "";
+
+  return `<fieldset class="hero-link-fieldset">
+    <legend>Destino al hacer clic</legend>
+    <label>Tipo de destino
+      <select name="link_type">
+        <option value="none" ${linkType === "none" ? "selected" : ""}>Sin enlace</option>
+        <option value="category" ${linkType === "category" ? "selected" : ""}>Categoría</option>
+        <option value="subcategory" ${linkType === "subcategory" ? "selected" : ""}>Subcategoría</option>
+        <option value="product" ${linkType === "product" ? "selected" : ""}>Producto</option>
+        <option value="section" ${linkType === "section" ? "selected" : ""}>Sección</option>
+        <option value="internal_route" ${linkType === "internal_route" ? "selected" : ""}>Ruta interna (usa "Destino del CTA" de arriba)</option>
+      </select>
+    </label>
+    <label class="hero-link-sub${linkType === "category" ? "" : " hidden"}" data-link-type="category">Categoría
+      <select name="link_category">
+        <option value="">Selecciona una categoría...</option>
+        ${heroLinkCategoryOptions(selectedCategory)}
+      </select>
+    </label>
+    <label class="hero-link-sub${linkType === "subcategory" ? "" : " hidden"}" data-link-type="subcategory">Subcategoría
+      <select name="link_subcategory">
+        <option value="">Selecciona una subcategoría...</option>
+        ${heroLinkSubcategoryOptions(selectedSubcategoryValue)}
+      </select>
+    </label>
+    <label class="hero-link-sub${linkType === "product" ? "" : " hidden"}" data-link-type="product">Producto
+      <select name="link_product">
+        <option value="">Buscar producto...</option>
+        ${heroLinkProductOptions(selectedProduct)}
+      </select>
+    </label>
+    <label class="hero-link-sub${linkType === "section" ? "" : " hidden"}" data-link-type="section">Sección
+      <select name="link_section">
+        <option value="">Selecciona una sección...</option>
+        ${heroLinkSectionOptions(selectedSection)}
+      </select>
+    </label>
+    <p id="heroLinkPreview" class="section-hint"></p>
+  </fieldset>`;
+}
+
+// Comparte la misma lógica de "qué linkTarget corresponde a este
+// linkType" entre el preview en vivo y el submit real — nunca se
+// duplica el parseo entre los dos.
+function parseHeroLinkFromForm(fd) {
+  const linkType = fd.get("link_type") || "internal_route";
+  let linkTarget = null;
+  if (linkType === "category") linkTarget = fd.get("link_category") || null;
+  else if (linkType === "subcategory") {
+    const raw = fd.get("link_subcategory") || "";
+    const [category, subcategory] = raw.split("::");
+    linkTarget = subcategory ? { category, subcategory } : null;
+  } else if (linkType === "product") linkTarget = fd.get("link_product") || null;
+  else if (linkType === "section") linkTarget = fd.get("link_section") || null;
+  return { linkType, linkTarget };
+}
+
+function updateHeroLinkVisibility() {
+  const form = $("#heroEditForm");
+  if (!form) return;
+  const fd = new FormData(form);
+  const { linkType, linkTarget } = parseHeroLinkFromForm(fd);
+  form.querySelectorAll(".hero-link-sub").forEach((el) => {
+    el.classList.toggle("hidden", el.dataset.linkType !== linkType);
+  });
+  const preview = $("#heroLinkPreview");
+  if (preview) {
+    preview.textContent = "Destino: " + describeSlideDestination({ linkType, linkTarget, ctaHref: fd.get("cta_href") });
+  }
+}
+
 function heroPreviewHtml(fields) {
   const hasCopy = fields.eyebrow || fields.title || fields.subtitle || fields.ctaText;
   return `<div class="hero-preview">
@@ -972,6 +1106,7 @@ function openHeroEdit(slide) {
         <label>Texto del CTA<input name="cta_text" value="${esc(s.ctaText || "")}" placeholder="Ej. Explorar catálogo"></label>
         <label>Destino del CTA<input name="cta_href" value="${esc(s.ctaHref || "")}" placeholder="#catalogo, /discover, o https://..."></label>
       </div>
+      ${heroLinkFieldsetHtml(s)}
       <label>Texto alternativo (accesibilidad)<input name="alt" value="${esc(s.alt || "")}" placeholder="Describe la imagen para lectores de pantalla."></label>
       <label class="checkbox-field"><input type="checkbox" name="active" ${s.active ? "checked" : ""}> Activo (visible en Home)</label>
       <div class="save-row">
@@ -983,10 +1118,13 @@ function openHeroEdit(slide) {
   `;
 
   $("#heroEditForm").addEventListener("input", updateHeroPreview);
+  $("#heroEditForm").addEventListener("input", updateHeroLinkVisibility);
+  updateHeroLinkVisibility();
 
   $("#heroEditForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
+    const { linkType, linkTarget } = parseHeroLinkFromForm(fd);
     const fields = {
       eyebrow: fd.get("eyebrow") || null,
       title: fd.get("title") || null,
@@ -995,6 +1133,8 @@ function openHeroEdit(slide) {
       ctaHref: fd.get("cta_href") || null,
       alt: fd.get("alt") || null,
       active: fd.get("active") === "on",
+      linkType,
+      linkTarget,
     };
     $("#heroSaveStatus").textContent = "Guardando...";
     const saved = await patchSlide(s.id, fields);
@@ -1016,7 +1156,16 @@ function openHeroEdit(slide) {
       setImageStatus(statusEl, "error", "No se guardó la imagen. Motivo: selecciona un archivo primero.");
       return;
     }
-    e.currentTarget.disabled = true;
+    // Fase 39 — bug real encontrado al probar creación repetida de
+    // slides: `Event.currentTarget` deja de apuntar al elemento una vez
+    // que el listener async pasa su primer `await` (así lo define el
+    // spec de DOM Events — el navegador lo resetea a null apenas
+    // termina el despacho síncrono del evento). El `finally` de abajo
+    // corría con `e.currentTarget === null`, lanzaba silenciosamente, y
+    // el botón quedaba deshabilitado para siempre. Se captura la
+    // referencia real ANTES del await.
+    const btn = e.currentTarget;
+    btn.disabled = true;
     try {
       const updated = await uploadHeroImage(s.id, file, "desktop", statusEl);
       if (updated) {
@@ -1025,7 +1174,7 @@ function openHeroEdit(slide) {
         await loadHeroSlides();
       }
     } finally {
-      e.currentTarget.disabled = false;
+      btn.disabled = false;
     }
   });
   $("#uploadHeroMobileBtn").addEventListener("click", async (e) => {
@@ -1035,7 +1184,8 @@ function openHeroEdit(slide) {
       setImageStatus(statusEl, "error", "No se guardó la imagen. Motivo: selecciona un archivo primero.");
       return;
     }
-    e.currentTarget.disabled = true;
+    const btn = e.currentTarget; // ver comentario arriba (mismo bug/fix)
+    btn.disabled = true;
     try {
       const updated = await uploadHeroImage(s.id, file, "mobile", statusEl);
       if (updated) {
@@ -1047,7 +1197,7 @@ function openHeroEdit(slide) {
         await loadHeroSlides();
       }
     } finally {
-      e.currentTarget.disabled = false;
+      btn.disabled = false;
     }
   });
 
@@ -1118,7 +1268,16 @@ $("#tabHero").addEventListener("click", () => switchAdminView("hero"));
 $("#tabOrders").addEventListener("click", () => switchAdminView("orders"));
 $("#newSlideBtn").addEventListener("click", async (e) => {
   if (e.currentTarget.disabled) return;
-  e.currentTarget.disabled = true;
+  // Fase 39 — bug real encontrado al probar la creación de varios
+  // slides en una sola sesión: `e.currentTarget` deja de ser válido
+  // (el navegador lo resetea a null) apenas el listener async cruza su
+  // primer `await` — el `finally` de abajo corría entonces con
+  // `e.currentTarget === null`, lanzaba silenciosamente, y el botón
+  // quedaba deshabilitado para siempre (había que refrescar la página
+  // completa para poder crear un segundo slide). Se captura la
+  // referencia real ANTES de cualquier await.
+  const btn = e.currentTarget;
+  btn.disabled = true;
   try {
     // Crea el draft en el servidor ANTES de abrir el diálogo — nunca hay
     // upload UI para un slide que todavía no existe (ver comentario arriba
@@ -1141,7 +1300,7 @@ $("#newSlideBtn").addEventListener("click", async (e) => {
     await loadHeroSlides();
     openHeroEdit(payload.slide);
   } finally {
-    e.currentTarget.disabled = false;
+    btn.disabled = false;
   }
 });
 $("#closeHeroEdit").addEventListener("click", () => $("#heroEditDialog").close());

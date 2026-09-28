@@ -29,6 +29,8 @@ const {
   loadSlidesUntilFound,
   saveSlides,
   isSafeCtaHref,
+  isValidLinkType,
+  isValidLinkTarget,
   makeSlideId,
   nextOrder,
   pickSlideFields,
@@ -36,6 +38,20 @@ const {
   pathFromUrl,
   deleteObject,
 } = require("../_lib/heroSlides");
+
+// Fase 39 — misma validación en los dos puntos de entrada (POST/PATCH):
+// linkType debe ser uno de los valores del enum (o ausente/null), y
+// linkTarget debe tener la forma correcta para ese linkType. Nunca una
+// validación referencial (ver comentario en _lib/heroSlides.js).
+function validateLinkFields(fields) {
+  if ("linkType" in fields && !isValidLinkType(fields.linkType)) {
+    return "linkType inválido.";
+  }
+  if (("linkType" in fields || "linkTarget" in fields) && !isValidLinkTarget(fields.linkType, fields.linkTarget)) {
+    return "linkTarget no corresponde con el linkType elegido.";
+  }
+  return null;
+}
 
 module.exports = async function handler(req, res) {
   if (!["GET", "POST", "PATCH", "DELETE"].includes(req.method)) {
@@ -69,6 +85,8 @@ module.exports = async function handler(req, res) {
     if (!isSafeCtaHref(fields.ctaHref)) {
       return sendError(res, 400, "Destino de CTA no permitido. Usa una ruta interna (/, #) o una URL http(s) válida.");
     }
+    const linkError = validateLinkFields(fields);
+    if (linkError) return sendError(res, 400, linkError);
     try {
       const slides = await loadSlides(env);
       const now = new Date().toISOString();
@@ -84,6 +102,13 @@ module.exports = async function handler(req, res) {
         alt: fields.alt ?? null,
         order: nextOrder(slides),
         active: false,
+        // Fase 39 — destino de clic configurable (ver _lib/heroSlides.js).
+        // Al igual que el resto de este objeto, se lista explícitamente
+        // (este literal nunca hace `...fields`) — omitir esto aquí haría
+        // que un slide nuevo perdiera silenciosamente el destino elegido
+        // en su primer guardado, aunque SLIDE_FIELDS ya lo permita.
+        linkType: fields.linkType ?? null,
+        linkTarget: fields.linkTarget ?? null,
         createdAt: now,
         updatedAt: now,
       };
@@ -160,6 +185,8 @@ module.exports = async function handler(req, res) {
     if ("ctaHref" in fields && !isSafeCtaHref(fields.ctaHref)) {
       return sendError(res, 400, "Destino de CTA no permitido. Usa una ruta interna (/, #) o una URL http(s) válida.");
     }
+    const linkError = validateLinkFields(fields);
+    if (linkError) return sendError(res, 400, linkError);
     const updated = { ...slides[index], ...fields, updatedAt: new Date().toISOString() };
     const next = [...slides];
     next[index] = updated;

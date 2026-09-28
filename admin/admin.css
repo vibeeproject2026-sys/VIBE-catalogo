@@ -111,6 +111,14 @@ dialog::backdrop{background:#000a}
 .edit-row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
 .checkbox-field{display:flex;align-items:center;gap:8px;flex-direction:row}
 .checkbox-field input{width:16px;height:16px}
+
+/* Fase 39 — fieldset de destino de clic del Hero: mismo look que el
+   resto de .edit-form (labels/selects), con un borde sutil propio para
+   agruparlo visualmente sin destacar de más. */
+.hero-link-fieldset{border:1px solid #e5e5e5;border-radius:10px;padding:14px 16px 16px;display:grid;gap:12px;margin:0}
+.hero-link-fieldset legend{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--pink);padding:0 6px}
+.hero-link-sub.hidden{display:none}
+#heroLinkPreview{margin:0;font-size:12px;color:#666;font-weight:400}
 .image-hint{font-size:11px;color:#999;font-weight:400}
 .save-row{display:flex;justify-content:flex-end;gap:10px;padding-top:6px;border-top:1px solid #eee}
 .save-status{font-size:12px;color:#777;align-self:center}

@@ -20,7 +20,56 @@ const MANIFEST_PATH = "hero/slides.json";
 // EDITORIAL_FIELDS en api/admin/_lib/editorialFields.js, esto es lo que
 // realmente impide que cualquier otra clave (o un intento de escribir
 // products/categories) llegue al manifiesto.
-const SLIDE_FIELDS = ["image", "mobileImage", "eyebrow", "title", "subtitle", "ctaText", "ctaHref", "alt", "order", "active"];
+//
+// Fase 39 — linkType/linkTarget: destino de clic configurable, además
+// (no en reemplazo) de ctaHref. Ver isValidLinkType/isValidLinkTarget
+// más abajo para la validación estructural — este archivo nunca valida
+// que un valor de categoría/subcategoría/producto exista de verdad (eso
+// mantendría un acoplamiento con products/categories que este módulo
+// deliberadamente no tiene); esa corrección referencial vive enteramente
+// en Admin, que solo ofrece valores reales en sus selects.
+const SLIDE_FIELDS = ["image", "mobileImage", "eyebrow", "title", "subtitle", "ctaText", "ctaHref", "alt", "order", "active", "linkType", "linkTarget"];
+
+const LINK_TYPES = ["none", "category", "subcategory", "product", "section", "internal_route"];
+const MAX_LINK_TARGET_LENGTH = 200;
+
+function isValidLinkType(linkType) {
+  return linkType === null || linkType === undefined || LINK_TYPES.includes(linkType);
+}
+
+// Estructural, no referencial (ver comentario de SLIDE_FIELDS arriba).
+// - none/internal_route: no necesitan linkTarget (internal_route usa
+//   ctaHref, ya validado por isSafeCtaHref).
+// - category/product/section: un string no vacío y de largo razonable.
+// - subcategory: un objeto {category, subcategory}, ambas claves string
+//   no vacías — necesario para desambiguar (dos categorías distintas
+//   podrían compartir el mismo nombre de subcategoría), igual que
+//   getSubcategories(products, group, category) ya exige category en
+//   js/taxonomy.js.
+const LINK_TYPES_REQUIRING_TARGET = ["category", "subcategory", "product", "section"];
+
+function isValidLinkTarget(linkType, linkTarget) {
+  if (linkTarget === null || linkTarget === undefined) {
+    return !LINK_TYPES_REQUIRING_TARGET.includes(linkType);
+  }
+  if (linkType === "category" || linkType === "product" || linkType === "section") {
+    return typeof linkTarget === "string" && linkTarget.trim().length > 0 && linkTarget.length <= MAX_LINK_TARGET_LENGTH;
+  }
+  if (linkType === "subcategory") {
+    return (
+      linkTarget &&
+      typeof linkTarget === "object" &&
+      typeof linkTarget.category === "string" &&
+      linkTarget.category.trim().length > 0 &&
+      typeof linkTarget.subcategory === "string" &&
+      linkTarget.subcategory.trim().length > 0
+    );
+  }
+  // none/internal_route/sin linkType: cualquier linkTarget presente es
+  // simplemente ignorado por buildSlideHref (js/hero-links.js), así que
+  // no hace falta rechazarlo acá — pero tampoco se usa para nada.
+  return true;
+}
 
 function makeSlideId() {
   return `hero-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -117,6 +166,8 @@ function shapePublicSlide(s) {
     ctaHref: s.ctaHref ?? null,
     alt: s.alt ?? null,
     order: typeof s.order === "number" ? s.order : null,
+    linkType: s.linkType ?? null,
+    linkTarget: s.linkTarget ?? null,
   };
 }
 
@@ -141,8 +192,11 @@ function buildHeroImagePath(slideId, slot, ext) {
 module.exports = {
   MANIFEST_PATH,
   SLIDE_FIELDS,
+  LINK_TYPES,
   makeSlideId,
   isSafeCtaHref,
+  isValidLinkType,
+  isValidLinkTarget,
   loadSlides,
   loadSlidesUntilFound,
   saveSlides,

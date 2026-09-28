@@ -9,6 +9,8 @@
 const assert = require("assert/strict");
 const {
   isSafeCtaHref,
+  isValidLinkType,
+  isValidLinkTarget,
   getActiveSlides,
   shapePublicSlide,
   nextOrder,
@@ -16,6 +18,7 @@ const {
   makeSlideId,
   buildHeroImagePath,
   SLIDE_FIELDS,
+  LINK_TYPES,
 } = require("../api/_lib/heroSlides");
 const { validateHeroUpload, HERO_DESKTOP_MIN_WIDTH, HERO_DESKTOP_MIN_HEIGHT, HERO_MOBILE_MIN_WIDTH, HERO_MOBILE_MIN_HEIGHT } = require("../api/admin/_lib/imageValidation");
 const { downloadObject } = require("../api/admin/_lib/storage");
@@ -97,13 +100,54 @@ test("slides sin order van al final, de forma estable", () => {
 console.log("shapePublicSlide (sección 10 — nunca expone campos administrativos)");
 test("no incluye createdAt/updatedAt/active", () => {
   const s = shapePublicSlide({ id: "x", image: "i.jpg", active: true, createdAt: "2026-01-01", updatedAt: "2026-01-02" });
-  assert.deepEqual(Object.keys(s).sort(), ["alt", "ctaHref", "ctaText", "eyebrow", "id", "image", "mobileImage", "order", "subtitle", "title"]);
+  assert.deepEqual(
+    Object.keys(s).sort(),
+    ["alt", "ctaHref", "ctaText", "eyebrow", "id", "image", "linkTarget", "linkType", "mobileImage", "order", "subtitle", "title"]
+  );
 });
 test("campos ausentes caen a null, nunca undefined", () => {
   const s = shapePublicSlide({ id: "x", image: "i.jpg" });
   assert.equal(s.title, null);
   assert.equal(s.ctaHref, null);
   assert.equal(s.mobileImage, null);
+  assert.equal(s.linkType, null);
+  assert.equal(s.linkTarget, null);
+});
+test("linkType/linkTarget reales se exponen tal cual (Fase 39)", () => {
+  const s = shapePublicSlide({ id: "x", image: "i.jpg", linkType: "category", linkTarget: "Rostro" });
+  assert.equal(s.linkType, "category");
+  assert.equal(s.linkTarget, "Rostro");
+});
+
+console.log("isValidLinkType / isValidLinkTarget (Fase 39 — destino de clic configurable, validación estructural)");
+test("null/undefined es válido (retrocompatibilidad — slides existentes nunca tuvieron este campo)", () => {
+  assert.equal(isValidLinkType(null), true);
+  assert.equal(isValidLinkType(undefined), true);
+});
+test("acepta exactamente los 6 valores del enum, nada más", () => {
+  LINK_TYPES.forEach((t) => assert.equal(isValidLinkType(t), true));
+  assert.equal(isValidLinkType("otra-cosa"), false);
+  assert.equal(isValidLinkType("Category"), false); // case-sensitive, sin normalización silenciosa
+});
+test("category/product/section exigen un string no vacío", () => {
+  assert.equal(isValidLinkTarget("category", "Rostro"), true);
+  assert.equal(isValidLinkTarget("category", ""), false);
+  assert.equal(isValidLinkTarget("category", null), false);
+  assert.equal(isValidLinkTarget("product", "122"), true);
+  assert.equal(isValidLinkTarget("section", "discover"), true);
+});
+test("subcategory exige el objeto {category, subcategory} completo", () => {
+  assert.equal(isValidLinkTarget("subcategory", { category: "Rostro", subcategory: "Rubor líquido" }), true);
+  assert.equal(isValidLinkTarget("subcategory", { category: "Rostro" }), false);
+  assert.equal(isValidLinkTarget("subcategory", { subcategory: "Rubor líquido" }), false);
+  assert.equal(isValidLinkTarget("subcategory", "Rostro::Rubor líquido"), false); // debe ser objeto, nunca un string compuesto
+});
+test("none/internal_route no exigen linkTarget", () => {
+  assert.equal(isValidLinkTarget("none", null), true);
+  assert.equal(isValidLinkTarget("internal_route", null), true);
+});
+test("un linkTarget absurdamente largo se rechaza (defensa básica, no solo confianza en Admin)", () => {
+  assert.equal(isValidLinkTarget("category", "x".repeat(500)), false);
 });
 
 console.log("nextOrder / makeSlideId / pickSlideFields / buildHeroImagePath");
@@ -122,6 +166,10 @@ test("pickSlideFields solo copia los campos de la whitelist (nunca product_id/na
   assert.deepEqual(Object.keys(picked).sort(), ["active", "title"]);
   assert.equal(SLIDE_FIELDS.includes("title"), true);
   assert.equal(SLIDE_FIELDS.includes("name"), false);
+});
+test("pickSlideFields sí copia linkType/linkTarget cuando vienen en el body (Fase 39)", () => {
+  const picked = pickSlideFields({ title: "Hola", linkType: "category", linkTarget: "Rostro" });
+  assert.deepEqual(Object.keys(picked).sort(), ["linkTarget", "linkType", "title"]);
 });
 test("buildHeroImagePath usa el prefijo hero/{id}/, separado por completo de products/{id}/", () => {
   assert.equal(buildHeroImagePath("hero-abc", "desktop", "webp"), "hero/hero-abc/main.webp");
