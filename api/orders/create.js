@@ -23,7 +23,7 @@ const { applyCors } = require("../catalog/_lib/cors");
 const { sendJson, sendError, methodNotAllowed } = require("../catalog/_lib/http");
 const { validateOrderPayload } = require("./_lib/validate");
 const { insertOrder, markOrderNotifications } = require("./_lib/store");
-const { sendOrderConfirmationEmail } = require("./_lib/email");
+const { sendOrderConfirmationEmail, sendInternalOrderNotificationEmail } = require("./_lib/email");
 const { sendWhatsAppNotification } = require("./_lib/whatsappNotify");
 
 const PRODUCT_COLUMNS = "id,name,price,stock,category,promo_active,promo_price,promo_start,promo_end,promo_text";
@@ -132,7 +132,18 @@ module.exports = async function handler(req, res) {
     return sendError(res, 502, "No se pudo registrar el pedido. Intenta de nuevo.");
   }
 
-  const [emailResult, whatsappResult] = await Promise.all([sendOrderConfirmationEmail(order), sendWhatsAppNotification(order)]);
+  // El aviso interno a VIBE (sendInternalOrderNotificationEmail) es un
+  // correo distinto, a una audiencia distinta (ORDERS_NOTIFICATION_EMAIL,
+  // nunca customer_email) — se intenta en paralelo con el mismo criterio
+  // de "nunca bloquea ni falsea éxito" que ya aplican los otros dos.
+  // Su resultado no se persiste en `orders` (no es un campo que el
+  // brief pida trackear) ni se expone al cliente — solo queda en los
+  // logs del servidor si falla (ver _lib/email.js).
+  const [emailResult, , whatsappResult] = await Promise.all([
+    sendOrderConfirmationEmail(order),
+    sendInternalOrderNotificationEmail(order),
+    sendWhatsAppNotification(order),
+  ]);
 
   await markOrderNotifications(order.id, { emailSent: emailResult.sent, whatsappNotified: whatsappResult.sent }, env);
 

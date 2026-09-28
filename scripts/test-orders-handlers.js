@@ -252,6 +252,85 @@ async function main() {
     });
   });
 
+  await test("con RESEND_API_KEY/EMAIL_FROM_ADDRESS/ORDERS_NOTIFICATION_EMAIL configuradas, se intentan los dos correos (cliente e interno) con destinatarios distintos, y el pedido responde 201 con emailSent:true", async () => {
+    await withEnv(
+      { ...BASE_ENV, RESEND_API_KEY: "re_test", EMAIL_FROM_ADDRESS: "VIBE Beauty <pedidos@vibebeautycol.com>", ORDERS_NOTIFICATION_EMAIL: "ana.vibe@example.com" },
+      async () => {
+        const resendRecipients = [];
+        const originalFetch = global.fetch;
+        global.fetch = async (url, opts) => {
+          const u = String(url);
+          if (u.includes("/rest/v1/products")) return { ok: true, status: 200, text: async () => JSON.stringify([mockRealProduct()]) };
+          if (u.includes("/rest/v1/orders") && opts.method === "POST") {
+            const body = JSON.parse(opts.body);
+            return { ok: true, status: 201, text: async () => JSON.stringify({ ...body, id: 9, created_at: "2026-09-27T00:00:00Z" }) };
+          }
+          if (u.includes("api.resend.com")) {
+            resendRecipients.push(JSON.parse(opts.body).to);
+            return { ok: true, status: 200, text: async () => "{}" };
+          }
+          return { ok: true, status: 204, text: async () => "" };
+        };
+        try {
+          const req = {
+            method: "POST",
+            headers: {},
+            body: { customer: VALID_CUSTOMER, contactConsent: true, items: [{ productId: 1, quantity: 1 }] },
+          };
+          const res = mockRes();
+          await createHandler(req, res);
+          assert.equal(res.statusCode, 201);
+          assert.equal(res.body.emailSent, true);
+          assert.equal(resendRecipients.length, 2, "deberían intentarse exactamente 2 envíos a Resend (cliente + interno)");
+          assert.ok(resendRecipients.includes(VALID_CUSTOMER.email), "el cliente debe recibir su propio correo");
+          assert.ok(resendRecipients.includes("ana.vibe@example.com"), "VIBE debe recibir el aviso interno en ORDERS_NOTIFICATION_EMAIL");
+        } finally {
+          global.fetch = originalFetch;
+        }
+      }
+    );
+  });
+
+  await test("si Resend falla, el pedido sigue registrándose (201) y email_sent queda false — el checkout nunca se rompe por el email (items 15/16/17)", async () => {
+    await withEnv(
+      { ...BASE_ENV, RESEND_API_KEY: "re_test", EMAIL_FROM_ADDRESS: "VIBE Beauty <pedidos@vibebeautycol.com>", ORDERS_NOTIFICATION_EMAIL: "ana.vibe@example.com" },
+      async () => {
+        let markPatchBody = null;
+        const originalFetch = global.fetch;
+        global.fetch = async (url, opts) => {
+          const u = String(url);
+          if (u.includes("/rest/v1/products")) return { ok: true, status: 200, text: async () => JSON.stringify([mockRealProduct()]) };
+          if (u.includes("/rest/v1/orders") && opts.method === "POST") {
+            const body = JSON.parse(opts.body);
+            return { ok: true, status: 201, text: async () => JSON.stringify({ ...body, id: 10, created_at: "2026-09-27T00:00:00Z" }) };
+          }
+          if (u.includes("api.resend.com")) {
+            return { ok: false, status: 403, text: async () => JSON.stringify({ message: "domain not verified" }) };
+          }
+          if (u.includes("/rest/v1/orders") && opts.method === "PATCH") {
+            markPatchBody = JSON.parse(opts.body);
+            return { ok: true, status: 204, text: async () => "" };
+          }
+          return { ok: true, status: 204, text: async () => "" };
+        };
+        try {
+          const req = {
+            method: "POST",
+            headers: {},
+            body: { customer: VALID_CUSTOMER, contactConsent: true, items: [{ productId: 1, quantity: 1 }] },
+          };
+          const res = mockRes();
+          await createHandler(req, res);
+          assert.equal(res.statusCode, 201, "el pedido debe seguir registrándose aunque Resend falle");
+          assert.equal(res.body.emailSent, false);
+          assert.equal(markPatchBody.email_sent, false);
+        } finally {
+          global.fetch = originalFetch;
+        }
+      }
+    );
+  });
+
   console.log("\n/api/admin/orders");
 
   await test("sin Authorization, deniega con 401 antes de tocar Supabase", async () => {
