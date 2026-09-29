@@ -197,7 +197,7 @@ async function main() {
           // Ambos productos aportan a la navegación ahora, no solo el curado.
           assert.equal(res.body.categories.length, 2);
           const groups = res.body.categories.map((g) => g.group).sort();
-          assert.deepEqual(groups, ["Otros", "Skincare"]);
+          assert.deepEqual(groups, ["Accesorios", "Skincare"]);
         }
         assert.ok(res.headers["Cache-Control"].includes("max-age"));
       } finally {

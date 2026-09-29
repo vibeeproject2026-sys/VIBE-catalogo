@@ -15,10 +15,17 @@ const CATEGORY_GROUPS = {
   "Ojos": "Maquillaje",
   "Uñas": "Maquillaje",
   "Skincare": "Skincare",
-  "Otro": "Otros",
+  // Fase 41 — antes "Otros": el nav y las puertas "Shop VIBE" ya usaban
+  // data-group="Accesorios" en el cliente, pero ningún producto real
+  // caía en ese valor (todos resolvían a "Otros") — esos enlaces
+  // filtraban a un catálogo vacío contra datos reales. Este cambio es
+  // solo config de presentación del catálogo (no una tabla en
+  // Supabase, no el POS) y corrige ese bug real además de cumplir el
+  // rebrand comercial pedido.
+  "Otro": "Accesorios",
 };
 
-const DEFAULT_GROUP = "Otros";
+const DEFAULT_GROUP = "Accesorios";
 
 function resolveCategoryGroup(posCategory) {
   return CATEGORY_GROUPS[posCategory] || DEFAULT_GROUP;

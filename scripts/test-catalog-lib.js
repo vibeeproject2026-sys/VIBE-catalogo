@@ -34,8 +34,8 @@ async function main() {
     assert.equal(resolveCategoryGroup("Labios"), "Maquillaje");
     assert.equal(resolveCategoryGroup("Skincare"), "Skincare");
   });
-  await test("unknown category falls back to Otros, never disappears", () => {
-    assert.equal(resolveCategoryGroup("CategoriaQueNoExiste"), "Otros");
+  await test("unknown category falls back to Accesorios, never disappears", () => {
+    assert.equal(resolveCategoryGroup("CategoriaQueNoExiste"), "Accesorios");
   });
 
   console.log("joinCatalog (Fase 31 — LEFT JOIN: todo producto del POS se incluye)");
