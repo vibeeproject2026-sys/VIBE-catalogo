@@ -1209,6 +1209,14 @@ function openHeroEdit(slide) {
 // /api/admin/orders (GET) — nunca con /api/orders/create (ese es el
 // endpoint público del checkout) ni con products/hero-slides. Sin
 // acciones: no hay edición de estado ni reenvío de notificaciones acá.
+//
+// Fase 40 — VIBE decidió no usar WhatsApp automático: el número del
+// cliente sigue mostrándose (es el dato que VIBE necesita para
+// contactar manualmente por WhatsApp Business), pero la columna
+// "WhatsApp enviado" se retira — nunca hubo un envío automático real
+// que reportar, y dejarla visible sugería una automatización que no
+// existe. whatsapp_notified sigue existiendo en Supabase (no se borra
+// nada, no hay DDL) — solo deja de mostrarse como indicador operativo.
 // ==========================================================================
 
 let ordersState = { orders: [], loaded: false };
@@ -1256,11 +1264,10 @@ function renderOrdersTable() {
         <td>${money(Number(o.total))}</td>
         <td>${esc(ORDER_STATUS_LABELS[o.status] || o.status)}</td>
         <td>${o.email_sent ? "Sí" : "No"}</td>
-        <td>${o.whatsapp_notified ? "Sí" : "No"}</td>
       </tr>`
         )
         .join("")
-    : `<tr><td colspan="9"><span class="section-hint">Todavía no hay ningún pedido registrado.</span></td></tr>`;
+    : `<tr><td colspan="8"><span class="section-hint">Todavía no hay ningún pedido registrado.</span></td></tr>`;
 }
 
 $("#tabProducts").addEventListener("click", () => switchAdminView("products"));

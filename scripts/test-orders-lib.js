@@ -203,14 +203,57 @@ async function main() {
     assert.ok(text.toLowerCase().includes("whatsapp"));
     assert.ok(html.toLowerCase().includes("whatsapp"));
   });
-  test("contiene marca del producto cuando existe, y el bloque '¿Qué sigue?' con sus 4 pasos", () => {
+  test("contiene marca del producto cuando existe, y el bloque 'Ahora hacemos nuestra parte' con sus 4 pasos (Fase 40)", () => {
     const { text, html } = buildOrderEmail(FAKE_ORDER);
     assert.ok(text.includes("(VIBE)"));
     assert.ok(html.includes(">VIBE<") || html.includes("VIBE</span>"));
-    for (const step of ["Recibimos tu pedido.", "Revisamos disponibilidad.", "Te contactaremos por WhatsApp al número registrado.", "Coordinaremos contigo los siguientes pasos."]) {
+    for (const step of ["Recibimos tu pedido.", "Revisamos disponibilidad.", "Juntos confirmamos envío y forma de pago."]) {
       assert.ok(text.includes(step), `falta el paso "${step}" en el texto`);
       assert.ok(html.includes(step), `falta el paso "${step}" en el html`);
     }
+    // El paso de contacto ahora incluye el número real del cliente
+    // (personalización, sección 8 del brief) — se verifica por partes.
+    assert.ok(text.includes("VIBE te contactará al 3001234567 por WhatsApp."), "falta el paso de contacto con el número real en el texto");
+    assert.ok(html.includes(FAKE_ORDER.customer_phone), "el html debería mostrar el número real del cliente");
+    assert.ok(html.includes("por WhatsApp"), "el html debería mencionar el contacto por WhatsApp");
+  });
+  test("saluda por el nombre de pila del cliente (Fase 40 — personalización)", () => {
+    const { text, html } = buildOrderEmail(FAKE_ORDER);
+    assert.ok(text.includes("Hola, Ana 💗"), "el texto debería saludar solo con el primer nombre");
+    assert.ok(html.includes("Hola, Ana 💗"), "el html debería saludar solo con el primer nombre");
+    assert.ok(!text.includes("Hola, Ana Cliente"), "no debería usar el apellido en el saludo");
+  });
+  test("nunca afirma que el pedido está en camino o fue enviado (Fase 40, sección 2)", () => {
+    const { text, html } = buildOrderEmail(FAKE_ORDER);
+    for (const forbidden of ["está en camino", "ha sido enviado", "entrega confirmada", "tu vibe ya está en camino"]) {
+      assert.ok(!text.toLowerCase().includes(forbidden), `el texto afirma "${forbidden}"`);
+      assert.ok(!html.toLowerCase().includes(forbidden), `el html afirma "${forbidden}"`);
+    }
+  });
+  test("usa 'Entregamos a' (Fase 40) en vez del encabezado técnico anterior 'Datos de entrega'", () => {
+    const { html } = buildOrderEmail(FAKE_ORDER);
+    assert.ok(html.includes("Entregamos a"));
+  });
+  test("muestra 'TOTAL DEL PEDIDO' con jerarquía propia (Fase 40 — bloque de total editorial)", () => {
+    const { text, html } = buildOrderEmail(FAKE_ORDER);
+    assert.ok(text.includes("TOTAL DEL PEDIDO:"));
+    assert.ok(html.includes("Total del pedido"));
+  });
+  test("cierre de marca incluye la frase emocional 'Tu belleza. Tu estilo. Tu VIBE.'", () => {
+    const { text, html } = buildOrderEmail(FAKE_ORDER);
+    assert.ok(text.includes("Tu belleza. Tu estilo. Tu VIBE."));
+    assert.ok(html.includes("Tu belleza. Tu estilo. Tu VIBE."));
+  });
+  test("producto SIN imagen real -> placeholder de marca 'VIBE' en tabla anidada, nunca una imagen inventada", () => {
+    const orderWithoutImage = { ...FAKE_ORDER, items: [{ ...FAKE_ORDER.items[0], image: null }] };
+    const { html } = buildOrderEmail(orderWithoutImage);
+    assert.ok(!html.includes("<img"), "sin imagen real no debería renderizar ningún <img>");
+    assert.ok(html.includes("background:#151515"), "debería mostrar el placeholder oscuro de marca");
+  });
+  test("producto CON imagen real -> renderiza <img> con esa URL exacta, nunca una inventada", () => {
+    const orderWithImage = { ...FAKE_ORDER, items: [{ ...FAKE_ORDER.items[0], image: "https://xyz.supabase.co/storage/v1/object/public/product-images/products/1/main.webp" }] };
+    const { html } = buildOrderEmail(orderWithImage);
+    assert.ok(html.includes('src="https://xyz.supabase.co/storage/v1/object/public/product-images/products/1/main.webp"'));
   });
   test("tiene versión text/plain completa, no solo html (item 19)", () => {
     const { text } = buildOrderEmail(FAKE_ORDER);

@@ -99,6 +99,13 @@ module.exports = async function handler(req, res) {
       name: real.name,
       variantName: it.variantName || "Único",
       brand: real.brand ?? null,
+      // Fase 40 — imagen real del producto (server-authoritative, igual
+      // que name/brand/price: nunca la del request) para que el email de
+      // confirmación pueda mostrar una miniatura cuando exista. La
+      // mayoría de productos reales hoy no tienen foto (ver auditoría de
+      // Fase 37) — email.js cae a un placeholder de marca cuando
+      // image es null, nunca inventa ni rompe el layout.
+      image: real.image ?? null,
       sku: it.sku ?? null,
       quantity,
       price,

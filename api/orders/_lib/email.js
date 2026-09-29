@@ -45,12 +45,39 @@ function escapeHtml(s) {
     .replaceAll('"', "&quot;");
 }
 
+// Fase 40 — saludo personalizado ("Hola, Mariana 💗"): solo el primer
+// nombre, nunca el apellido completo, para que se sienta cercano sin
+// ser formal. El nombre completo se sigue mostrando tal cual en
+// "Entregamos a:".
+function firstName(fullName) {
+  const trimmed = String(fullName || "").trim();
+  if (!trimmed) return "";
+  return trimmed.split(/\s+/)[0];
+}
+
+// Miniatura de producto — usa la imagen real si existe (URL pública de
+// Storage, nunca inventada) o un placeholder de marca en tabla anidada
+// (más compatible con Outlook que un <div> centrado por line-height).
+// Sección 4 del brief: "si usar imágenes implica romper el email,
+// mantener una versión elegante sin imagen" — este placeholder nunca
+// depende de una imagen externa cargando bien.
+function productThumbHtml(item) {
+  if (item.image) {
+    return `<img src="${escapeHtml(item.image)}" width="56" height="56" alt="" style="width:56px;height:56px;border-radius:10px;object-fit:cover;display:block;">`;
+  }
+  return `<table role="presentation" width="56" height="56" cellpadding="0" cellspacing="0" style="width:56px;height:56px;background:#151515;border-radius:10px;">
+    <tr><td align="center" valign="middle" style="color:${BRAND.pink};font-size:9px;font-weight:800;letter-spacing:.06em;">VIBE</td></tr>
+  </table>`;
+}
+
 // ==========================================================================
-// Cliente — confirmación premium de marca (sección 5/6 del brief:
-// header VIBE, mensaje principal, estado, identificación, productos,
-// total, datos de entrega, "¿Qué sigue?", cierre). Tabla + estilos
-// inline para compatibilidad real de clientes de correo (sin CSS
-// moderno, sin JS, sin dependencias externas) — sección 9.
+// Cliente — confirmación premium de marca (Fase 40: extensión digital
+// de la experiencia VIBE, no un email transaccional genérico). Tabla +
+// estilos inline para compatibilidad real de clientes de correo (sin
+// CSS moderno, sin JS, sin dependencias externas, sin gradientes que
+// fallen en Outlook) — sigue la disciplina de siempre: nunca afirma
+// "pagado"/"confirmado"/"enviado"/"en camino", el contacto posterior es
+// SIEMPRE manual por WhatsApp Business, nunca automático.
 // ==========================================================================
 
 // order: la fila ya insertada en Supabase (id, created_at, items,
@@ -61,6 +88,7 @@ function buildOrderEmail(order) {
   const dateLabel = formatOrderDate(order.created_at);
   const items = Array.isArray(order.items) ? order.items : [];
   const notes = String(order.customer_notes || "").trim();
+  const name = firstName(order.customer_name);
 
   const rowsText = items
     .map((l) => `${lineLabel(l)}${l.brand ? ` (${l.brand})` : ""}\nCantidad: ${l.quantity}  ·  Precio: ${money(l.price)}  ·  Subtotal: ${money(l.lineSubtotal)}`)
@@ -69,13 +97,14 @@ function buildOrderEmail(order) {
   const rowsHtml = items
     .map(
       (l) => `<tr>
-        <td style="padding:12px 0;border-bottom:1px solid #f0f0f0;font-size:14px;color:#111111;">
+        <td style="padding:14px 0;border-bottom:1px solid #f0f0f0;width:56px;">${productThumbHtml(l)}</td>
+        <td style="padding:14px 0 14px 16px;border-bottom:1px solid #f0f0f0;font-size:14px;color:#111111;">
           ${l.brand ? `<span style="display:block;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#999999;margin:0 0 2px;">${escapeHtml(l.brand)}</span>` : ""}
           <span style="font-weight:600;">${escapeHtml(lineLabel(l))}</span>
           <span style="display:block;font-size:12px;color:#999999;margin-top:2px;">Cantidad: ${l.quantity}</span>
         </td>
-        <td style="padding:12px 0;border-bottom:1px solid #f0f0f0;font-size:13px;color:#777777;text-align:right;vertical-align:top;">${money(l.price)}</td>
-        <td style="padding:12px 0;border-bottom:1px solid #f0f0f0;font-size:14px;color:#111111;text-align:right;vertical-align:top;font-weight:700;">${money(l.lineSubtotal)}</td>
+        <td style="padding:14px 0;border-bottom:1px solid #f0f0f0;font-size:13px;color:#777777;text-align:right;vertical-align:top;">${money(l.price)}</td>
+        <td style="padding:14px 0;border-bottom:1px solid #f0f0f0;font-size:14px;color:#111111;text-align:right;vertical-align:top;font-weight:700;">${money(l.lineSubtotal)}</td>
       </tr>`
     )
     .join("");
@@ -85,30 +114,32 @@ function buildOrderEmail(order) {
   const text = [
     "VIBE — Vibrant Iconic Beauty Essentials",
     "",
-    "¡Recibimos tu pedido!",
-    "Gracias por elegir VIBE.",
+    `Hola, ${name} 💗`,
+    "Recibimos tu pedido.",
+    "Gracias por elegir VIBE — ya estamos revisando los detalles.",
+    "",
+    `Pedido ${orderNumber} — ${dateLabel}`,
     "",
     "PEDIDO RECIBIDO",
     "Tu pedido fue registrado correctamente. Nuestro equipo revisará la disponibilidad y se pondrá en contacto contigo por WhatsApp al número registrado para gestionar y finalizar tu pedido.",
     "",
-    `Pedido ${orderNumber} — ${dateLabel}`,
-    "",
     rowsText,
     "",
-    `TOTAL: ${money(order.total)}`,
+    `TOTAL DEL PEDIDO: ${money(order.total)}`,
     "",
-    "Datos de entrega:",
+    "Entregamos a:",
     order.customer_name,
     order.customer_city,
     order.customer_address,
     ...(notes ? [`Notas: ${notes}`] : []),
     "",
-    "¿QUÉ SIGUE?",
+    "AHORA HACEMOS NUESTRA PARTE",
     "1. Recibimos tu pedido.",
     "2. Revisamos disponibilidad.",
-    "3. Te contactaremos por WhatsApp al número registrado.",
-    "4. Coordinaremos contigo los siguientes pasos.",
+    `3. VIBE te contactará al ${order.customer_phone} por WhatsApp.`,
+    "4. Juntos confirmamos envío y forma de pago.",
     "",
+    "Tu belleza. Tu estilo. Tu VIBE.",
     "Gracias por elegir VIBE.",
     "Vibrant Iconic Beauty Essentials",
     "vibebeautycol.com",
@@ -123,13 +154,27 @@ function buildOrderEmail(order) {
         </td>
       </tr>
       <tr>
-        <td style="padding:36px 32px 8px;text-align:center;">
-          <h1 style="margin:0 0 6px;font-size:22px;color:#111111;">¡Recibimos tu pedido!</h1>
-          <p style="margin:0;color:#777777;font-size:14px;">Gracias por elegir VIBE.</p>
+        <td style="padding:40px 32px 4px;text-align:center;">
+          <p style="margin:0 0 14px;font-size:15px;color:${BRAND.pink};font-weight:700;">Hola, ${escapeHtml(name)} 💗</p>
+          <h1 style="margin:0 0 8px;font-size:24px;color:#111111;font-weight:800;letter-spacing:-.01em;">Recibimos tu pedido.</h1>
+          <p style="margin:0;color:#777777;font-size:14px;line-height:1.6;">Gracias por elegir VIBE — ya estamos revisando los detalles.</p>
         </td>
       </tr>
       <tr>
-        <td style="padding:20px 32px 0;">
+        <td style="padding:28px 32px 0;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #f0f0f0;border-radius:14px;">
+            <tr>
+              <td style="padding:18px 24px;text-align:center;">
+                <p style="margin:0 0 4px;font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#999999;">Pedido</p>
+                <p style="margin:0 0 8px;font-size:26px;font-weight:800;color:#111111;letter-spacing:.02em;">${orderNumber}</p>
+                <p style="margin:0;font-size:12px;color:#999999;">${dateLabel}</p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:16px 32px 0;">
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fff5fa;border-radius:12px;">
             <tr>
               <td style="padding:16px 20px;">
@@ -141,24 +186,26 @@ function buildOrderEmail(order) {
         </td>
       </tr>
       <tr>
-        <td style="padding:24px 32px 0;">
-          <p style="margin:0;font-size:13px;color:#999999;">Pedido <strong style="color:#111111;">${orderNumber}</strong> · ${dateLabel}</p>
-        </td>
-      </tr>
-      <tr>
-        <td style="padding:16px 32px 0;">
+        <td style="padding:28px 32px 0;">
+          <p style="margin:0 0 4px;font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#999999;">Tu selección</p>
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rowsHtml}</table>
         </td>
       </tr>
       <tr>
-        <td style="padding:16px 32px 0;text-align:right;">
-          <p style="margin:0;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#999999;">Total</p>
-          <p style="margin:2px 0 0;font-size:22px;font-weight:800;color:#111111;">${money(order.total)}</p>
+        <td style="padding:24px 32px 0;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#111111;border-radius:14px;">
+            <tr>
+              <td style="padding:18px 24px;text-align:center;">
+                <p style="margin:0 0 4px;font-size:10px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:#ffffffaa;">Total del pedido</p>
+                <p style="margin:0;font-size:26px;font-weight:800;color:#ffffff;">${money(order.total)}</p>
+              </td>
+            </tr>
+          </table>
         </td>
       </tr>
       <tr>
         <td style="padding:28px 32px 0;">
-          <p style="margin:0 0 8px;font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#999999;">Datos de entrega</p>
+          <p style="margin:0 0 8px;font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#999999;">Entregamos a</p>
           <p style="margin:0;font-size:14px;color:#333333;line-height:1.7;">
             ${escapeHtml(order.customer_name)}<br>
             ${escapeHtml(order.customer_city)}<br>
@@ -171,13 +218,13 @@ function buildOrderEmail(order) {
         <td style="padding:28px 32px 0;">
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fafafa;border-radius:12px;">
             <tr>
-              <td style="padding:18px 20px;">
-                <p style="margin:0 0 10px;font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:${BRAND.pink};">¿Qué sigue?</p>
+              <td style="padding:20px 24px;">
+                <p style="margin:0 0 12px;font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:${BRAND.pink};">Ahora hacemos nuestra parte</p>
                 <ol style="margin:0;padding-left:18px;color:#444444;font-size:13px;line-height:1.9;">
                   <li>Recibimos tu pedido.</li>
                   <li>Revisamos disponibilidad.</li>
-                  <li>Te contactaremos por WhatsApp al número registrado.</li>
-                  <li>Coordinaremos contigo los siguientes pasos.</li>
+                  <li>VIBE te contactará al <strong style="color:#111111;">${escapeHtml(order.customer_phone)}</strong> por WhatsApp.</li>
+                  <li>Juntos confirmamos envío y forma de pago.</li>
                 </ol>
               </td>
             </tr>
@@ -185,9 +232,10 @@ function buildOrderEmail(order) {
         </td>
       </tr>
       <tr>
-        <td style="padding:32px 32px 36px;text-align:center;">
-          <p style="margin:0 0 4px;font-size:14px;color:#333333;">Gracias por elegir VIBE.</p>
-          <p style="margin:0 0 12px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#999999;">Vibrant Iconic Beauty Essentials</p>
+        <td style="padding:36px 32px 40px;text-align:center;">
+          <p style="margin:0 0 6px;font-size:16px;color:#111111;font-weight:700;">Tu belleza. Tu estilo. Tu VIBE.</p>
+          <p style="margin:0 0 16px;font-size:13px;color:#777777;">Gracias por elegir VIBE.</p>
+          <p style="margin:0 0 4px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#999999;">Vibrant Iconic Beauty Essentials</p>
           <p style="margin:0;font-size:12px;color:${BRAND.pink};">vibebeautycol.com</p>
         </td>
       </tr>
