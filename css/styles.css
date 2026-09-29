@@ -57,12 +57,20 @@ header.scrolled .logo-image{width:126px;height:50px}
 .menu-btn[aria-expanded="true"] span:nth-child(3){transform:translateY(-6.5px) rotate(-45deg)}
 
 .mobile-nav{display:none;flex-direction:column;background:#070707;border-top:1px solid var(--line);overflow:hidden;max-height:0;transition:max-height .25s ease}
-.mobile-nav.open{max-height:220px}
+/* Fase 41 — el submenú Rostro/Ojos/Labios sumó 3 filas al menú mobile;
+   220px (el alto de 4 filas) ya no alcanza para las 9 filas actuales —
+   con overflow:hidden, el exceso simplemente quedaba invisible. */
+.mobile-nav.open{max-height:520px}
 .mobile-nav a{padding:16px 20px;border-bottom:1px solid var(--line);font-size:14px;font-weight:700;letter-spacing:.02em;color:#ddd;transition:color .2s ease,background .2s ease}
 .mobile-nav a:active{color:#fff;background:#111}
 .mobile-nav a.nav-active{color:var(--pink);border-left:3px solid var(--pink);padding-left:17px}
 @media(prefers-reduced-motion:reduce){.mobile-nav a{transition:none}}
 .mobile-nav a:last-child{border-bottom:0}
+/* Fase 41 — submenú Maquillaje → Rostro/Ojos/Labios: mismo link de
+   mobile-nav, con indentación + tipografía más chica para leerse como
+   subcategoría anidada, no como un mundo de nivel 1. */
+.mobile-nav a.mobile-nav-sub{padding-left:36px;font-size:13px;font-weight:600;color:#aaa}
+.mobile-nav a.mobile-nav-sub.nav-active{padding-left:33px}
 
 .hero{padding:56px 0 72px;overflow:hidden;background:radial-gradient(circle at 80% 45%,#430020 0,#050505 46%)}
 /* Fase 35.3 — bug/pedido reportado: la pieza ya se mostraba completa
@@ -153,133 +161,50 @@ header.scrolled .logo-image{width:126px;height:50px}
 .hero-dot:before{content:"";width:6px;height:6px;border-radius:50%;background:#ffffff66;transition:background .2s ease,width .2s ease,border-radius .2s ease}
 .hero-dot.active:before{background:#fff;width:16px;border-radius:3px}
 
-.values{background:var(--bg);padding:40px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
-.values-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:22px}
-.value p{margin:0;font-size:13px;color:#e6e6e6;letter-spacing:.01em}
-.value-mark{display:block;width:26px;height:2px;background:var(--pink);margin-bottom:14px}
-
 .heading{display:flex;justify-content:space-between;align-items:end;gap:20px;margin-bottom:40px}
 .heading h2{font-size:58px;letter-spacing:-.045em;margin:0}
 .heading>p{color:#6e6e6e;font-size:13px}
 
-.explore{background:#fff;color:#111;padding:100px 0 24px}
-.explore .eyebrow{color:var(--pink)}
-/* Fase 36.1 — pedido explícito: "las categorías deben sentirse como
-   mundos VIBE, no como botones administrativos". Sin fotografías reales
-   por mundo (no se inventan), la protagonista es la composición: cards
-   grandes, oscuras, con degradé propio por posición (nunca la misma
-   pieza plana blanca de antes) y tipografía a gran escala. */
-.category-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px}
-.category-card{display:flex;flex-direction:column;justify-content:space-between;width:100%;min-height:230px;text-align:left;font:inherit;border:0;border-radius:var(--radius);padding:32px;color:#fff;background:linear-gradient(155deg,#1c1c1c,#0b0b0b);transition:transform .25s ease,box-shadow .25s ease}
-.category-card:nth-of-type(3n+2){background:linear-gradient(155deg,#420021,#150009)}
-.category-card:nth-of-type(3n+3){background:linear-gradient(155deg,#2a0016,#0b0b0b)}
-.category-card:hover{transform:translateY(-6px);box-shadow:0 24px 48px -20px rgba(255,0,122,.5)}
-@media(prefers-reduced-motion:reduce){
-  .category-card{transition:none}
-  .category-card:hover{transform:none}
-}
-.category-card span{font-size:12px;color:var(--pink);letter-spacing:.16em;text-transform:uppercase;font-weight:800}
-.category-card h3{margin:14px 0 0;font-size:clamp(26px,3vw,32px);font-weight:800;letter-spacing:-.02em;line-height:1.05}
-/* Fase 37 — antes solo había una flecha circular sin texto; benchmark
-   e.l.f. siempre acompaña el ícono con la acción en palabras
-   ("SHOP NOW"). Microcopy propia de VIBE, nunca esa frase textual. */
-.category-card-cta{display:flex;align-items:center;justify-content:space-between;margin-top:22px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#ddd}
-.category-card .arrow{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;border:1px solid #ffffff44;font-size:18px;color:#fff;letter-spacing:normal;text-transform:none;transition:background .2s ease,border-color .2s ease}
-.category-card:hover .arrow{background:var(--pink);border-color:var(--pink)}
-@media(prefers-reduced-motion:reduce){.category-card .arrow{transition:none}}
+/* Fase 41 — "Descubre tu VIBE": reemplaza a la vez "Shop VIBE" y "Shop
+   by Category" (única sección de descubrimiento por categoría del
+   Home). Mosaico editorial en vez de una grilla pareja: Rostro más
+   grande (2x2), Ojos/Labios individuales, Skincare con presencia
+   propia, Accesorios como franja horizontal — vía grid-template-areas.
+   Mismo tratamiento de placeholder oscuro+wordmark que el resto del
+   sitio (.card-img-empty), nunca una foto de stock inventada. */
+.discover-vibe-mosaic{background:#fff;color:#111;padding:100px 0 24px}
+.discover-vibe-mosaic .eyebrow{color:var(--pink)}
+.discover-vibe-grid{display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:220px 220px 140px;grid-template-areas:"rostro rostro ojos labios" "rostro rostro skincare skincare" "accesorios accesorios accesorios accesorios";gap:16px}
+.discover-vibe-tile{position:relative;display:flex;flex-direction:column;justify-content:flex-end;width:100%;height:100%;text-align:left;font:inherit;border:0;border-radius:var(--radius);padding:26px;color:#fff;background:linear-gradient(155deg,#1c1c1c,#0b0b0b);overflow:hidden;transition:transform .25s ease,box-shadow .25s ease}
+.discover-vibe-tile:hover{transform:translateY(-4px);box-shadow:0 24px 48px -20px rgba(255,0,122,.5)}
+@media(prefers-reduced-motion:reduce){.discover-vibe-tile{transition:none}.discover-vibe-tile:hover{transform:none}}
+.discover-vibe-tile-rostro{grid-area:rostro;background:linear-gradient(160deg,#ff2f95,#7a0040)}
+.discover-vibe-tile-ojos{grid-area:ojos;background:linear-gradient(155deg,#1c1c1c,#0b0b0b)}
+.discover-vibe-tile-labios{grid-area:labios;background:linear-gradient(155deg,#420021,#150009)}
+.discover-vibe-tile-skincare{grid-area:skincare;background:linear-gradient(155deg,#2a0016,#0b0b0b)}
+.discover-vibe-tile-accesorios{grid-area:accesorios;flex-direction:row;align-items:center;justify-content:space-between;background:linear-gradient(160deg,#4a0026,#160009)}
+.discover-vibe-tile-label{font-size:clamp(24px,3vw,34px);font-weight:800;letter-spacing:-.02em;line-height:1.05;margin-bottom:8px}
+.discover-vibe-tile-accesorios .discover-vibe-tile-label{margin-bottom:0}
+.discover-vibe-tile-cta{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#ddd}
+.discover-vibe-tile-cta .arrow{transition:transform .2s ease}
+.discover-vibe-tile:hover .discover-vibe-tile-cta .arrow{transform:translateX(4px)}
+@media(prefers-reduced-motion:reduce){.discover-vibe-tile-cta .arrow{transition:none}.discover-vibe-tile:hover .discover-vibe-tile-cta .arrow{transform:none}}
+.discover-vibe-tile-count{position:absolute;top:20px;right:22px;font-size:11px;color:var(--pink);letter-spacing:.1em;text-transform:uppercase;font-weight:800}
+.discover-vibe-tile-accesorios .discover-vibe-tile-count{position:static}
 
-/* Fase 38 — "Shop VIBE": puerta de marca (blanco), deliberadamente
-   distinta de Shop by Category (oscura, con conteo real por grupo, ver
-   .category-card arriba) — aquí NUNCA hay un número de inventario, solo
-   una decisión editorial de a dónde ir. Cada puerta usa un tratamiento
-   de color propio (rosa/negro/degradado ciruela) en vez de repetir el
-   mismo fondo tres veces — ritmo dentro del propio bloque. */
-.shop-vibe{background:#fff;color:#111;padding:96px 0 24px}
-.shop-vibe .eyebrow{color:var(--pink)}
-.shop-vibe-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:22px}
-.shop-door{display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-end;width:100%;min-height:360px;text-align:left;font:inherit;border:0;border-radius:var(--radius);padding:34px;color:#fff;transition:transform .25s ease,box-shadow .25s ease}
-.shop-door:hover{transform:translateY(-6px);box-shadow:0 26px 52px -22px rgba(0,0,0,.4)}
-@media(prefers-reduced-motion:reduce){.shop-door{transition:none}.shop-door:hover{transform:none}}
-.shop-door-makeup{background:linear-gradient(160deg,#ff2f95,#7a0040)}
-.shop-door-skincare{background:linear-gradient(160deg,#1c1c1c,#0b0b0b)}
-.shop-door-accessories{background:linear-gradient(160deg,#4a0026,#160009)}
-.shop-door-label{font-size:clamp(26px,2.6vw,32px);font-weight:800;letter-spacing:-.01em;margin-bottom:10px}
-.shop-door-desc{font-size:14px;color:#f0f0f0cc;margin-bottom:22px;max-width:220px}
-.shop-door-cta{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
-.shop-door-cta .arrow{transition:transform .2s ease}
-.shop-door:hover .shop-door-cta .arrow{transform:translateX(4px)}
-@media(prefers-reduced-motion:reduce){.shop-door-cta .arrow{transition:none}.shop-door:hover .shop-door-cta .arrow{transform:none}}
-
-/* Fase 38 — "Editorial Beauty Moment": sin fotografía editorial real,
-   la composición viene de tipografía+degradado+forma — nunca una foto
-   inventada. Rompe el ritmo blanco→blanco con una franja rosa entre dos
-   bloques de producto/categoría. */
-.editorial-moment{background:linear-gradient(120deg,#ff2f95,#c2005f 55%,#7a0040);padding:100px 0;overflow:hidden}
-.editorial-moment-inner{display:grid;grid-template-columns:1.1fr .9fr;gap:48px;align-items:center}
-.editorial-moment-copy .eyebrow{color:#fff}
-.editorial-moment-copy h2{font-size:clamp(38px,5vw,64px);line-height:.98;letter-spacing:-.03em;font-weight:800;color:#fff;margin:14px 0 18px}
-.editorial-moment-lead{font-size:17px;color:#ffffffdd;max-width:420px;margin:0 0 28px}
-.editorial-moment-graphic{position:relative;display:grid;place-items:center;min-height:280px}
-.editorial-moment-word{font-size:clamp(90px,14vw,180px);font-weight:800;letter-spacing:-.04em;color:#ffffff26;-webkit-text-stroke:2px #ffffff55;user-select:none}
-@media(max-width:900px){.editorial-moment-graphic{display:none}}
-
-/* Fase 38 — "Descubre VIBE" (Product Discovery): mismo contenedor
+/* Fase 38 — "Encuentra tu VIBE" (Product Discovery): mismo contenedor
    .featured de siempre, sin cambios estructurales — solo el matiz de
-   fondo propio (igual criterio que #novedades/#promociones) para que
-   se distinga de Shop by Category justo arriba. */
+   fondo propio (igual criterio que Ofertas) para que se distinga del
+   mosaico justo arriba. */
 #productDiscovery{background:linear-gradient(180deg,#fff7fb,#fff)}
 
-/* Fase 37/38 — "Discover VIBE": antes vivía dentro de .featured (fondo
-   blanco, igual que Novedades/Promociones); ahora es su propio momento
-   oscuro y siempre visible (con contenido real o con la invitación de
-   marca — ver #discoverHomeEmpty), coherente con "Discover como parte
-   real de la marca, no una sección al final". */
-.discover-vibe{background:#0b0b0b;color:#fff;padding:96px 0;position:relative;overflow:hidden}
-.discover-vibe:after{content:"";position:absolute;width:320px;height:320px;border-radius:50%;background:#FF007A22;filter:blur(90px);right:8%;top:20%}
-.discover-vibe .heading{position:relative}
-.discover-vibe .heading h2{color:#fff}
-.discover-vibe .heading>p{color:#ccc}
-.discover-vibe .eyebrow{color:var(--pink)}
-.discover-vibe .article-card{background:#151515;border-color:#292929}
-.discover-vibe-empty{position:relative;text-align:center;max-width:640px;margin:0 auto}
-.discover-vibe-empty h2{font-size:clamp(30px,4vw,44px);line-height:1.05;letter-spacing:-.02em;color:#fff;margin:14px 0 18px}
-.discover-vibe-empty-copy{color:#ccc;font-size:15px;line-height:1.6;margin:0 0 26px}
-
-/* Fase 38 — cierre de marca ("Community"): reemplaza el CTA final
-   plano. Sin backend de newsletter todavía, el form queda visible pero
-   deshabilitado (nunca una captura que finge funcionar). */
-.community{background:linear-gradient(155deg,#0b0b0b,#3a0020 70%,#ff2f95);padding:100px 0;text-align:center}
-.community-inner{max-width:560px;margin:0 auto}
-.community .eyebrow{justify-content:center;color:#fff}
-.community h2{font-size:clamp(34px,5vw,52px);letter-spacing:-.02em;color:#fff;margin:14px 0 16px}
-.community-copy{color:#ffffffdd;font-size:16px;line-height:1.6;margin:0 0 30px}
-.community-form{display:flex;gap:10px;margin:0 0 12px}
-.community-form input{flex:1;min-height:52px;border-radius:999px;border:1px solid #ffffff55;background:#ffffff14;color:#fff;padding:0 20px;font-size:14px}
-.community-form input::placeholder{color:#ffffffaa}
-.community-form input:disabled,.community-form button:disabled{opacity:.6;cursor:not-allowed}
-.community-note{font-size:12px;color:#ffffffaa;margin:0 0 30px}
-.community-secondary{margin-top:4px}
+/* Fase 41 — Instagram: bloque estático oscuro, sin feed embebido. */
+.instagram-vibe{background:#0b0b0b;color:#fff;padding:96px 0;position:relative;overflow:hidden}
+.instagram-vibe:after{content:"";position:absolute;width:320px;height:320px;border-radius:50%;background:#FF007A22;filter:blur(90px);right:8%;top:20%}
+.instagram-vibe-inner{position:relative;text-align:center;max-width:560px;margin:0 auto}
+.instagram-vibe-inner h2{font-size:clamp(30px,4vw,44px);line-height:1.05;letter-spacing:-.02em;color:#fff;margin:14px 0 26px}
 .button.outline.light{color:#fff;border-color:#ffffff77}
 .button.outline.light:hover{background:#fff;color:#111}
-@media(max-width:640px){
-  .community-form{flex-direction:column}
-}
-
-/* Fase 37 — bloque "Campaña": spotlight editorial de un único producto
-   real (ver renderCampaign() en app.js), inspirado en el patrón de
-   e.l.f. de destacar un producto con foto grande + copy + CTA. Fondo
-   oscuro para diferenciarlo claramente de las grillas blancas de
-   alrededor — un momento propio, no una card más. */
-.campaign{background:#0b0b0b;padding:76px 0}
-.campaign-inner{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:center}
-.campaign-media{aspect-ratio:4/5;border-radius:var(--radius);overflow:hidden;background:#f2f2f2;display:grid;place-items:center;width:100%}
-.campaign-media:has(.card-img-empty){background:linear-gradient(160deg,#151515,#0b0b0b)}
-.campaign-photo{width:100%;height:100%;object-fit:cover;display:block}
-.campaign-copy{color:#fff}
-.campaign-copy h2{font-size:clamp(30px,4vw,46px);letter-spacing:-.02em;line-height:1.05;margin:12px 0 16px}
-.campaign-desc{color:#ccc;font-size:15px;line-height:1.6;margin:0 0 20px;max-width:440px}
-.campaign-price{font-size:26px;font-weight:800;color:#fff;margin:0 0 26px}
-.campaign-price .old{color:#888;font-size:16px;font-weight:400;margin-left:8px}
 
 .featured{background:#fff;color:#111;padding:88px 0 24px}
 .featured .eyebrow{color:var(--pink)}
@@ -291,9 +216,8 @@ header.scrolled .logo-image{width:126px;height:50px}
    de color propio por sección (nunca inventando datos, solo tratamiento
    visual) para que cada una se lea como su propio momento comercial:
    Novedades = frescura, Promociones = urgencia de compra. */
-#novedades{background:linear-gradient(180deg,#fff7fb,#fff)}
-#promociones{background:linear-gradient(180deg,#fff0f6,#fff)}
-#promociones .eyebrow::before{background:#111}
+#ofertasHome{background:linear-gradient(180deg,#fff0f6,#fff)}
+#ofertasHome .eyebrow::before{background:#111}
 
 .catalog{background:#fff;color:#111;padding:88px 0 110px}
 .catalog .eyebrow{color:var(--pink)}
@@ -377,47 +301,6 @@ header.scrolled .logo-image{width:126px;height:50px}
   .card-cta:hover,.card-cta:focus-visible{transform:none}
 }
 .empty{text-align:center;padding:60px;color:#777}
-
-/* Fase 30 — Discover / Editorial VIBE. Misma familia visual que .card
-   (grid/aspect-ratio/radius), pero con su propia identidad: sin precio,
-   con excerpt y fecha, y un CTA de texto en vez de un botón sólido —
-   deliberadamente distinta de una product card y de una tarjeta de blog
-   genérica. */
-.discover-landing{background:#fff;color:#111;padding:64px 0 90px}
-.discover-hero{max-width:620px;margin:0 0 40px}
-.discover-hero .eyebrow{color:var(--pink)}
-.discover-hero h2{font-size:44px;letter-spacing:-.03em;margin:0 0 14px}
-.discover-intro{color:#666;font-size:15px;line-height:1.6;margin:0}
-.discover-categories{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:36px}
-.discover-category-pill{display:inline-flex;align-items:center;border:1px solid #eee;background:#fafafa;border-radius:999px;padding:8px 16px;font-size:12px;color:#333}
-.discover-featured{margin-bottom:36px}
-.discover-featured .article-card{display:grid;grid-template-columns:1.1fr 1fr;gap:32px;align-items:center}
-.discover-featured .article-card-img{aspect-ratio:16/11}
-/* Fase 36 — estado vacío editorial (0 artículos publicados hoy): mismo
-   lenguaje visual oscuro+acento rosa que .pdp-no-image/.article-no-image
-   para los demás vacíos "reales" del sitio, pero como una pieza propia
-   (nunca un emoji, nunca "Próximamente" — ver comentario en app.js). */
-.discover-empty{margin:0 0 40px;padding:64px 32px;border-radius:var(--radius);background:linear-gradient(160deg,#151515,#0b0b0b);text-align:center}
-.discover-empty h3{color:#fff;font-size:clamp(22px,3vw,32px);line-height:1.2;margin:10px 0 16px;font-weight:800}
-.discover-empty-copy{color:#ccc;max-width:520px;margin:0 auto;font-size:15px;line-height:1.6}
-
-.article-card{min-width:0}
-.article-card-img{display:block;width:100%;aspect-ratio:4/5;border:0;border-radius:var(--radius);background:#f2f2f2;overflow:hidden;padding:0;position:relative}
-.article-photo{width:100%;height:100%;object-fit:cover;display:block;transition:transform .35s ease}
-.article-card-img:hover .article-photo{transform:scale(1.035)}
-.article-no-image{width:100%;height:100%;display:grid;place-items:center;background:linear-gradient(150deg,#fff,#fdf3f8);color:var(--pink);font-weight:800;letter-spacing:.16em;font-size:13px}
-.article-card-body{padding:15px 3px}
-.article-category{font-size:9px;color:var(--pink);letter-spacing:.18em;text-transform:uppercase;font-weight:800;margin:0 0 6px}
-.article-card h3{margin:0 0 6px;font-size:18px;line-height:1.25}
-.article-excerpt{font-size:13px;color:#777;margin:0 0 8px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.article-date{font-size:11px;color:#999;margin:0 0 10px}
-.article-cta{border:0;background:none;padding:0;color:#111;font-weight:800;font-size:12px;letter-spacing:.02em;text-decoration:underline;text-underline-offset:3px}
-.article-cta:hover{color:var(--pink)}
-
-.editorial{background:var(--bg);padding:110px 0;position:relative;overflow:hidden}
-.editorial:after{content:"";position:absolute;width:360px;height:360px;border-radius:50%;background:#FF007A22;filter:blur(90px);left:50%;top:50%;transform:translate(-50%,-50%)}
-.editorial-quote{position:relative;text-align:center;margin:0;font-size:clamp(32px,5vw,56px);line-height:1.15;letter-spacing:-.03em;font-weight:800;color:#f2f2f2}
-.editorial-quote span{color:var(--pink)}
 
 .cta-final{background:var(--surface);padding:70px 0;border-top:1px solid var(--line)}
 .cta-final-inner{display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap}
@@ -596,23 +479,6 @@ dialog::backdrop{background:#000d}
 .pdp-not-found h2{font-size:26px;margin:8px 0 10px}
 .pdp-not-found p{color:#aaa;margin:0 0 22px}
 
-/* Fase 30 — detalle de artículo dentro de #articleDialog: mismo tema
-   oscuro y misma estructura de dos columnas que el PDP (#productDetail),
-   reutilizada tal cual con sus propias clases. */
-#articleDetail{display:grid;grid-template-columns:1fr 1fr}
-.article-detail-hero{min-height:520px;background:#111;overflow:hidden}
-.article-detail-photo{width:100%;height:100%;min-height:520px;object-fit:cover;display:block}
-.article-detail-body{padding:45px 38px}
-.article-detail-body h2{font-size:32px;line-height:1.1;margin:6px 0 14px}
-.article-detail-excerpt{color:#ccc;font-size:15px;margin:0 0 18px}
-.article-content{color:#ccc;font-size:14px;line-height:1.75}
-.article-content p{margin:0 0 16px}
-.article-related{margin-top:32px;border-top:1px solid #292929;padding-top:24px}
-.article-related h3{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--pink);margin:0 0 16px}
-.article-related .grid{grid-template-columns:repeat(2,1fr);gap:14px}
-dialog .article-no-image{width:100%;height:100%;min-height:520px;display:grid;place-items:center;background:linear-gradient(160deg,#151515,#0b0b0b);color:var(--pink);font-weight:800;letter-spacing:.16em;font-size:14px}
-dialog .article-category{color:var(--pink)}
-dialog .article-date{color:#999}
 
 #checkoutDialog{width:min(560px,calc(100% - 28px))}
 #checkoutForm{padding:28px;display:grid;gap:16px}
@@ -682,18 +548,21 @@ footer small{letter-spacing:.25em;font-size:7px}
      deriva su alto de aspect-ratio (ver regla base), que ya responde
      solo al ancho disponible en este breakpoint (columna completa). */
   .heading{align-items:flex-start;flex-direction:column}
-  .values-grid{grid-template-columns:repeat(2,1fr)}
-  .campaign-inner{grid-template-columns:1fr;gap:28px}
-  .campaign{padding:48px 0}
-  /* Fase 38 — Shop VIBE/Editorial Moment/Community mobile: nunca
-     "desktop reducido" — grid a una columna, tipografía/paddings
-     propios para mobile (ver bloques específicos más abajo). */
-  .shop-vibe-grid{grid-template-columns:1fr}
-  .shop-door{min-height:220px;padding:26px}
-  .editorial-moment-inner{grid-template-columns:1fr}
-  .editorial-moment{padding:64px 0}
-  .discover-vibe{padding:64px 0}
-  .community{padding:64px 0}
+  /* Fase 41 — mosaico "Descubre tu VIBE": la composición con áreas
+     nombradas (Rostro grande, etc.) es un tratamiento de escritorio;
+     en mobile colapsa a una columna con imágenes de tamaño legible
+     (nunca miniaturas), en el orden natural del DOM. Bug real de CSS
+     Grid encontrado con Playwright: `grid-area:<nombre>` en cada tile
+     crea una área implícita de 1x1 con ESE nombre aunque el padre ya
+     no tenga grid-template-areas (spec: un <custom-ident> repetido en
+     las 4 propiedades de posición declara su propia área si no existe
+     una) — sin resetear grid-area, los 5 tiles quedaban anclados a esa
+     área degenerada y se apilaban exactamente en la misma celda. */
+  .discover-vibe-grid{grid-template-columns:1fr;grid-template-rows:none;grid-template-areas:none}
+  .discover-vibe-tile{grid-area:auto;min-height:180px}
+  .discover-vibe-tile-accesorios{flex-direction:column;align-items:flex-start;justify-content:flex-end}
+  .discover-vibe-tile-accesorios .discover-vibe-tile-count{position:absolute;top:20px;right:22px}
+  .instagram-vibe{padding:64px 0}
 }
 
 @media(max-width:640px){
@@ -751,9 +620,7 @@ footer small{letter-spacing:.25em;font-size:7px}
   .hero-arrow{width:34px;height:34px;font-size:17px}
   .hero-arrow-prev{left:8px}
   .hero-arrow-next{right:8px}
-  .values{padding:28px 0}
-  .values-grid{grid-template-columns:1fr 1fr;gap:18px}
-  .explore{padding:52px 0 10px}
+  .discover-vibe-mosaic{padding:52px 0 10px}
   .featured{padding:40px 0 10px}
   .catalog{padding:40px 0 80px}
   .heading h2{font-size:46px}
@@ -763,8 +630,6 @@ footer small{letter-spacing:.25em;font-size:7px}
   .tabs::-webkit-scrollbar{display:none}
   .tabs-sub{margin:-6px 0 20px}
   .grid{gap:16px}
-  .category-grid{grid-template-columns:1fr}
-  .editorial{padding:70px 0}
   .cta-final{padding:50px 0}
   .detail-copy{padding:30px 24px}
   #productDetail{grid-template-columns:1fr}
@@ -787,13 +652,5 @@ footer small{letter-spacing:.25em;font-size:7px}
   .checkout-confirmation{padding:32px 20px 26px}
   .checkout-confirmation-actions{flex-direction:column}
   .checkout-confirmation-actions .button{width:100%}
-  .discover-landing{padding:44px 0 70px}
-  .discover-hero h2{font-size:32px}
-  .discover-featured .article-card{grid-template-columns:1fr}
-  .article-detail-body{padding:30px 24px}
-  #articleDetail{grid-template-columns:1fr}
-  .article-detail-hero,.article-detail-photo{min-height:330px}
-  dialog .article-no-image{min-height:330px}
-  .article-related .grid{grid-template-columns:1fr 1fr;gap:12px}
   footer .wrap{flex-direction:column;align-items:flex-start;gap:16px}
 }
