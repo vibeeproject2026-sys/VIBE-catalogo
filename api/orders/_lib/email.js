@@ -22,7 +22,22 @@ const BRAND = {
   pink: "#FF007A",
   pink2: "#FF4FA3",
   white: "#FFFFFF",
+  black: "#050505",
 };
+
+// Fase 40.1 — beautyvibecol.com / vibebeautycol.com no tiene todavía una
+// página funcional detrás (el dominio está verificado en Resend
+// únicamente como remitente de correo, no como sitio web) — el enlace
+// de marca del email debe apuntar al catálogo real y en producción.
+const CATALOG_URL = "https://vibe-catalogo.vercel.app";
+
+// Fase 40.1 — logo oficial real de VIBE (el mismo assets/vibe-logo.svg
+// que ya usa el header/footer del sitio en producción — nunca
+// reconstruido ni aproximado), exportado a PNG a 3x para que funcione
+// de forma confiable en clientes de correo que no soportan SVG en
+// <img> (Outlook de escritorio, notablemente). Es una conversión de
+// formato fiel al pixel del mismo archivo oficial, no un asset nuevo.
+const LOGO_URL = `${CATALOG_URL}/assets/vibe-logo-email.png`;
 
 function money(n) {
   return new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(n);
@@ -142,15 +157,15 @@ function buildOrderEmail(order) {
     "Tu belleza. Tu estilo. Tu VIBE.",
     "Gracias por elegir VIBE.",
     "Vibrant Iconic Beauty Essentials",
-    "vibebeautycol.com",
+    `Visita VIBE: ${CATALOG_URL}`,
   ].join("\n");
 
   const html = `<div style="background:#f6f6f6;padding:32px 16px;font-family:Helvetica,Arial,sans-serif;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:0 auto;background:${BRAND.white};border-radius:16px;overflow:hidden;">
       <tr>
-        <td style="background:${BRAND.pink};padding:32px 32px 28px;text-align:center;">
-          <p style="margin:0;color:${BRAND.white};font-size:11px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;">Vibrant Iconic Beauty Essentials</p>
-          <p style="margin:8px 0 0;color:${BRAND.white};font-size:32px;font-weight:800;letter-spacing:.04em;">VIBE</p>
+        <td style="background:${BRAND.black};padding:36px 32px 32px;text-align:center;">
+          <p style="margin:0 0 14px;color:${BRAND.white};font-size:11px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;">Vibrant Iconic Beauty Essentials</p>
+          <img src="${LOGO_URL}" width="180" height="67" alt="VIBE" style="display:inline-block;width:180px;height:67px;border:0;">
         </td>
       </tr>
       <tr>
@@ -235,8 +250,8 @@ function buildOrderEmail(order) {
         <td style="padding:36px 32px 40px;text-align:center;">
           <p style="margin:0 0 6px;font-size:16px;color:#111111;font-weight:700;">Tu belleza. Tu estilo. Tu VIBE.</p>
           <p style="margin:0 0 16px;font-size:13px;color:#777777;">Gracias por elegir VIBE.</p>
-          <p style="margin:0 0 4px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#999999;">Vibrant Iconic Beauty Essentials</p>
-          <p style="margin:0;font-size:12px;color:${BRAND.pink};">vibebeautycol.com</p>
+          <p style="margin:0 0 16px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#999999;">Vibrant Iconic Beauty Essentials</p>
+          <a href="${CATALOG_URL}" style="display:inline-block;font-size:12px;font-weight:700;color:${BRAND.pink};text-decoration:none;border:1px solid ${BRAND.pink};border-radius:999px;padding:10px 22px;">Visita VIBE</a>
         </td>
       </tr>
     </table>

@@ -239,16 +239,36 @@ async function main() {
     assert.ok(text.includes("TOTAL DEL PEDIDO:"));
     assert.ok(html.includes("Total del pedido"));
   });
+  console.log("\nbuildOrderEmail — logo oficial + link del catálogo (Fase 40.1)");
+  test("nunca contiene el texto 'vibebeautycol.com' (esa URL no tiene página funcional todavía)", () => {
+    const { text, html } = buildOrderEmail(FAKE_ORDER);
+    assert.ok(!text.includes("vibebeautycol.com"));
+    assert.ok(!html.includes("vibebeautycol.com"));
+  });
+  test("el enlace de marca del footer apunta exactamente a https://vibe-catalogo.vercel.app, con anchor 'Visita VIBE'", () => {
+    const { text, html } = buildOrderEmail(FAKE_ORDER);
+    assert.ok(text.includes("https://vibe-catalogo.vercel.app"));
+    assert.ok(html.includes('href="https://vibe-catalogo.vercel.app"'));
+    assert.ok(html.includes(">Visita VIBE<"));
+  });
+  test("el header usa el logo oficial real (assets/vibe-logo.svg exportado a PNG, nunca reconstruido) con alt text y tamaño fijo", () => {
+    const { html } = buildOrderEmail(FAKE_ORDER);
+    assert.ok(html.includes("vibe-logo-email.png"));
+    assert.ok(html.includes('alt="VIBE"'));
+    assert.ok(html.includes('width="180"') && html.includes('height="67"'), "debe tener width/height fijos para no romper el layout si las imágenes están bloqueadas");
+  });
   test("cierre de marca incluye la frase emocional 'Tu belleza. Tu estilo. Tu VIBE.'", () => {
     const { text, html } = buildOrderEmail(FAKE_ORDER);
     assert.ok(text.includes("Tu belleza. Tu estilo. Tu VIBE."));
     assert.ok(html.includes("Tu belleza. Tu estilo. Tu VIBE."));
   });
-  test("producto SIN imagen real -> placeholder de marca 'VIBE' en tabla anidada, nunca una imagen inventada", () => {
+  test("producto SIN imagen real -> placeholder de marca 'VIBE' en tabla anidada, nunca una imagen de producto inventada (Fase 40.1: el <img> del logo oficial en el header sigue presente y es esperado)", () => {
     const orderWithoutImage = { ...FAKE_ORDER, items: [{ ...FAKE_ORDER.items[0], image: null }] };
     const { html } = buildOrderEmail(orderWithoutImage);
-    assert.ok(!html.includes("<img"), "sin imagen real no debería renderizar ningún <img>");
-    assert.ok(html.includes("background:#151515"), "debería mostrar el placeholder oscuro de marca");
+    const imgTags = html.match(/<img[^>]*>/g) || [];
+    assert.equal(imgTags.length, 1, "el único <img> debería ser el del logo oficial del header");
+    assert.ok(imgTags[0].includes("vibe-logo-email.png"), "el único <img> presente debe ser el logo oficial");
+    assert.ok(html.includes("background:#151515"), "debería mostrar el placeholder oscuro de marca del producto");
   });
   test("producto CON imagen real -> renderiza <img> con esa URL exacta, nunca una inventada", () => {
     const orderWithImage = { ...FAKE_ORDER, items: [{ ...FAKE_ORDER.items[0], image: "https://xyz.supabase.co/storage/v1/object/public/product-images/products/1/main.webp" }] };
