@@ -172,25 +172,22 @@ header.scrolled .logo-image{width:126px;height:50px}
    propia, Accesorios como franja horizontal — vía grid-template-areas.
    Mismo tratamiento de placeholder oscuro+wordmark que el resto del
    sitio (.card-img-empty), nunca una foto de stock inventada. */
-.discover-vibe-mosaic{background:#fff;color:#111;padding:100px 0 24px}
-.discover-vibe-mosaic .eyebrow{color:var(--pink)}
-.discover-vibe-grid{display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:220px 220px 140px;grid-template-areas:"rostro rostro ojos labios" "rostro rostro skincare skincare" "accesorios accesorios accesorios accesorios";gap:16px}
-.discover-vibe-tile{position:relative;display:flex;flex-direction:column;justify-content:flex-end;width:100%;height:100%;text-align:left;font:inherit;border:0;border-radius:var(--radius);padding:26px;color:#fff;background:linear-gradient(155deg,#1c1c1c,#0b0b0b);overflow:hidden;transition:transform .25s ease,box-shadow .25s ease}
-.discover-vibe-tile:hover{transform:translateY(-4px);box-shadow:0 24px 48px -20px rgba(255,0,122,.5)}
-@media(prefers-reduced-motion:reduce){.discover-vibe-tile{transition:none}.discover-vibe-tile:hover{transform:none}}
-.discover-vibe-tile-rostro{grid-area:rostro;background:linear-gradient(160deg,#ff2f95,#7a0040)}
-.discover-vibe-tile-ojos{grid-area:ojos;background:linear-gradient(155deg,#1c1c1c,#0b0b0b)}
-.discover-vibe-tile-labios{grid-area:labios;background:linear-gradient(155deg,#420021,#150009)}
-.discover-vibe-tile-skincare{grid-area:skincare;background:linear-gradient(155deg,#2a0016,#0b0b0b)}
-.discover-vibe-tile-accesorios{grid-area:accesorios;flex-direction:row;align-items:center;justify-content:space-between;background:linear-gradient(160deg,#4a0026,#160009)}
-.discover-vibe-tile-label{font-size:clamp(24px,3vw,34px);font-weight:800;letter-spacing:-.02em;line-height:1.05;margin-bottom:8px}
-.discover-vibe-tile-accesorios .discover-vibe-tile-label{margin-bottom:0}
-.discover-vibe-tile-cta{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#ddd}
-.discover-vibe-tile-cta .arrow{transition:transform .2s ease}
-.discover-vibe-tile:hover .discover-vibe-tile-cta .arrow{transform:translateX(4px)}
-@media(prefers-reduced-motion:reduce){.discover-vibe-tile-cta .arrow{transition:none}.discover-vibe-tile:hover .discover-vibe-tile-cta .arrow{transform:none}}
-.discover-vibe-tile-count{position:absolute;top:20px;right:22px;font-size:11px;color:var(--pink);letter-spacing:.1em;text-transform:uppercase;font-weight:800}
-.discover-vibe-tile-accesorios .discover-vibe-tile-count{position:static}
+/* Fase 42 — "Descubre tu VIBE" pasa de mosaico de banners (hasta 220px,
+   tipografía clamp(24,3vw,34)) a una fila de chips compactos: mismo
+   descubrimiento por categoría real, altura mínima (~100px), tratamiento
+   uniforme (nunca 5 colores de banner distintos — eso es justamente lo
+   que se sentía "pesado"). */
+.discover-vibe-chips{background:#fff;color:#111;padding:56px 0}
+.discover-vibe-chips .eyebrow{color:var(--pink)}
+.discover-vibe-chip-row{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+.discover-vibe-chip{display:flex;flex-direction:column;justify-content:space-between;min-height:100px;width:100%;text-align:left;font:inherit;border:0;border-radius:14px;padding:16px 18px;color:#fff;background:linear-gradient(155deg,#1c1c1c,#0b0b0b);transition:transform .2s ease,box-shadow .2s ease}
+.discover-vibe-chip:hover{transform:translateY(-3px);box-shadow:0 14px 28px -14px rgba(255,0,122,.5)}
+@media(prefers-reduced-motion:reduce){.discover-vibe-chip{transition:none}.discover-vibe-chip:hover{transform:none}}
+.discover-vibe-chip-label{font-size:15px;font-weight:800;letter-spacing:-.01em}
+.discover-vibe-chip-count{display:block;margin-top:4px;font-size:10px;color:var(--pink);letter-spacing:.08em;text-transform:uppercase;font-weight:700}
+.discover-vibe-chip-arrow{align-self:flex-end;margin-top:8px;font-size:14px;color:#ddd;transition:transform .2s ease}
+.discover-vibe-chip:hover .discover-vibe-chip-arrow{transform:translateX(3px);color:var(--pink)}
+@media(prefers-reduced-motion:reduce){.discover-vibe-chip-arrow{transition:none}.discover-vibe-chip:hover .discover-vibe-chip-arrow{transform:none}}
 
 /* Fase 38 — "Encuentra tu VIBE" (Product Discovery): mismo contenedor
    .featured de siempre, sin cambios estructurales — solo el matiz de
@@ -206,7 +203,10 @@ header.scrolled .logo-image{width:126px;height:50px}
 .button.outline.light{color:#fff;border-color:#ffffff77}
 .button.outline.light:hover{background:#fff;color:#111}
 
-.featured{background:#fff;color:#111;padding:88px 0 24px}
+/* Fase 42 — pedido explícito: reducir la sensación de "bloques
+   gigantes" en el Home — 88px de aire superior se sentía pesado para
+   una sección de vitrina curada, nunca una PLP. */
+.featured{background:#fff;color:#111;padding:64px 0 24px}
 .featured .eyebrow{color:var(--pink)}
 .featured .wrap>.button{margin-top:8px}
 /* Fase 36.1 — pedido explícito: "cada bloque debe sentirse como una
@@ -546,20 +546,10 @@ footer small{letter-spacing:.25em;font-size:7px}
      deriva su alto de aspect-ratio (ver regla base), que ya responde
      solo al ancho disponible en este breakpoint (columna completa). */
   .heading{align-items:flex-start;flex-direction:column}
-  /* Fase 41 — mosaico "Descubre tu VIBE": la composición con áreas
-     nombradas (Rostro grande, etc.) es un tratamiento de escritorio;
-     en mobile colapsa a una columna con imágenes de tamaño legible
-     (nunca miniaturas), en el orden natural del DOM. Bug real de CSS
-     Grid encontrado con Playwright: `grid-area:<nombre>` en cada tile
-     crea una área implícita de 1x1 con ESE nombre aunque el padre ya
-     no tenga grid-template-areas (spec: un <custom-ident> repetido en
-     las 4 propiedades de posición declara su propia área si no existe
-     una) — sin resetear grid-area, los 5 tiles quedaban anclados a esa
-     área degenerada y se apilaban exactamente en la misma celda. */
-  .discover-vibe-grid{grid-template-columns:1fr;grid-template-rows:none;grid-template-areas:none}
-  .discover-vibe-tile{grid-area:auto;min-height:180px}
-  .discover-vibe-tile-accesorios{flex-direction:column;align-items:flex-start;justify-content:flex-end}
-  .discover-vibe-tile-accesorios .discover-vibe-tile-count{position:absolute;top:20px;right:22px}
+  /* Fase 42 — 5 chips en 5 columnas se aprietan por debajo de 900px;
+     2 columnas (mismo criterio que .grid de productos) da suficiente
+     aire sin importar el ancho exacto en este rango. */
+  .discover-vibe-chip-row{grid-template-columns:repeat(2,1fr)}
   .instagram-vibe{padding:64px 0}
 }
 
@@ -618,7 +608,8 @@ footer small{letter-spacing:.25em;font-size:7px}
   .hero-arrow{width:34px;height:34px;font-size:17px}
   .hero-arrow-prev{left:8px}
   .hero-arrow-next{right:8px}
-  .discover-vibe-mosaic{padding:52px 0 10px}
+  .discover-vibe-chips{padding:40px 0}
+  .discover-vibe-chip-row{gap:10px}
   .featured{padding:40px 0 10px}
   .catalog{padding:40px 0 80px}
   .heading h2{font-size:46px}

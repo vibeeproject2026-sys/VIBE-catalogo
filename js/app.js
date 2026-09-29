@@ -320,16 +320,25 @@ function goToFilter(overrides) {
   $("#catalogo").scrollIntoView({ behavior: "smooth" });
 }
 
-// Fase 41 — "Descubre tu VIBE": única sección de descubrimiento por
+// Fase 41/42 — "Descubre tu VIBE": única sección de descubrimiento por
 // categoría del Home (reemplaza a la vez "Shop VIBE" y "Shop by
 // Category" — decisión explícita de la usuaria, nunca conviven dos
-// secciones de categorías). Exactamente estas 5 tiles reales, pedidas
-// tal cual: Rostro/Ojos/Labios (categorías reales del grupo
+// secciones de categorías). Exactamente estas 5 categorías reales,
+// pedidas tal cual: Rostro/Ojos/Labios (categorías reales del grupo
 // Maquillaje), Skincare (grupo y categoría al ser lo mismo) y
 // Accesorios (categoría POS real "Otro" — ver categoryGroups.js,
 // Fase 41 Parte B.1). Conteos y enlaces 100% reales: mismo criterio
 // exacto que categoryOf()/groupOf() en taxonomy.js
 // (editorialCategory || category), nunca inventado.
+//
+// Fase 42 — auditoría de datos reales: solo 1/68 productos tiene una
+// subcategoría curada hoy (catalog_metadata.subcategory, existe y
+// funciona en Admin, casi sin usar todavía). El brief original de esta
+// fase pedía subcategorías reales en vez de categorías — confirmado
+// con la usuaria que, sin ese dato, se mantienen las 5 categorías pero
+// en un tratamiento de CHIP compacto (antes: tiles de hasta 220px con
+// tipografía enorme) — resuelve el problema real (bloques gigantes)
+// sin inventar ni depender de datos que no existen.
 const DISCOVER_VIBE_TILES = [
   { label: "Rostro", group: "Maquillaje", category: "Rostro" },
   { label: "Ojos", group: "Maquillaje", category: "Ojos" },
@@ -341,10 +350,10 @@ const DISCOVER_VIBE_TILES = [
 function renderDiscoverVibe() {
   $("#discoverVibeGrid").innerHTML = DISCOVER_VIBE_TILES.map(({ label, group, category }) => {
     const count = state.products.filter((p) => (p.editorialCategory || p.category) === category).length;
-    return `<button class="discover-vibe-tile discover-vibe-tile-${label.toLowerCase()}" data-group="${esc(group)}" data-category="${esc(category)}">
-      <span class="discover-vibe-tile-label">${esc(label)}</span>
-      <span class="discover-vibe-tile-cta">Explorar <span class="arrow">→</span></span>
-      <span class="discover-vibe-tile-count">${count} producto${count === 1 ? "" : "s"}</span>
+    return `<button class="discover-vibe-chip" data-group="${esc(group)}" data-category="${esc(category)}">
+      <span class="discover-vibe-chip-label">${esc(label)}</span>
+      <span class="discover-vibe-chip-count">${count} producto${count === 1 ? "" : "s"}</span>
+      <span class="discover-vibe-chip-arrow">→</span>
     </button>`;
   }).join("");
 }
@@ -780,7 +789,6 @@ function bindWorldNav(selector) {
 bindWorldNav(".nav-links");
 bindWorldNav("#mobileNav");
 bindWorldNav("#discoverVibeGrid");
-bindWorldNav("#discoveryPills");
 
 // Fase 27: los enlaces de Novedades del header navegan a la PLP real
 // filtrada (antes solo hacían scroll a la franja de la Home). Fase 41 —
