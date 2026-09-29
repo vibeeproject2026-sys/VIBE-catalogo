@@ -117,6 +117,12 @@ function productImage(p, cls = "product-photo") {
   return p.image ? `<img class="${cls}" src="${p.image}" alt="${esc(p.name)}" loading="lazy">` : `<span class="card-img-empty">${esc(p.imageLabel)}</span>`;
 }
 
+// Fase 41 — pedido explícito: la card retail-premium retira categoría/
+// descripción corta (esa información pasa a vivir solo en el PDP) y
+// deja la jerarquía imagen→marca→nombre→precio→CTA. El CTA se relabela
+// "Ver producto"→"+ Agregar" pero mantiene exactamente el mismo
+// comportamiento (navega al PDP) — nunca un quick-add-to-cart sin
+// pasar por la selección de variante/cantidad del PDP.
 function productCard(p) {
   // Fase 26: precio promocional solo si promoActive viene resuelto por el
   // servidor (nunca calculado aquí) y hay un promoPrice real. El badge
@@ -132,14 +138,12 @@ function productCard(p) {
       ${productImage(p)}
     </button>
     <div class="card-body">
-      <p class="product-category">${esc(p.category)}</p>
-      <h3>${esc(p.name)}</h3>
       ${p.brand ? `<p class="card-brand">${esc(p.brand)}</p>` : ""}
-      ${p.shortDescription ? `<p class="desc">${esc(p.shortDescription)}</p>` : ""}
+      <h3>${esc(p.name)}</h3>
       <span class="price">${money(showPromo ? p.promoPrice : p.price)}</span>
       ${showPromo ? `<span class="old">${money(p.price)}</span>` : p.oldPrice ? `<span class="old">${money(p.oldPrice)}</span>` : ""}
       ${p.available === false ? `<span class="availability-badge">Agotado</span>` : ""}
-      <button class="button card-cta" data-product="${p.id}">Ver producto</button>
+      <button class="button card-cta" data-product="${p.id}">+ Agregar</button>
     </div>
   </article>`;
 }

@@ -252,11 +252,11 @@ header.scrolled .logo-image{width:126px;height:50px}
 .tabs-sub .tab.active{background:#111;color:#fff;border-color:#111}
 #searchInput{width:260px;border:1px solid #ddd;border-radius:999px;padding:11px 16px;background:#fafafa;outline:0}
 
-/* Fase 36.1 — 4 columnas hacía que cada foto de producto fuera chica
-   (pedido explícito: "aumentar perceptiblemente tamaño de fotografía/
-   área visual" en las cards). 3 columnas en desktop = ~33% más ancho
-   por card, misma cantidad de aire (gap sin cambiar). */
-.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:26px}
+/* Fase 41 — pedido explícito, revierte la decisión de Fase 36.1: vuelve
+   a 4 columnas en desktop (retail premium, más productos visibles por
+   fila) — mobile se mantiene en 2 columnas (@media max-width:900px,
+   sin cambios). */
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:24px}
 .card{min-width:0}
 /* Fase 36 — la card ganó una elevación sutil en hover (foto completa
    levantándose con una sombra suave), el mismo lenguaje que ya usaba
@@ -281,10 +281,8 @@ header.scrolled .logo-image{width:126px;height:50px}
 }
 .card-badge{position:absolute;top:10px;left:10px;z-index:2;background:var(--pink);color:#fff;font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:4px 10px;border-radius:999px}
 .card-body{padding:18px 4px}
-.product-category{font-size:10px;color:var(--pink);letter-spacing:.18em;text-transform:uppercase;font-weight:800;margin:0 0 7px}
-.card h3{margin:0 0 4px;font-size:19px;letter-spacing:-.01em}
 .card-brand{margin:0 0 6px;font-size:12px;color:#888;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
-.desc{font-size:12px;color:#777;margin:0 0 10px}
+.card h3{margin:0 0 4px;font-size:19px;letter-spacing:-.01em}
 .price{font-size:17px;font-weight:800}
 .old{text-decoration:line-through;color:#777;font-weight:400;margin-left:7px;font-size:13px}
 .availability-badge{display:inline-block;margin-left:8px;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#b91c4a}
