@@ -320,8 +320,15 @@ function triStateField(name, label, value) {
 }
 
 async function openEdit(productId) {
-  const res = await adminFetch(`/api/admin/catalog-metadata?product_id=${encodeURIComponent(productId)}`);
-  if (res.status === 401) {
+  // Fase 41 — la capa promocional vive en `products` (POS), no en
+  // catalog_metadata, así que se carga con su propio fetch en paralelo
+  // — dos orígenes de datos distintos, nunca mezclados en un mismo
+  // request/guardado.
+  const [res, promoRes] = await Promise.all([
+    adminFetch(`/api/admin/catalog-metadata?product_id=${encodeURIComponent(productId)}`),
+    adminFetch(`/api/admin/product-promo?product_id=${encodeURIComponent(productId)}`),
+  ]);
+  if (res.status === 401 || promoRes.status === 401) {
     clearToken();
     showLogin("Token incorrecto o vencido.");
     return;
@@ -331,6 +338,7 @@ async function openEdit(productId) {
     return;
   }
   const { product, metadata } = await res.json();
+  const promo = promoRes.ok ? await promoRes.json() : { promoActive: false, promoPrice: null, promoStart: null, promoEnd: null, promoText: null, discountPercent: null };
   const m = metadata || {};
   // Fase 34 — additional_info ya llega como objeto (el servidor lo
   // parsea, ver api/admin/catalog-metadata.js): los ~40 campos
@@ -350,6 +358,32 @@ async function openEdit(productId) {
         <div><span>Disponibilidad</span>${Number(product.stock) > 0 ? "Disponible" : "Agotado"} (stock: ${product.stock})</div>
       </div>
     </div>
+
+    <details class="admin-accordion" open>
+      <summary>Promoción VIBE</summary>
+      <div class="admin-accordion-body">
+        <p class="section-hint">
+          Precio base del POS: <strong>${money(product.price)}</strong> — esta sección nunca lo modifica,
+          solo administra el descuento (mismas columnas de <code>products</code> que ya consume el catálogo
+          público; el POS sigue siendo la fuente de verdad de producto/precio/inventario).
+        </p>
+        <label class="checkbox-field"><input type="checkbox" id="promoActiveInput" ${promo.promoActive ? "checked" : ""}> Promoción activa</label>
+        <div class="edit-row">
+          <label>Precio promocional<input type="number" id="promoPriceInput" min="0" step="1" value="${promo.promoPrice ?? ""}" placeholder="Ej. 16640"></label>
+          <label>Texto promocional (opcional)<input id="promoTextInput" value="${esc(promo.promoText || "")}" placeholder="Ej. -20%"></label>
+        </div>
+        <div class="edit-row">
+          <label>Fecha inicio (opcional)<input type="date" id="promoStartInput" value="${promo.promoStart ? String(promo.promoStart).slice(0, 10) : ""}"></label>
+          <label>Fecha fin (opcional)<input type="date" id="promoEndInput" value="${promo.promoEnd ? String(promo.promoEnd).slice(0, 10) : ""}"></label>
+        </div>
+        <p id="promoSummary" class="section-hint"></p>
+        <p id="promoError" class="field-error"></p>
+        <div class="save-row">
+          <span id="promoSaveStatus" class="save-status"></span>
+          <button type="button" id="savePromoBtn" class="button dark">Guardar promoción</button>
+        </div>
+      </div>
+    </details>
 
     <details class="admin-accordion" open>
       <summary>2. Identificación</summary>
@@ -661,6 +695,82 @@ async function openEdit(productId) {
   });
 
   $("#cancelEdit").addEventListener("click", () => $("#editDialog").close());
+
+  // Fase 41 — resumen en vivo + validación (promo_price siempre menor
+  // al precio base, igual regla que ya aplica el servidor — se
+  // recalcula acá solo para dar feedback inmediato, la fuente de
+  // verdad sigue siendo la validación de api/admin/product-promo.js).
+  function readPromoForm() {
+    const priceStr = $("#promoPriceInput").value.trim();
+    return {
+      active: $("#promoActiveInput").checked,
+      price: priceStr === "" ? null : Number(priceStr),
+      start: $("#promoStartInput").value || null,
+      end: $("#promoEndInput").value || null,
+      text: $("#promoTextInput").value.trim() || null,
+    };
+  }
+  function updatePromoSummary() {
+    const f = readPromoForm();
+    const errEl = $("#promoError");
+    const saveBtn = $("#savePromoBtn");
+    errEl.textContent = "";
+    saveBtn.disabled = false;
+
+    if (f.price != null && (!Number.isFinite(f.price) || f.price <= 0)) {
+      errEl.textContent = "El precio promocional debe ser un número positivo.";
+      saveBtn.disabled = true;
+    } else if (f.price != null && f.price >= product.price) {
+      errEl.textContent = "El precio promocional debe ser menor al precio base.";
+      saveBtn.disabled = true;
+    } else if (f.active && f.price == null) {
+      errEl.textContent = "Necesitas un precio promocional para activar la promoción.";
+      saveBtn.disabled = true;
+    }
+
+    const pct = f.price != null && f.price > 0 && f.price < product.price ? Math.round((1 - f.price / product.price) * 100) : null;
+    $("#promoSummary").textContent = `Precio base: ${money(product.price)} · Precio promo: ${f.price != null ? money(f.price) : "—"} · Descuento: ${pct != null ? pct + "%" : "—"} · Estado: ${f.active ? "Activa" : "Inactiva"}`;
+  }
+  ["promoActiveInput", "promoPriceInput", "promoStartInput", "promoEndInput", "promoTextInput"].forEach((id) => {
+    $(`#${id}`).addEventListener("input", updatePromoSummary);
+  });
+  updatePromoSummary();
+
+  $("#savePromoBtn").addEventListener("click", async () => {
+    const f = readPromoForm();
+    const btn = $("#savePromoBtn"); // capturado antes del await — ver Fase 39, bug real de e.currentTarget tras await
+    btn.disabled = true;
+    $("#promoSaveStatus").textContent = "Guardando...";
+    try {
+      const patchRes = await adminFetch("/api/admin/product-promo", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          product_id: product.id,
+          promo_active: f.active,
+          promo_price: f.price,
+          promo_start: f.start,
+          promo_end: f.end,
+          promo_text: f.text,
+        }),
+      });
+      if (patchRes.status === 401) {
+        clearToken();
+        showLogin("Token incorrecto o vencido.");
+        return;
+      }
+      const payload = await patchRes.json().catch(() => ({}));
+      if (!patchRes.ok) {
+        $("#promoSaveStatus").textContent = "";
+        $("#promoError").textContent = (payload && payload.error) || "No se pudo guardar la promoción.";
+        return;
+      }
+      $("#promoSaveStatus").textContent = "Guardado.";
+      await loadProducts();
+    } finally {
+      btn.disabled = false;
+    }
+  });
 
   $("#uploadMainBtn").addEventListener("click", async () => {
     const file = $("#mainImageInput").files[0];

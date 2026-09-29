@@ -17,17 +17,18 @@
       <span class="logo-image"><img src="assets/vibe-logo.svg" alt="VIBE"></span>
       <small>VIBRANT ICONIC BEAUTY ESSENTIALS</small>
     </a>
-    <!-- Fase 37 — orden inspirado en la navegación real de e.l.f.
-         (What's Hot primero, Discover al final): Novedades encabeza la
-         nav (la entrada de "qué hay nuevo"), Discover sigue siendo el
-         último ítem — mismos links/ids/handlers, ningún link nuevo. -->
+    <!-- Fase 41 — Discover desaparece de la navegación (el brief lo
+         retira explícitamente); Promociones se renombra a Ofertas y
+         deja de ser condicional: ahora apunta a la página completa
+         #ofertas (que sí maneja su propio estado vacío elegante, ver
+         renderOfertasPage() en app.js), en vez de ocultarse cuando no
+         hay promoción activa. -->
     <nav class="nav-links">
       <a href="#catalogo" id="navNovedades">Novedades</a>
       <a href="#catalogo" data-group="Maquillaje">Maquillaje</a>
       <a href="#catalogo" data-group="Skincare">Skincare</a>
       <a href="#catalogo" data-group="Accesorios">Accesorios</a>
-      <a href="#catalogo" id="navPromociones" class="hidden">Promociones</a>
-      <a href="#discover" id="navDiscover">Discover</a>
+      <a href="#ofertas" id="navOfertas">Ofertas</a>
     </nav>
     <div class="nav-actions">
       <button id="cartButton" class="cart-btn">Carrito <b id="cartCount">0</b></button>
@@ -39,10 +40,12 @@
   <nav id="mobileNav" class="mobile-nav" aria-label="Menú móvil">
     <a href="#catalogo" id="mobileNavNovedades">Novedades</a>
     <a href="#catalogo" data-group="Maquillaje">Maquillaje</a>
+    <a href="#catalogo" class="mobile-nav-sub" data-group="Maquillaje" data-category="Rostro">Rostro</a>
+    <a href="#catalogo" class="mobile-nav-sub" data-group="Maquillaje" data-category="Ojos">Ojos</a>
+    <a href="#catalogo" class="mobile-nav-sub" data-group="Maquillaje" data-category="Labios">Labios</a>
     <a href="#catalogo" data-group="Skincare">Skincare</a>
     <a href="#catalogo" data-group="Accesorios">Accesorios</a>
-    <a href="#catalogo" id="mobileNavPromociones" class="hidden">Promociones</a>
-    <a href="#discover" id="mobileNavDiscover">Discover</a>
+    <a href="#ofertas" id="mobileNavOfertas">Ofertas</a>
     <a href="#catalogo" id="mobileSearchLink">Buscar</a>
   </nav>
 </header>
@@ -182,14 +185,19 @@
   </div>
 </section>
 
-<section id="promociones" class="featured hidden">
+<!-- Fase 41 — antes "Promociones": misma fuente de datos
+     (selectPromotions(), promoActive===true resuelto server-side),
+     mismo principio de ausencia total sin datos reales
+     (renderOfertasHome() en app.js). Ahora enlaza a la página completa
+     de Ofertas (#ofertas) en vez de solo scrollear dentro del Home. -->
+<section id="ofertasHome" class="featured hidden">
   <div class="wrap">
     <div class="heading">
-      <div><p class="eyebrow">POR TIEMPO LIMITADO</p><h2>Promociones</h2></div>
+      <div><p class="eyebrow">POR TIEMPO LIMITADO</p><h2>Ofertas VIBE</h2></div>
       <p>Aprovecha antes de que termine.</p>
     </div>
-    <div id="promocionesGrid" class="grid"></div>
-    <a class="button outline" href="#catalogo">Ver catálogo completo</a>
+    <div id="ofertasHomeGrid" class="grid"></div>
+    <a class="button outline" href="#ofertas">Ver todas las ofertas →</a>
   </div>
 </section>
 
@@ -239,6 +247,26 @@
     <p id="allSoldOutNotice" class="notice hidden">Todos los productos de esta selección están agotados por ahora.</p>
     <div id="productGrid" class="grid"></div>
     <p id="emptyState" class="empty hidden">Estamos preparando algo especial para ti.</p>
+  </div>
+</section>
+
+<!-- Fase 41 — página completa de Ofertas (antes solo existía el teaser
+     de Home). Misma fuente real (selectPromotions(), promoActive===true
+     resuelto server-side) — nunca una promoción inventada. Sin ninguna
+     activa hoy, se muestra un estado vacío honesto con salida al
+     catálogo completo, nunca una sección rota. Ver renderOfertasPage()
+     en app.js. -->
+<section id="ofertas" class="catalog">
+  <div class="wrap">
+    <div class="heading">
+      <div><p class="eyebrow">POR TIEMPO LIMITADO</p><h2>Ofertas VIBE</h2></div>
+      <p>Precios especiales, seleccionados por VIBE.</p>
+    </div>
+    <div id="ofertasGrid" class="grid"></div>
+    <div id="ofertasEmpty" class="empty hidden">
+      <p>Ahora mismo no hay ofertas. Pero siempre hay algo nuevo por descubrir.</p>
+      <a class="button outline" href="#catalogo">Ver catálogo →</a>
+    </div>
   </div>
 </section>
 

@@ -78,11 +78,17 @@ function tabButton(label, active, dataAttr) {
 // una marca persistente (.nav-active, ver CSS) mientras siga aplicada,
 // sin depender de que el mouse esté encima.
 function updateHeaderNavActive() {
+  // Fase 41 — el submenú mobile de Maquillaje (Rostro/Ojos/Labios,
+  // mismo data-group="Maquillaje" + un data-category propio) no debe
+  // marcarse activo solo por group — necesita que category también
+  // coincida, para no iluminar "Rostro" cuando en realidad se filtró
+  // por Maquillaje sin subcategoría (o por otra subcategoría).
   document.querySelectorAll(".nav-links a[data-group], #mobileNav a[data-group]").forEach((a) => {
-    a.classList.toggle("nav-active", state.group !== "Todos" && a.dataset.group === state.group);
+    const matchesGroup = state.group !== "Todos" && a.dataset.group === state.group;
+    const matchesCategory = !a.dataset.category || a.dataset.category === state.category;
+    a.classList.toggle("nav-active", matchesGroup && matchesCategory);
   });
   document.querySelectorAll("#navNovedades, #mobileNavNovedades").forEach((a) => a.classList.toggle("nav-active", state.newOnly === true));
-  document.querySelectorAll("#navPromociones, #mobileNavPromociones").forEach((a) => a.classList.toggle("nav-active", state.promo === true));
 }
 
 function renderNav() {
@@ -319,16 +325,29 @@ function renderNovedades() {
   if (list.length) $("#novedadesGrid").innerHTML = list.map(productCard).join("");
 }
 
-// Fase 26 — Promociones: única fuente, promoActive === true (ya resuelto
-// server-side). Sin datos reales, tanto la sección de Home como la
-// entrada de navegación (desktop + mobile) quedan completamente
-// ausentes — nunca un enlace vacío.
-function renderPromociones() {
+// Fase 26/41 — "Ofertas VIBE" en Home (antes "Promociones"): única
+// fuente, promoActive === true (ya resuelto server-side). Sin datos
+// reales, la sección completa queda ausente — nunca un bloque vacío.
+// El link de nav "Ofertas" ya no depende de esto (Fase 41: dejó de ser
+// condicional, siempre apunta a la página completa #ofertas, que
+// maneja su propio estado vacío — ver renderOfertasPage()).
+function renderOfertasHome() {
   const list = selectPromotions(state.products);
   const hasPromotions = list.length > 0;
-  $("#promociones").classList.toggle("hidden", !hasPromotions);
-  document.querySelectorAll("#navPromociones, #mobileNavPromociones").forEach((el) => el.classList.toggle("hidden", !hasPromotions));
-  if (hasPromotions) $("#promocionesGrid").innerHTML = list.map(productCard).join("");
+  $("#ofertasHome").classList.toggle("hidden", !hasPromotions);
+  if (hasPromotions) $("#ofertasHomeGrid").innerHTML = list.map(productCard).join("");
+}
+
+// Fase 41 — página completa "Ofertas" (#ofertas, ver index.html): misma
+// fuente real que renderOfertasHome(), sin paginación (la PLP tampoco
+// la tiene hoy) — muestra todas las promociones activas. Sin ninguna,
+// estado vacío honesto con salida al catálogo, nunca una grilla rota.
+function renderOfertasPage() {
+  const list = selectPromotions(state.products);
+  const hasPromotions = list.length > 0;
+  $("#ofertasGrid").classList.toggle("hidden", !hasPromotions);
+  $("#ofertasEmpty").classList.toggle("hidden", hasPromotions);
+  if (hasPromotions) $("#ofertasGrid").innerHTML = list.map(productCard).join("");
 }
 
 // Punto de entrada compartido por Shop by World, los enlaces de mundo del
@@ -966,6 +985,11 @@ $("#categoryShowcase").addEventListener("click", e => {
   goToFilter({ group: b.dataset.group });
 });
 
+// Fase 41 — el submenú mobile de Maquillaje (Rostro/Ojos/Labios) pasa
+// también un data-category, además del data-group ya existente —
+// goToFilter ya soporta category como filtro independiente (misma
+// lógica que ya usa el panel Filter&Sort), así que esto reusa 100% de
+// lo existente, solo agrega el segundo atributo al click handler.
 function bindWorldNav(selector) {
   const el = document.querySelector(selector);
   if (!el) return;
@@ -973,26 +997,21 @@ function bindWorldNav(selector) {
     const b = e.target.closest("[data-group]");
     if (!b) return;
     e.preventDefault();
-    goToFilter({ group: b.dataset.group });
+    goToFilter({ group: b.dataset.group, category: b.dataset.category || "Todos" });
   });
 }
 bindWorldNav(".nav-links");
 bindWorldNav("#mobileNav");
 
-// Fase 27: los enlaces de Novedades/Promociones del header ahora navegan
-// a la PLP real filtrada (antes solo hacían scroll a la franja de la
-// Home). Las franjas de Home (renderNovedades/renderPromociones, Fase 26)
-// no cambian.
+// Fase 27: los enlaces de Novedades del header navegan a la PLP real
+// filtrada (antes solo hacían scroll a la franja de la Home). Fase 41 —
+// Promociones se retiró de aquí: "Ofertas" en el nav ahora es un enlace
+// normal a la página #ofertas (renderOfertasPage()), ya no un filtro
+// que interceptar.
 document.querySelectorAll("#navNovedades, #mobileNavNovedades").forEach((el) => {
   el.addEventListener("click", (e) => {
     e.preventDefault();
     goToFilter({ newOnly: true });
-  });
-});
-document.querySelectorAll("#navPromociones, #mobileNavPromociones").forEach((el) => {
-  el.addEventListener("click", (e) => {
-    e.preventDefault();
-    goToFilter({ promo: true });
   });
 });
 
@@ -1046,7 +1065,8 @@ bindProductGrid("#featuredGrid");
 // Fase 28: estas dos nunca estuvieron enlazadas desde la Fase 26 — hacer
 // clic en una tarjeta de Novedades o Promociones en Home no abría nada.
 bindProductGrid("#novedadesGrid");
-bindProductGrid("#promocionesGrid");
+bindProductGrid("#ofertasHomeGrid");
+bindProductGrid("#ofertasGrid");
 bindProductGrid("#campaign");
 // Fase 30 — Discover.
 bindArticleGrid("#discoverHomeGrid");
@@ -1599,7 +1619,8 @@ async function loadCatalog() {
   renderFeatured();
   renderCampaign();
   renderNovedades();
-  renderPromociones();
+  renderOfertasHome();
+  renderOfertasPage();
   renderCategoryShowcase();
 
   // Fase 28 — link compartido de un producto (?product=<id>): la URL ya
