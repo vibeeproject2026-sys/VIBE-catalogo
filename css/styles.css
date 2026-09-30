@@ -1,4 +1,18 @@
-:root{--bg:#050505;--surface:#0b0b0b;--surface-2:#121212;--text:#fff;--muted:#b7b7b7;--line:#292929;--pink:#FF007A;--pink2:#FF4FA3;--max:1180px;--radius:18px}
+:root{--bg:#050505;--surface:#0b0b0b;--surface-2:#121212;--text:#fff;--muted:#b7b7b7;--line:#292929;--pink:#FF007A;--pink2:#FF4FA3;--max:1180px;--radius:18px;
+  /* Fase 42.3 — el Hero (abajo, .hero-grid) usa deliberadamente un
+     contenedor más ancho que --max (1440px vs 1180px, ver nota de la
+     Fase 35.3: la pieza del carrusel necesitaba más espacio) — eso deja
+     su borde izquierdo más pegado al viewport que el de .wrap, que es
+     lo que usa el logo del Header. En vez de un padding fijo (que se
+     desalinearía en otros anchos), esto calcula la mitad exacta de la
+     diferencia entre ambos contenedores en CUALQUIER viewport, y se
+     aplica como padding a .hero-copy — el logo y el texto del Hero
+     quedan en el mismo sistema de grid sin tocar el ancho/proporción
+     de la imagen del carrusel. Se resuelve a 0 automáticamente en
+     cuanto cualquiera de los dos contenedores cae por debajo de su
+     tope (≤1220px), que es también donde el Hero pasa a una columna. */
+  --hero-align-pad:calc((min(1440px,100vw - 40px) - min(var(--max),100vw - 40px)) / 2)
+}
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
 body{margin:0;background:var(--bg);color:var(--text);font-family:"Inter",system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
@@ -93,6 +107,12 @@ header.scrolled .logo-image{width:138px}
    mobile/tablet (el cap de 1440px nunca compite ahí), así que esto no
    toca esos breakpoints. */
 .hero-grid{display:grid;grid-template-columns:2fr 3fr;gap:48px;align-items:center;width:min(1440px,calc(100% - 40px));margin:0 auto}
+/* Fase 42.3 — desplaza el bloque de bienvenida hacia el centro de su
+   columna (antes pegado al borde izquierdo real del viewport) y lo
+   alinea con el logo del Header — ver --hero-align-pad arriba. Sigue
+   siendo una composición alineada a la izquierda, solo con aire real
+   antes del primer carácter. */
+.hero-copy{padding-left:var(--hero-align-pad)}
 .hero h1{font-size:clamp(58px,8vw,98px);line-height:.88;letter-spacing:-.055em;margin:0;font-weight:800}
 .hero h1 span{color:var(--pink)}
 .lead{max-width:450px;color:#bdbdbd;font-size:17px;line-height:1.55;margin:30px 0}
@@ -561,8 +581,18 @@ footer small{letter-spacing:.25em;font-size:7px}
 @media(max-width:640px){
   .wrap{width:calc(100% - 28px)}
   .nav{height:78px}
-  header.scrolled .nav{height:64px}
-  .logo-image{width:146px}
+  /* Fase 42.3 — bug real encontrado: header.scrolled .nav ya achicaba
+     la barra (78→64px), pero header.scrolled .logo-image seguía
+     resolviendo a la regla de escritorio (138px, especificidad 0,2,0)
+     porque .logo-image{width:146px} de acá arriba tiene menos
+     especificidad (0,1,0) y nunca le ganaba — el logo mobile pasaba de
+     146 a 138px, un cambio de apenas 5%, casi imperceptible. Esta regla
+     (misma especificidad 0,2,0 que la de escritorio, pero definida
+     después en el archivo) sí gana, y con una reducción real (~26%),
+     el efecto de scroll vuelve a notarse en mobile. */
+  header.scrolled .nav{height:58px}
+  .logo-image{width:152px}
+  header.scrolled .logo-image{width:112px}
   .logo small{font-size:5px}
   .nav-links{display:none}
   .menu-btn{display:flex}
