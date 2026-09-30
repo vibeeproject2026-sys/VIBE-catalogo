@@ -6,7 +6,6 @@ import {
   getSubcategories,
   filterProducts,
   breadcrumbForState,
-  selectFeatured,
   selectPromotions,
   sortProducts,
   emptyStateCopy,
@@ -264,25 +263,6 @@ function removeFilter(key) {
   applyFiltersAndRender();
 }
 
-// Fase 38 — "Descubre VIBE" (Product Discovery): el brief pide que esta
-// sección SIEMPRE tenga productos reales, sin depender de curaduría que
-// hoy no existe (0 featured en producción). selectFeatured() sigue
-// siendo la fuente cuando SÍ hay curaduría real (Fase 24, sin cambios);
-// solo cuando no hay ninguno se cae a una muestra real de catálogo
-// disponible — nunca "los primeros N" disfrazados de destacados: el
-// encabezado ("Descubre VIBE") ya no promete curaduría editorial como
-// "Destacados" sí hacía, así que mostrar catálogo real aquí no es
-// inventar nada. Cada card sigue mostrando solo badge/precio/
-// disponibilidad reales — nunca "Nuevo"/"Best Seller" fabricados.
-const PRODUCT_DISCOVERY_FALLBACK_SIZE = 8;
-function renderFeatured() {
-  const curated = selectFeatured(state.products);
-  const list = curated.length ? curated : state.products.filter((p) => p.available !== false).slice(0, PRODUCT_DISCOVERY_FALLBACK_SIZE);
-  $("#featuredGrid").innerHTML = list.length
-    ? list.map(productCard).join("")
-    : `<p class="empty">Estamos preparando la selección VIBE.</p>`;
-}
-
 // Fase 26/41 — "Ofertas VIBE" en Home (antes "Promociones"): única
 // fuente, promoActive === true (ya resuelto server-side). Sin datos
 // reales, la sección completa queda ausente — nunca un bloque vacío.
@@ -331,29 +311,45 @@ function goToFilter(overrides) {
 // exacto que categoryOf()/groupOf() en taxonomy.js
 // (editorialCategory || category), nunca inventado.
 //
-// Fase 42 — auditoría de datos reales: solo 1/68 productos tiene una
-// subcategoría curada hoy (catalog_metadata.subcategory, existe y
-// funciona en Admin, casi sin usar todavía). El brief original de esta
-// fase pedía subcategorías reales en vez de categorías — confirmado
-// con la usuaria que, sin ese dato, se mantienen las 5 categorías pero
-// en un tratamiento de CHIP compacto (antes: tiles de hasta 220px con
-// tipografía enorme) — resuelve el problema real (bloques gigantes)
-// sin inventar ni depender de datos que no existen.
+// Fase 42.6 — pedido explícito: Rostro y Labios ganan protagonismo
+// visual (tile más grande) — decisión de diseño fija, independiente de
+// qué producto termine ilustrándola. La FOTO en sí sigue siendo 100%
+// data-driven: se toma el primer producto real de esa categoría que
+// tenga imagen subida (auditoría en producción: solo 2/68 productos
+// tienen foto real hoy — id 122 "Rubor líquido" en Rostro, id 110
+// "VIBE Lip Duo" en Labios — pura coincidencia que sean justo las dos
+// categorías priorizadas). Si una categoría no tiene ningún producto
+// con foto, cae al mismo placeholder de marca (gradiente oscuro) que
+// ya usa el resto del sitio — nunca una imagen inventada ni prestada
+// de otra categoría.
 const DISCOVER_VIBE_TILES = [
-  { label: "Rostro", group: "Maquillaje", category: "Rostro" },
-  { label: "Ojos", group: "Maquillaje", category: "Ojos" },
-  { label: "Labios", group: "Maquillaje", category: "Labios" },
-  { label: "Skincare", group: "Skincare", category: "Skincare" },
-  { label: "Accesorios", group: "Accesorios", category: "Otro" },
+  { label: "Rostro", group: "Maquillaje", category: "Rostro", featured: true },
+  { label: "Labios", group: "Maquillaje", category: "Labios", featured: true },
+  { label: "Ojos", group: "Maquillaje", category: "Ojos", featured: false },
+  { label: "Skincare", group: "Skincare", category: "Skincare", featured: false },
+  { label: "Accesorios", group: "Accesorios", category: "Otro", featured: false },
 ];
 
 function renderDiscoverVibe() {
-  $("#discoverVibeGrid").innerHTML = DISCOVER_VIBE_TILES.map(({ label, group, category }) => {
-    const count = state.products.filter((p) => (p.editorialCategory || p.category) === category).length;
-    return `<button class="discover-vibe-chip" data-group="${esc(group)}" data-category="${esc(category)}">
-      <span class="discover-vibe-chip-label">${esc(label)}</span>
-      <span class="discover-vibe-chip-count">${count} producto${count === 1 ? "" : "s"}</span>
-      <span class="discover-vibe-chip-arrow">→</span>
+  $("#discoverVibeGrid").innerHTML = DISCOVER_VIBE_TILES.map(({ label, group, category, featured }) => {
+    const inCategory = state.products.filter((p) => (p.editorialCategory || p.category) === category);
+    const count = inCategory.length;
+    const withPhoto = inCategory.find((p) => p.image);
+    const sizeClass = featured ? "discover-tile-featured" : "discover-tile-compact";
+    const slugClass = `discover-tile-${label.toLowerCase()}`;
+    const imageHtml = withPhoto
+      ? `<img class="discover-tile-photo" src="${esc(withPhoto.image)}" alt="${esc(label)}" loading="lazy">`
+      : `<span class="discover-tile-empty" aria-hidden="true">VIBE</span>`;
+    return `<button class="discover-tile ${sizeClass} ${slugClass}" data-group="${esc(group)}" data-category="${esc(category)}">
+      ${imageHtml}
+      <span class="discover-tile-scrim"></span>
+      <span class="discover-tile-body">
+        <span class="discover-tile-label">${esc(label)}</span>
+        <span class="discover-tile-meta">
+          <span class="discover-tile-cta">Explorar →</span>
+          <span class="discover-tile-count">${count} producto${count === 1 ? "" : "s"}</span>
+        </span>
+      </span>
     </button>`;
   }).join("");
 }
@@ -848,7 +844,6 @@ $("#activeFilters").addEventListener("click", (e) => {
 });
 
 bindProductGrid("#productGrid");
-bindProductGrid("#featuredGrid");
 bindProductGrid("#ofertasHomeGrid");
 bindProductGrid("#ofertasGrid");
 
@@ -1332,7 +1327,6 @@ async function loadCatalog() {
   applyUrlToFilterState(urlState);
 
   $("#productGrid").innerHTML = `<p class="empty">Cargando catálogo...</p>`;
-  $("#featuredGrid").innerHTML = `<p class="empty">Cargando selección...</p>`;
   $("#discoverVibeGrid").innerHTML = `<p class="empty">Cargando categorías...</p>`;
 
   try {
@@ -1341,14 +1335,12 @@ async function loadCatalog() {
     console.error("[VIBE] No se pudo inicializar el catálogo.", e);
     const message = `<p class="empty">No pudimos cargar el catálogo en este momento. Intenta de nuevo más tarde.</p>`;
     $("#productGrid").innerHTML = message;
-    $("#featuredGrid").innerHTML = message;
     $("#discoverVibeGrid").innerHTML = message;
     return;
   }
 
   renderNav();
   renderProducts();
-  renderFeatured();
   renderOfertasHome();
   renderOfertasPage();
   renderDiscoverVibe();

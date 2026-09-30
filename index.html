@@ -78,61 +78,22 @@
   </div>
 </section>
 
-<!-- Fase 42 — "Descubre tu VIBE": auditoría de datos reales mostró que
-     solo 1/68 productos tiene subcategoría curada (catalog_metadata.
-     subcategory), así que un mosaico a nivel de subcategoría hoy
-     mostraría casi nada real — decisión confirmada con la usuaria:
-     mantener las 5 categorías reales (Rostro/Ojos/Labios/Skincare/
-     Accesorios), pero como chips compactos en vez de banners gigantes
-     (Fase 41 los mostraba como bloques de hasta 220px con tipografía
-     enorme — exactamente lo que esta fase pide reducir). Conteos y
-     enlaces 100% reales, mismo goToFilter()/bindWorldNav() de siempre
-     (ver renderDiscoverVibe() en app.js). -->
-<section id="discoverVibe" class="discover-vibe-chips">
+<!-- Fase 42/42.6 — "Descubre tu VIBE": mismas 5 categorías reales
+     (Rostro/Ojos/Labios/Skincare/Accesorios — auditoría de la Fase 42
+     confirmó que las subcategorías reales son insuficientes hoy, 1/68
+     productos). Fase 42.6 — pedido explícito: pasa de chips de texto a
+     tiles visuales con foto real de producto (Rostro/Labios, las dos
+     únicas categorías con foto subida hoy en producción — coincidencia
+     real, no forzada) y protagonismo visual mayor para esas dos; el
+     resto usa el mismo placeholder de marca del sitio. Conteos/enlaces
+     100% reales, mismo goToFilter()/bindWorldNav() de siempre (ver
+     renderDiscoverVibe() en app.js). -->
+<section id="discoverVibe" class="discover-vibe-visual">
   <div class="wrap">
     <div class="heading">
       <div><p class="eyebrow">DESCUBRE</p><h2>Descubre tu VIBE</h2></div>
     </div>
-    <div id="discoverVibeGrid" class="discover-vibe-chip-row"></div>
-  </div>
-</section>
-
-<!-- Fase 38/41/42 — "Encuentra tu VIBE" (antes "Product Discovery"): a
-     diferencia de Ofertas (oculta sin dato real), esta sección SIEMPRE
-     muestra productos reales — usa featured si existe curaduría
-     (selectFeatured), y si no (nuestro caso hoy: 0 featured), cae a una
-     muestra real del catálogo disponible (ver renderFeatured() en
-     app.js). Nunca inventa Nuevo/Best Seller/reviews/rating/promo — cada
-     card sigue mostrando solo lo que ese producto realmente tiene.
-     Fase 42 — pedido explícito: dejó de sentirse como "selección
-     editorial" para sentirse como una PLP incrustada; se retiran los
-     pills de filtro rápido (duplicaban el nav del header y la propia
-     PLP) para que esto vuelva a leerse como una vitrina curada, no
-     otro punto de filtrado más. -->
-<section id="productDiscovery" class="featured">
-  <div class="wrap">
-    <div class="heading">
-      <div><p class="eyebrow">CATÁLOGO</p><h2>Encuentra tu VIBE</h2></div>
-      <p>Una selección de lo que puedes encontrar hoy en tu ritual VIBE.</p>
-    </div>
-    <div id="featuredGrid" class="grid"></div>
-    <a class="button outline" href="#catalogo">Ver todo el catálogo →</a>
-  </div>
-</section>
-
-<!-- Fase 41 — antes "Promociones": misma fuente de datos
-     (selectPromotions(), promoActive===true resuelto server-side),
-     mismo principio de ausencia total sin datos reales
-     (renderOfertasHome() en app.js). Ahora enlaza a la página completa
-     de Ofertas (#ofertas) en vez de solo scrollear dentro del Home. -->
-<section id="ofertasHome" class="featured hidden">
-  <div class="wrap">
-    <div class="heading">
-      <div><p class="eyebrow">POR TIEMPO LIMITADO</p><h2>Ofertas VIBE</h2></div>
-      <p>Aprovecha antes de que termine.</p>
-    </div>
-    <div id="ofertasHomeGrid" class="grid"></div>
-    <a class="button outline" href="#ofertas">Ver todas las ofertas →</a>
+    <div id="discoverVibeGrid" class="discover-tile-grid"></div>
   </div>
 </section>
 
@@ -157,6 +118,25 @@
     <p id="allSoldOutNotice" class="notice hidden">Todos los productos de esta selección están agotados por ahora.</p>
     <div id="productGrid" class="grid"></div>
     <p id="emptyState" class="empty hidden">Estamos preparando algo especial para ti.</p>
+  </div>
+</section>
+
+<!-- Fase 41 — antes "Promociones": misma fuente de datos
+     (selectPromotions(), promoActive===true resuelto server-side),
+     mismo principio de ausencia total sin datos reales
+     (renderOfertasHome() en app.js). Ahora enlaza a la página completa
+     de Ofertas (#ofertas) en vez de solo scrollear dentro del Home.
+     Fase 42.6 — reordenada después de #catalogo para que la
+     arquitectura del Home quede Hero→Descubre tu VIBE→Catálogo→
+     Ofertas→Instagram→Footer. -->
+<section id="ofertasHome" class="featured hidden">
+  <div class="wrap">
+    <div class="heading">
+      <div><p class="eyebrow">POR TIEMPO LIMITADO</p><h2>Ofertas VIBE</h2></div>
+      <p>Aprovecha antes de que termine.</p>
+    </div>
+    <div id="ofertasHomeGrid" class="grid"></div>
+    <a class="button outline" href="#ofertas">Ver todas las ofertas →</a>
   </div>
 </section>
 

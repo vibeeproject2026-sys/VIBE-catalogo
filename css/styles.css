@@ -41,9 +41,13 @@ header.scrolled .nav{height:68px}
    504x207px reales) reemplaza el SVG reconstruido. aspect-ratio usa la
    proporción NATIVA real del PNG en vez de forzar el 154x62 heredado
    del SVG (proporción distinta, 2.48:1 vs 2.43:1 real) — así
-   object-fit:contain nunca necesita compensar con letterboxing. */
-.logo-image{display:block;width:170px;aspect-ratio:504/207;overflow:hidden;transition:width .25s ease}
-header.scrolled .logo-image{width:138px}
+   object-fit:contain nunca necesita compensar con letterboxing.
+   Fase 42.6 — pedido explícito: el logo se sentía demasiado grande en
+   su estado máximo. Reducido ~18% (170px→140px) manteniendo la misma
+   proporción de reducción al hacer scroll (~17%, 138px→114px) — más
+   aire alrededor sin tocar el asset ni la altura del Header. */
+.logo-image{display:block;width:140px;aspect-ratio:504/207;overflow:hidden;transition:width .25s ease}
+header.scrolled .logo-image{width:114px}
 .logo-image img{width:100%;height:100%;object-fit:contain;display:block}
 .logo small{font-size:6px;letter-spacing:.31em;color:#fff;white-space:nowrap}
 .nav-links{display:flex;gap:30px;color:#b7b7b7;font-size:13px;font-weight:700;letter-spacing:.02em}
@@ -190,35 +194,43 @@ header.scrolled .logo-image{width:138px}
 .heading h2{font-size:58px;letter-spacing:-.045em;margin:0}
 .heading>p{color:#6e6e6e;font-size:13px}
 
-/* Fase 41 — "Descubre tu VIBE": reemplaza a la vez "Shop VIBE" y "Shop
-   by Category" (única sección de descubrimiento por categoría del
-   Home). Mosaico editorial en vez de una grilla pareja: Rostro más
-   grande (2x2), Ojos/Labios individuales, Skincare con presencia
-   propia, Accesorios como franja horizontal — vía grid-template-areas.
-   Mismo tratamiento de placeholder oscuro+wordmark que el resto del
-   sitio (.card-img-empty), nunca una foto de stock inventada. */
-/* Fase 42 — "Descubre tu VIBE" pasa de mosaico de banners (hasta 220px,
-   tipografía clamp(24,3vw,34)) a una fila de chips compactos: mismo
-   descubrimiento por categoría real, altura mínima (~100px), tratamiento
-   uniforme (nunca 5 colores de banner distintos — eso es justamente lo
-   que se sentía "pesado"). */
-.discover-vibe-chips{background:#fff;color:#111;padding:56px 0}
-.discover-vibe-chips .eyebrow{color:var(--pink)}
-.discover-vibe-chip-row{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
-.discover-vibe-chip{display:flex;flex-direction:column;justify-content:space-between;min-height:100px;width:100%;text-align:left;font:inherit;border:0;border-radius:14px;padding:16px 18px;color:#fff;background:linear-gradient(155deg,#1c1c1c,#0b0b0b);transition:transform .2s ease,box-shadow .2s ease}
-.discover-vibe-chip:hover{transform:translateY(-3px);box-shadow:0 14px 28px -14px rgba(255,0,122,.5)}
-@media(prefers-reduced-motion:reduce){.discover-vibe-chip{transition:none}.discover-vibe-chip:hover{transform:none}}
-.discover-vibe-chip-label{font-size:15px;font-weight:800;letter-spacing:-.01em}
-.discover-vibe-chip-count{display:block;margin-top:4px;font-size:10px;color:var(--pink);letter-spacing:.08em;text-transform:uppercase;font-weight:700}
-.discover-vibe-chip-arrow{align-self:flex-end;margin-top:8px;font-size:14px;color:#ddd;transition:transform .2s ease}
-.discover-vibe-chip:hover .discover-vibe-chip-arrow{transform:translateX(3px);color:var(--pink)}
-@media(prefers-reduced-motion:reduce){.discover-vibe-chip-arrow{transition:none}.discover-vibe-chip:hover .discover-vibe-chip-arrow{transform:none}}
-
-/* Fase 38 — "Encuentra tu VIBE" (Product Discovery): mismo contenedor
-   .featured de siempre, sin cambios estructurales — solo el matiz de
-   fondo propio (igual criterio que Ofertas) para que se distinga del
-   mosaico justo arriba. */
-#productDiscovery{background:linear-gradient(180deg,#fff7fb,#fff)}
+/* Fase 42.6 — "Descubre tu VIBE": tercera iteración. De chips de texto
+   (Fase 42) a tiles visuales con foto real de producto — Rostro y
+   Labios ganan protagonismo (tile grande, 2 filas) por pedido
+   explícito, el resto queda compacto en la fila de abajo. Nunca una
+   pared de 5 tarjetas idénticas. Sin foto real disponible para una
+   categoría, cae al mismo placeholder oscuro+wordmark del resto del
+   sitio (.card-img-empty) — nunca una foto de stock inventada ni
+   prestada de otra categoría (ver renderDiscoverVibe() en app.js). */
+.discover-vibe-visual{background:#fff;color:#111;padding:56px 0}
+.discover-vibe-visual .eyebrow{color:var(--pink)}
+.discover-tile-grid{display:grid;grid-template-columns:repeat(6,1fr);grid-template-rows:190px 190px 140px;gap:16px;
+  grid-template-areas:
+    "rostro rostro rostro labios labios labios"
+    "rostro rostro rostro labios labios labios"
+    "ojos ojos skincare skincare accesorios accesorios"}
+.discover-tile-rostro{grid-area:rostro}
+.discover-tile-labios{grid-area:labios}
+.discover-tile-ojos{grid-area:ojos}
+.discover-tile-skincare{grid-area:skincare}
+.discover-tile-accesorios{grid-area:accesorios}
+.discover-tile{position:relative;display:block;width:100%;height:100%;border:0;border-radius:var(--radius);overflow:hidden;padding:0;text-align:left;font:inherit;background:linear-gradient(160deg,#1c1c1c,#0b0b0b);transition:transform .25s ease,box-shadow .25s ease}
+.discover-tile:hover{transform:translateY(-4px);box-shadow:0 22px 44px -20px rgba(255,0,122,.5)}
+@media(prefers-reduced-motion:reduce){.discover-tile{transition:none}.discover-tile:hover{transform:none}}
+.discover-tile-photo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;transition:transform .35s ease}
+.discover-tile:hover .discover-tile-photo{transform:scale(1.04)}
+@media(prefers-reduced-motion:reduce){.discover-tile-photo{transition:none}.discover-tile:hover .discover-tile-photo{transform:none}}
+/* Fase 42.6 — align-items:start (no center) para que el wordmark de
+   placeholder nunca compita con la etiqueta de categoría anclada abajo
+   en las tiles compactas, que son bajas (120-140px). */
+.discover-tile-empty{position:absolute;inset:0;display:grid;align-items:start;justify-content:center;padding-top:22px;color:var(--pink);font-weight:800;letter-spacing:.16em;font-size:13px;text-transform:uppercase}
+.discover-tile-scrim{position:absolute;inset:0;background:linear-gradient(0deg,#000000d9 0%,#00000000 60%)}
+.discover-tile-body{position:absolute;left:0;right:0;bottom:0;padding:16px 18px;color:#fff}
+.discover-tile-label{display:block;font-weight:800;letter-spacing:-.01em;font-size:17px}
+.discover-tile-featured .discover-tile-label{font-size:26px}
+.discover-tile-meta{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:6px}
+.discover-tile-cta{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#fff}
+.discover-tile-count{font-size:10px;color:#ddd;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap}
 
 /* Fase 41 — Instagram: bloque estático oscuro, sin feed embebido. */
 .instagram-vibe{background:#0b0b0b;color:#fff;padding:96px 0;position:relative;overflow:hidden}
@@ -571,10 +583,18 @@ footer small{letter-spacing:.25em;font-size:7px}
      deriva su alto de aspect-ratio (ver regla base), que ya responde
      solo al ancho disponible en este breakpoint (columna completa). */
   .heading{align-items:flex-start;flex-direction:column}
-  /* Fase 42 — 5 chips en 5 columnas se aprietan por debajo de 900px;
-     2 columnas (mismo criterio que .grid de productos) da suficiente
-     aire sin importar el ancho exacto en este rango. */
-  .discover-vibe-chip-row{grid-template-columns:repeat(2,1fr)}
+  /* Fase 42.6 — el grid de 6 columnas de escritorio (Rostro/Labios
+     grandes lado a lado) se aprieta por debajo de 900px. Mobile:
+     Rostro y Labios pasan a ocupar su propia fila completa (siguen
+     siendo las tiles protagonistas), Ojos+Skincare se emparejan en 2
+     columnas, Accesorios cierra como franja horizontal — nunca una
+     pared de 5 tiles idénticas. */
+  .discover-tile-grid{grid-template-columns:repeat(2,1fr);grid-template-rows:220px 220px 140px 100px;gap:12px;
+    grid-template-areas:
+      "rostro rostro"
+      "labios labios"
+      "ojos skincare"
+      "accesorios accesorios"}
   .instagram-vibe{padding:64px 0}
 }
 
@@ -583,16 +603,16 @@ footer small{letter-spacing:.25em;font-size:7px}
   .nav{height:78px}
   /* Fase 42.3 — bug real encontrado: header.scrolled .nav ya achicaba
      la barra (78→64px), pero header.scrolled .logo-image seguía
-     resolviendo a la regla de escritorio (138px, especificidad 0,2,0)
-     porque .logo-image{width:146px} de acá arriba tiene menos
-     especificidad (0,1,0) y nunca le ganaba — el logo mobile pasaba de
-     146 a 138px, un cambio de apenas 5%, casi imperceptible. Esta regla
-     (misma especificidad 0,2,0 que la de escritorio, pero definida
-     después en el archivo) sí gana, y con una reducción real (~26%),
-     el efecto de scroll vuelve a notarse en mobile. */
+     resolviendo a la regla de escritorio (especificidad 0,2,0) porque
+     .logo-image{width} de acá arriba tiene menos especificidad
+     (0,1,0) y nunca le ganaba. Esta regla (misma especificidad 0,2,0
+     que la de escritorio, pero definida después en el archivo) sí
+     gana — mantiene el efecto de scroll perceptible en mobile.
+     Fase 42.6 — misma reducción ~18% que en escritorio (152px→125px,
+     scrolled 112px→92px, mismo ratio de achique ~26% al hacer scroll). */
   header.scrolled .nav{height:58px}
-  .logo-image{width:152px}
-  header.scrolled .logo-image{width:112px}
+  .logo-image{width:125px}
+  header.scrolled .logo-image{width:92px}
   .logo small{font-size:5px}
   .nav-links{display:none}
   .menu-btn{display:flex}
@@ -602,8 +622,14 @@ footer small{letter-spacing:.25em;font-size:7px}
      pantalla completa). El copy actual (eyebrow/H1/lead/CTA) se oculta
      solo aquí — sigue intacto en el código y en desktop, no se eliminó
      (no se reutiliza en ningún otro lugar del sitio, se verificó antes
-     de tocar nada). */
-  .hero{padding:0}
+     de tocar nada).
+     Fase 42.6 — pedido explícito, SOLO mobile: con padding:0 el
+     carrusel arrancaba pegado al Header sticky, se sentía "montado"
+     encima. margin-top (no padding-top del Header, que no se toca)
+     agrega un respiro externo sutil sin cambiar la altura interna del
+     Header ni el tamaño/proporción del carrusel. Desktop no tiene esta
+     regla — el spacing ahí ya era correcto y no se toca. */
+  .hero{padding:0;margin-top:10px}
   .hero-copy{display:none}
   .hero-grid{gap:0}
 
@@ -643,8 +669,9 @@ footer small{letter-spacing:.25em;font-size:7px}
   .hero-arrow{width:34px;height:34px;font-size:17px}
   .hero-arrow-prev{left:8px}
   .hero-arrow-next{right:8px}
-  .discover-vibe-chips{padding:40px 0}
-  .discover-vibe-chip-row{gap:10px}
+  .discover-vibe-visual{padding:40px 0}
+  .discover-tile-grid{grid-template-rows:190px 190px 120px 90px;gap:10px}
+  .discover-tile-featured .discover-tile-label{font-size:22px}
   .featured{padding:40px 0 10px}
   .catalog{padding:40px 0 80px}
   .heading h2{font-size:46px}
