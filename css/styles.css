@@ -194,43 +194,35 @@ header.scrolled .logo-image{width:114px}
 .heading h2{font-size:58px;letter-spacing:-.045em;margin:0}
 .heading>p{color:#6e6e6e;font-size:13px}
 
-/* Fase 42.6 — "Descubre tu VIBE": tercera iteración. De chips de texto
-   (Fase 42) a tiles visuales con foto real de producto — Rostro y
-   Labios ganan protagonismo (tile grande, 2 filas) por pedido
-   explícito, el resto queda compacto en la fila de abajo. Nunca una
-   pared de 5 tarjetas idénticas. Sin foto real disponible para una
-   categoría, cae al mismo placeholder oscuro+wordmark del resto del
-   sitio (.card-img-empty) — nunca una foto de stock inventada ni
-   prestada de otra categoría (ver renderDiscoverVibe() en app.js). */
+/* Fase 42.7 — "Descubre tu VIBE": cuarta iteración, pedido explícito de
+   reemplazar la grilla (2 tiles grandes + 3 compactas) por una única
+   fila horizontal editorial — referencia conceptual "Shop by Category"
+   de retail de belleza (solo el patrón de layout, ningún asset/texto/
+   código ajeno). display:flex + overflow-x:auto en vez de grid: las 5
+   categorías viven en la misma banda, varias visibles a la vez, sigue
+   horizontalmente si el contenido excede el contenedor — nunca una
+   segunda fila. scroll-snap para que el swipe se sienta premium/
+   intencional. Scrollbar nativa oculta (mismo patrón ya usado en
+   .tabs) — la tarjeta siguiente asomándose es la señal de interacción,
+   pedida explícitamente en vez de dejar la scrollbar visible. Sin foto
+   real disponible para una categoría, la tarjeta cae al mismo
+   gradiente oscuro que trae .discover-tile por defecto — pedido
+   explícito de esta fase: nunca repetir el wordmark "VIBE" encima de
+   cada tile (ver renderDiscoverVibe() en app.js). */
 .discover-vibe-visual{background:#fff;color:#111;padding:56px 0}
 .discover-vibe-visual .eyebrow{color:var(--pink)}
-.discover-tile-grid{display:grid;grid-template-columns:repeat(6,1fr);grid-template-rows:190px 190px 140px;gap:16px;
-  grid-template-areas:
-    "rostro rostro rostro labios labios labios"
-    "rostro rostro rostro labios labios labios"
-    "ojos ojos skincare skincare accesorios accesorios"}
-.discover-tile-rostro{grid-area:rostro}
-.discover-tile-labios{grid-area:labios}
-.discover-tile-ojos{grid-area:ojos}
-.discover-tile-skincare{grid-area:skincare}
-.discover-tile-accesorios{grid-area:accesorios}
-.discover-tile{position:relative;display:block;width:100%;height:100%;border:0;border-radius:var(--radius);overflow:hidden;padding:0;text-align:left;font:inherit;background:linear-gradient(160deg,#1c1c1c,#0b0b0b);transition:transform .25s ease,box-shadow .25s ease}
+.discover-tile-grid{display:flex;gap:18px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;padding-bottom:2px}
+.discover-tile-grid::-webkit-scrollbar{display:none}
+.discover-tile{position:relative;flex:0 0 auto;scroll-snap-align:start;width:300px;height:420px;border:0;border-radius:var(--radius);overflow:hidden;padding:0;text-align:left;font:inherit;background:linear-gradient(160deg,#1c1c1c,#0b0b0b);transition:transform .25s ease,box-shadow .25s ease}
 .discover-tile:hover{transform:translateY(-4px);box-shadow:0 22px 44px -20px rgba(255,0,122,.5)}
 @media(prefers-reduced-motion:reduce){.discover-tile{transition:none}.discover-tile:hover{transform:none}}
 .discover-tile-photo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;transition:transform .35s ease}
 .discover-tile:hover .discover-tile-photo{transform:scale(1.04)}
 @media(prefers-reduced-motion:reduce){.discover-tile-photo{transition:none}.discover-tile:hover .discover-tile-photo{transform:none}}
-/* Fase 42.6 — align-items:start (no center) para que el wordmark de
-   placeholder nunca compita con la etiqueta de categoría anclada abajo
-   en las tiles compactas, que son bajas (120-140px). */
-.discover-tile-empty{position:absolute;inset:0;display:grid;align-items:start;justify-content:center;padding-top:22px;color:var(--pink);font-weight:800;letter-spacing:.16em;font-size:13px;text-transform:uppercase}
-.discover-tile-scrim{position:absolute;inset:0;background:linear-gradient(0deg,#000000d9 0%,#00000000 60%)}
-.discover-tile-body{position:absolute;left:0;right:0;bottom:0;padding:16px 18px;color:#fff}
-.discover-tile-label{display:block;font-weight:800;letter-spacing:-.01em;font-size:17px}
-.discover-tile-featured .discover-tile-label{font-size:26px}
-.discover-tile-meta{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:6px}
-.discover-tile-cta{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#fff}
-.discover-tile-count{font-size:10px;color:#ddd;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap}
+.discover-tile-scrim{position:absolute;inset:0;background:linear-gradient(0deg,#000000d9 0%,#00000000 55%)}
+.discover-tile-body{position:absolute;left:0;right:0;bottom:0;padding:20px 22px;color:#fff}
+.discover-tile-label{display:block;font-weight:800;letter-spacing:-.01em;font-size:24px;margin-bottom:8px}
+.discover-tile-cta{font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#fff}
 
 /* Fase 41 — Instagram: bloque estático oscuro, sin feed embebido. */
 .instagram-vibe{background:#0b0b0b;color:#fff;padding:96px 0;position:relative;overflow:hidden}
@@ -583,18 +575,9 @@ footer small{letter-spacing:.25em;font-size:7px}
      deriva su alto de aspect-ratio (ver regla base), que ya responde
      solo al ancho disponible en este breakpoint (columna completa). */
   .heading{align-items:flex-start;flex-direction:column}
-  /* Fase 42.6 — el grid de 6 columnas de escritorio (Rostro/Labios
-     grandes lado a lado) se aprieta por debajo de 900px. Mobile:
-     Rostro y Labios pasan a ocupar su propia fila completa (siguen
-     siendo las tiles protagonistas), Ojos+Skincare se emparejan en 2
-     columnas, Accesorios cierra como franja horizontal — nunca una
-     pared de 5 tiles idénticas. */
-  .discover-tile-grid{grid-template-columns:repeat(2,1fr);grid-template-rows:220px 220px 140px 100px;gap:12px;
-    grid-template-areas:
-      "rostro rostro"
-      "labios labios"
-      "ojos skincare"
-      "accesorios accesorios"}
+  /* Fase 42.7 — tiles un poco más angostas por debajo de 900px, mismo
+     concepto de fila horizontal con scroll (nunca grid). */
+  .discover-tile{width:260px;height:380px}
   .instagram-vibe{padding:64px 0}
 }
 
@@ -623,13 +606,15 @@ footer small{letter-spacing:.25em;font-size:7px}
      solo aquí — sigue intacto en el código y en desktop, no se eliminó
      (no se reutiliza en ningún otro lugar del sitio, se verificó antes
      de tocar nada).
-     Fase 42.6 — pedido explícito, SOLO mobile: con padding:0 el
+     Fase 42.6/42.7 — pedido explícito, SOLO mobile: con padding:0 el
      carrusel arrancaba pegado al Header sticky, se sentía "montado"
      encima. margin-top (no padding-top del Header, que no se toca)
-     agrega un respiro externo sutil sin cambiar la altura interna del
-     Header ni el tamaño/proporción del carrusel. Desktop no tiene esta
-     regla — el spacing ahí ya era correcto y no se toca. */
-  .hero{padding:0;margin-top:10px}
+     agrega un respiro externo sin cambiar la altura interna del Header
+     ni el tamaño/proporción del carrusel. 10px (Fase 42.6) resultó
+     insuficiente en la revisión visual — subido a 18px, dentro del
+     rango 16-20px pedido. Desktop no tiene esta regla — el spacing ahí
+     ya era correcto y no se toca. */
+  .hero{padding:0;margin-top:18px}
   .hero-copy{display:none}
   .hero-grid{gap:0}
 
@@ -669,9 +654,15 @@ footer small{letter-spacing:.25em;font-size:7px}
   .hero-arrow{width:34px;height:34px;font-size:17px}
   .hero-arrow-prev{left:8px}
   .hero-arrow-next{right:8px}
+  /* Fase 42.7 — mobile: tile angosta lo suficiente para que la
+     siguiente se asome (~85px visibles de la tile #2 dentro del ancho
+     de .wrap en 390px) — esa asomada es la señal de "hay más
+     categorías", pedida explícitamente en vez de dejar la scrollbar
+     visible. Sigue siendo scroll horizontal nativo, nunca grid. */
   .discover-vibe-visual{padding:40px 0}
-  .discover-tile-grid{grid-template-rows:190px 190px 120px 90px;gap:10px}
-  .discover-tile-featured .discover-tile-label{font-size:22px}
+  .discover-tile-grid{gap:12px}
+  .discover-tile{width:265px;height:350px}
+  .discover-tile-label{font-size:21px}
   .featured{padding:40px 0 10px}
   .catalog{padding:40px 0 80px}
   .heading h2{font-size:46px}

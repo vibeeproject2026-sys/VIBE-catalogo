@@ -311,44 +311,40 @@ function goToFilter(overrides) {
 // exacto que categoryOf()/groupOf() en taxonomy.js
 // (editorialCategory || category), nunca inventado.
 //
-// Fase 42.6 — pedido explícito: Rostro y Labios ganan protagonismo
-// visual (tile más grande) — decisión de diseño fija, independiente de
-// qué producto termine ilustrándola. La FOTO en sí sigue siendo 100%
-// data-driven: se toma el primer producto real de esa categoría que
-// tenga imagen subida (auditoría en producción: solo 2/68 productos
-// tienen foto real hoy — id 122 "Rubor líquido" en Rostro, id 110
-// "VIBE Lip Duo" en Labios — pura coincidencia que sean justo las dos
-// categorías priorizadas). Si una categoría no tiene ningún producto
-// con foto, cae al mismo placeholder de marca (gradiente oscuro) que
-// ya usa el resto del sitio — nunca una imagen inventada ni prestada
-// de otra categoría.
+// Fase 42.7 — pedido explícito: de grilla (2 tiles grandes + 3
+// compactas) a una única fila horizontal editorial, referencia
+// conceptual "Shop by Category" de retail de belleza — layout/
+// experiencia únicamente, ningún asset/texto/código ajeno. Mismas 5
+// categorías, mismo orden, mismo tamaño de tarjeta para las 5 (ya no
+// hay "featured" — la fila entera es protagonista). La FOTO sigue
+// siendo 100% data-driven: primer producto real de esa categoría con
+// imagen subida (auditoría en producción: solo Rostro id 122 y Labios
+// id 110 tienen foto real hoy). Sin foto real, la tarjeta cae al mismo
+// gradiente oscuro que ya trae .discover-tile por defecto — pedido
+// explícito de esta fase: nunca repetir el wordmark "VIBE" encima de
+// cada tile.
 const DISCOVER_VIBE_TILES = [
-  { label: "Rostro", group: "Maquillaje", category: "Rostro", featured: true },
-  { label: "Labios", group: "Maquillaje", category: "Labios", featured: true },
-  { label: "Ojos", group: "Maquillaje", category: "Ojos", featured: false },
-  { label: "Skincare", group: "Skincare", category: "Skincare", featured: false },
-  { label: "Accesorios", group: "Accesorios", category: "Otro", featured: false },
+  { label: "Rostro", group: "Maquillaje", category: "Rostro" },
+  { label: "Labios", group: "Maquillaje", category: "Labios" },
+  { label: "Ojos", group: "Maquillaje", category: "Ojos" },
+  { label: "Skincare", group: "Skincare", category: "Skincare" },
+  { label: "Accesorios", group: "Accesorios", category: "Otro" },
 ];
 
 function renderDiscoverVibe() {
-  $("#discoverVibeGrid").innerHTML = DISCOVER_VIBE_TILES.map(({ label, group, category, featured }) => {
+  $("#discoverVibeGrid").innerHTML = DISCOVER_VIBE_TILES.map(({ label, group, category }) => {
     const inCategory = state.products.filter((p) => (p.editorialCategory || p.category) === category);
-    const count = inCategory.length;
     const withPhoto = inCategory.find((p) => p.image);
-    const sizeClass = featured ? "discover-tile-featured" : "discover-tile-compact";
     const slugClass = `discover-tile-${label.toLowerCase()}`;
     const imageHtml = withPhoto
       ? `<img class="discover-tile-photo" src="${esc(withPhoto.image)}" alt="${esc(label)}" loading="lazy">`
-      : `<span class="discover-tile-empty" aria-hidden="true">VIBE</span>`;
-    return `<button class="discover-tile ${sizeClass} ${slugClass}" data-group="${esc(group)}" data-category="${esc(category)}">
+      : "";
+    return `<button class="discover-tile ${slugClass}" data-group="${esc(group)}" data-category="${esc(category)}">
       ${imageHtml}
       <span class="discover-tile-scrim"></span>
       <span class="discover-tile-body">
         <span class="discover-tile-label">${esc(label)}</span>
-        <span class="discover-tile-meta">
-          <span class="discover-tile-cta">Explorar →</span>
-          <span class="discover-tile-count">${count} producto${count === 1 ? "" : "s"}</span>
-        </span>
+        <span class="discover-tile-cta">Explorar →</span>
       </span>
     </button>`;
   }).join("");
