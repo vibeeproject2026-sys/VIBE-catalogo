@@ -211,9 +211,17 @@ header.scrolled .logo-image{width:114px}
    cada tile (ver renderDiscoverVibe() en app.js). */
 .discover-vibe-visual{background:#fff;color:#111;padding:56px 0}
 .discover-vibe-visual .eyebrow{color:var(--pink)}
-.discover-tile-grid{display:flex;gap:18px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;padding-bottom:2px}
+.discover-tile-row{position:relative}
+.discover-tile-grid{display:flex;gap:20px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;padding-bottom:2px}
 .discover-tile-grid::-webkit-scrollbar{display:none}
-.discover-tile{position:relative;flex:0 0 auto;scroll-snap-align:start;width:300px;height:420px;border:0;border-radius:var(--radius);overflow:hidden;padding:0;text-align:left;font:inherit;background:linear-gradient(160deg,#1c1c1c,#0b0b0b);transition:transform .25s ease,box-shadow .25s ease}
+/* Fase 42.8 — pedido explícito: EXACTAMENTE 4 tiles completos visibles
+   en 1440px (contenedor .wrap ahí = --max = 1180px), la 5ta se
+   descubre con scroll/flechas. Ancho calculado, no un número fijo:
+   (100% del contenedor - 3 gaps de 20px entre 4 tiles) / 4 — así
+   siempre entran exactamente 4 completos sin importar el ancho real
+   del contenedor en este breakpoint, nunca una tarjeta cortada a la
+   mitad. */
+.discover-tile{position:relative;flex:0 0 auto;scroll-snap-align:start;width:calc((100% - 60px) / 4);height:420px;border:0;border-radius:var(--radius);overflow:hidden;padding:0;text-align:left;font:inherit;background:linear-gradient(160deg,#1c1c1c,#0b0b0b);transition:transform .25s ease,box-shadow .25s ease}
 .discover-tile:hover{transform:translateY(-4px);box-shadow:0 22px 44px -20px rgba(255,0,122,.5)}
 @media(prefers-reduced-motion:reduce){.discover-tile{transition:none}.discover-tile:hover{transform:none}}
 .discover-tile-photo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;transition:transform .35s ease}
@@ -223,6 +231,20 @@ header.scrolled .logo-image{width:114px}
 .discover-tile-body{position:absolute;left:0;right:0;bottom:0;padding:20px 22px;color:#fff}
 .discover-tile-label{display:block;font-weight:800;letter-spacing:-.01em;font-size:24px;margin-bottom:8px}
 .discover-tile-cta{font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#fff}
+/* Fase 42.8 — flechas de navegación de la fila: mismo lenguaje visual
+   que .hero-arrow/.pdp-arrow (círculo oscuro translúcido + blur),
+   nunca un componente nuevo. Son hermanas de #discoverVibeGrid (no
+   hijas de ninguna tile), así que nunca interceptan el click de una
+   tarjeta — solo se superponen visualmente sobre el borde de la
+   primera/última tile visible, igual que las flechas del Hero se
+   superponen a la pieza. disabled (ver JS) las oculta por completo
+   cuando no hay contenido en esa dirección. */
+.discover-arrow{position:absolute;top:50%;transform:translateY(-50%);z-index:2;width:44px;height:44px;border-radius:50%;border:1px solid #ffffff33;background:#00000088;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);color:#fff;font-size:20px;line-height:1;display:grid;place-items:center;opacity:.85;transition:opacity .2s ease,background .2s ease}
+.discover-arrow:hover{opacity:1;background:#000000aa}
+.discover-arrow[disabled]{opacity:0;pointer-events:none}
+@media(prefers-reduced-motion:reduce){.discover-arrow{transition:none}}
+.discover-arrow-prev{left:10px}
+.discover-arrow-next{right:10px}
 
 /* Fase 41 — Instagram: bloque estático oscuro, sin feed embebido. */
 .instagram-vibe{background:#0b0b0b;color:#fff;padding:96px 0;position:relative;overflow:hidden}
@@ -663,6 +685,12 @@ footer small{letter-spacing:.25em;font-size:7px}
   .discover-tile-grid{gap:12px}
   .discover-tile{width:265px;height:350px}
   .discover-tile-label{font-size:21px}
+  /* Fase 42.8 — pedido explícito: flechas discretas en mobile, sin
+     estorbar el swipe nativo (que sigue siendo la interacción
+     principal) — más chicas y más translúcidas que en desktop. */
+  .discover-arrow{width:34px;height:34px;font-size:16px;opacity:.55}
+  .discover-arrow-prev{left:4px}
+  .discover-arrow-next{right:4px}
   .featured{padding:40px 0 10px}
   .catalog{padding:40px 0 80px}
   .heading h2{font-size:46px}

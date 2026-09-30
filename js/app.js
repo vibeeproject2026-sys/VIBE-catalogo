@@ -319,10 +319,22 @@ function goToFilter(overrides) {
 // hay "featured" — la fila entera es protagonista). La FOTO sigue
 // siendo 100% data-driven: primer producto real de esa categoría con
 // imagen subida (auditoría en producción: solo Rostro id 122 y Labios
-// id 110 tienen foto real hoy). Sin foto real, la tarjeta cae al mismo
-// gradiente oscuro que ya trae .discover-tile por defecto — pedido
-// explícito de esta fase: nunca repetir el wordmark "VIBE" encima de
-// cada tile.
+// id 110 tienen foto real hoy).
+//
+// Fase 42.8 — para Ojos/Skincare/Accesorios (sin foto real de producto
+// VIBE) se agrega una fotografía editorial genérica de belleza, real y
+// con licencia de uso comercial verificada (Unsplash License, ver
+// assets/discover/CREDITS.md) — nunca un producto VIBE inexistente, ni
+// una imagen de e.l.f., ni nada inventado. Descargadas al proyecto, no
+// referenciadas por URL externa. Si algún día existe foto real de
+// producto VIBE para estas categorías, reemplaza automáticamente a la
+// editorial (misma lógica de "primero lo real" que ya rige Rostro/
+// Labios). Nunca repite el wordmark "VIBE" encima de cada tile.
+const DISCOVER_EDITORIAL_FALLBACK = {
+  Ojos: "assets/discover/ojos.jpg",
+  Skincare: "assets/discover/skincare.jpg",
+  Accesorios: "assets/discover/accesorios.jpg",
+};
 const DISCOVER_VIBE_TILES = [
   { label: "Rostro", group: "Maquillaje", category: "Rostro" },
   { label: "Labios", group: "Maquillaje", category: "Labios" },
@@ -336,9 +348,8 @@ function renderDiscoverVibe() {
     const inCategory = state.products.filter((p) => (p.editorialCategory || p.category) === category);
     const withPhoto = inCategory.find((p) => p.image);
     const slugClass = `discover-tile-${label.toLowerCase()}`;
-    const imageHtml = withPhoto
-      ? `<img class="discover-tile-photo" src="${esc(withPhoto.image)}" alt="${esc(label)}" loading="lazy">`
-      : "";
+    const src = withPhoto ? withPhoto.image : DISCOVER_EDITORIAL_FALLBACK[label];
+    const imageHtml = src ? `<img class="discover-tile-photo" src="${esc(src)}" alt="${esc(label)}" loading="lazy">` : "";
     return `<button class="discover-tile ${slugClass}" data-group="${esc(group)}" data-category="${esc(category)}">
       ${imageHtml}
       <span class="discover-tile-scrim"></span>
@@ -348,6 +359,11 @@ function renderDiscoverVibe() {
       </span>
     </button>`;
   }).join("");
+  // Fase 42.8 — las flechas se enlazan una sola vez al arrancar (ver
+  // bindDiscoverArrows), pero su estado disabled depende del contenido
+  // real recién inyectado arriba — reutiliza el mismo listener de
+  // "resize" que ya recalcula ese estado, en vez de duplicar la lógica.
+  window.dispatchEvent(new Event("resize"));
 }
 
 // Fase 29, sección 2 — una línea del carrito: imagen, marca (si existe),
@@ -781,6 +797,48 @@ function bindWorldNav(selector) {
 bindWorldNav(".nav-links");
 bindWorldNav("#mobileNav");
 bindWorldNav("#discoverVibeGrid");
+
+// Fase 42.8 — flechas de "Descubre tu VIBE": desplazan la fila por un
+// tile completo (ancho real + gap, medido en vivo — nunca un número
+// fijo que se desincronice de las media queries) y se ocultan solas en
+// cada extremo. Un solo listener de scroll (con rAF para no saturar)
+// cubre tanto el swipe táctil como el click de las flechas, porque
+// ambos disparan el mismo evento nativo sobre el contenedor.
+function bindDiscoverArrows() {
+  const row = $("#discoverVibeGrid");
+  const prevBtn = $("#discoverPrev");
+  const nextBtn = $("#discoverNext");
+  if (!row || !prevBtn || !nextBtn) return;
+
+  function step() {
+    const tile = row.querySelector(".discover-tile");
+    if (!tile) return row.clientWidth * 0.8;
+    const gap = parseFloat(getComputedStyle(row).columnGap || getComputedStyle(row).gap || "0") || 0;
+    return tile.getBoundingClientRect().width + gap;
+  }
+
+  function updateArrows() {
+    const maxScroll = row.scrollWidth - row.clientWidth;
+    prevBtn.disabled = row.scrollLeft <= 1;
+    nextBtn.disabled = maxScroll <= 1 || row.scrollLeft >= maxScroll - 1;
+  }
+
+  prevBtn.addEventListener("click", () => row.scrollBy({ left: -step(), behavior: "smooth" }));
+  nextBtn.addEventListener("click", () => row.scrollBy({ left: step(), behavior: "smooth" }));
+
+  let ticking = false;
+  row.addEventListener("scroll", () => {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(() => {
+      updateArrows();
+      ticking = false;
+    });
+  });
+  window.addEventListener("resize", updateArrows);
+  updateArrows();
+}
+bindDiscoverArrows();
 
 // Fase 27: los enlaces de Novedades del header navegan a la PLP real
 // filtrada (antes solo hacían scroll a la franja de la Home). Fase 41 —

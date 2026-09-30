@@ -78,22 +78,29 @@
   </div>
 </section>
 
-<!-- Fase 42/42.6 — "Descubre tu VIBE": mismas 5 categorías reales
-     (Rostro/Ojos/Labios/Skincare/Accesorios — auditoría de la Fase 42
-     confirmó que las subcategorías reales son insuficientes hoy, 1/68
-     productos). Fase 42.6 — pedido explícito: pasa de chips de texto a
-     tiles visuales con foto real de producto (Rostro/Labios, las dos
-     únicas categorías con foto subida hoy en producción — coincidencia
-     real, no forzada) y protagonismo visual mayor para esas dos; el
-     resto usa el mismo placeholder de marca del sitio. Conteos/enlaces
-     100% reales, mismo goToFilter()/bindWorldNav() de siempre (ver
-     renderDiscoverVibe() en app.js). -->
+<!-- Fase 42/42.6/42.7/42.8 — "Descubre tu VIBE": mismas 5 categorías
+     reales (Rostro/Labios/Ojos/Skincare/Accesorios — auditoría de la
+     Fase 42 confirmó que las subcategorías reales son insuficientes
+     hoy, 1/68 productos), fila horizontal con scroll (Fase 42.7).
+     Fase 42.8 — pedido explícito: en 1440px deben verse exactamente 4
+     tiles completos (ancho calculado dinámicamente en CSS, ver
+     .discover-tile) y flechas para navegar a la 5ta — mismo lenguaje
+     visual que .hero-arrow/.pdp-arrow, nunca un componente nuevo.
+     Rostro/Labios conservan su foto real de producto; Ojos/Skincare/
+     Accesorios usan fotografía editorial genérica con licencia de uso
+     comercial verificada (ver assets/discover/CREDITS.md). Conteos/
+     enlaces 100% reales, mismo goToFilter()/bindWorldNav() de siempre
+     (ver renderDiscoverVibe() en app.js). -->
 <section id="discoverVibe" class="discover-vibe-visual">
   <div class="wrap">
     <div class="heading">
       <div><p class="eyebrow">DESCUBRE</p><h2>Descubre tu VIBE</h2></div>
     </div>
-    <div id="discoverVibeGrid" class="discover-tile-grid"></div>
+    <div class="discover-tile-row">
+      <div id="discoverVibeGrid" class="discover-tile-grid"></div>
+      <button type="button" class="discover-arrow discover-arrow-prev" id="discoverPrev" aria-label="Categoría anterior">‹</button>
+      <button type="button" class="discover-arrow discover-arrow-next" id="discoverNext" aria-label="Categoría siguiente">›</button>
+    </div>
   </div>
 </section>
 
