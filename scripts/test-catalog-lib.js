@@ -38,17 +38,37 @@ async function main() {
     assert.equal(resolveCategoryGroup("CategoriaQueNoExiste"), "Accesorios");
   });
 
-  console.log("joinCatalog (Fase 31 — LEFT JOIN: todo producto del POS se incluye)");
-  await test("incluye TODOS los productos, tengan o no una fila de metadata", () => {
-    const products = [{ id: 1 }, { id: 2 }, { id: 3 }];
-    const metadata = [{ product_id: 1 }, { product_id: 3 }];
+  console.log("joinCatalog (Fase 43 — solo productos con published = true)");
+  await test("incluye solo productos con fila published:true; sin fila o published:false quedan fuera", () => {
+    const products = [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }];
+    const metadata = [
+      { product_id: 1, published: true },
+      { product_id: 3, published: false },
+      { product_id: 4, published: true },
+    ];
     const joined = joinCatalog(products, metadata);
-    assert.deepEqual(joined.map((r) => r.product.id), [1, 2, 3]);
+    assert.deepEqual(joined.map((r) => r.product.id), [1, 4]);
   });
-  await test("un producto sin fila de metadata queda con metadata: null (nunca undefined, nunca se cae del join)", () => {
-    const joined = joinCatalog([{ id: 5 }], []);
+  await test("un producto sin fila de metadata no sale del join", () => {
+    assert.deepEqual(joinCatalog([{ id: 5 }], []), []);
+  });
+  await test("published null/undefined/truthy-no-booleano no cuenta como publicado", () => {
+    const products = [{ id: 1 }, { id: 2 }, { id: 3 }];
+    const metadata = [
+      { product_id: 1, published: null },
+      { product_id: 2 },
+      { product_id: 3, published: "true" },
+    ];
+    assert.deepEqual(joinCatalog(products, metadata), []);
+  });
+  await test("producto publicado y agotado se conserva (la disponibilidad es independiente)", () => {
+    const joined = joinCatalog([{ id: 9, stock: 0 }], [{ product_id: 9, published: true }]);
     assert.equal(joined.length, 1);
-    assert.equal(joined[0].metadata, null);
+    assert.equal(joined[0].metadata.published, true);
+  });
+  await test("product_id numérico vs string se empareja igual", () => {
+    const joined = joinCatalog([{ id: 7 }], [{ product_id: "7", published: true }]);
+    assert.equal(joined.length, 1);
   });
 
   console.log("shapeProduct");

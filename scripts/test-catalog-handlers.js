@@ -130,7 +130,7 @@ async function main() {
       }
     });
 
-    await test("GET with a full mocked dataset returns every POS product, shaped and cached (Fase 31: editorial metadata is optional)", async () => {
+    await test("GET with a full mocked dataset returns only published products, shaped and cached (Fase 43: no published row -> not public)", async () => {
       process.env.SUPABASE_URL = "https://example.supabase.co";
       process.env.SUPABASE_SERVICE_ROLE_KEY = "test-key-not-real";
       const originalFetch = global.fetch;
@@ -169,8 +169,8 @@ async function main() {
                   editorial_order: 1,
                   published: true,
                 },
-                // product id 2 has NO metadata row -> must still appear
-                // (Fase 31), only with name/price/stock-derived availability.
+                // product id 2 has NO metadata row -> must NOT appear
+                // publicly (Fase 43).
               ]),
           };
         }
@@ -182,22 +182,16 @@ async function main() {
         await handler(req, res);
         assert.equal(res.statusCode, 200);
         if (label === "products") {
-          assert.equal(res.body.products.length, 2);
+          assert.equal(res.body.products.length, 1);
           const withMeta = res.body.products.find((p) => p.id === 1);
-          const withoutMeta = res.body.products.find((p) => p.id === 2);
           assert.equal(withMeta.image, "assets/products/cleanser.svg");
-          assert.equal(withoutMeta.name, "Sin ficha editorial todavia");
-          assert.equal(withoutMeta.price, 1000);
-          assert.equal(withoutMeta.available, true); // stock: 3
-          assert.equal(withoutMeta.image, null);
-          assert.deepEqual(withoutMeta.benefits, []);
+          assert.equal(res.body.products.some((p) => p.id === 2), false);
           assert.equal(JSON.stringify(res.body).includes("cost_base"), false);
           assert.equal(JSON.stringify(res.body).includes('"stock"'), false);
         } else {
-          // Ambos productos aportan a la navegación ahora, no solo el curado.
-          assert.equal(res.body.categories.length, 2);
+          // Solo el producto publicado aporta a la navegación (Fase 43).
           const groups = res.body.categories.map((g) => g.group).sort();
-          assert.deepEqual(groups, ["Accesorios", "Skincare"]);
+          assert.deepEqual(groups, ["Skincare"]);
         }
         assert.ok(res.headers["Cache-Control"].includes("max-age"));
       } finally {
@@ -273,11 +267,11 @@ async function main() {
         }
       });
 
-      // Fase 35 — comportamiento esperado (NO es un bug): una fila con
-      // published:false, aunque tenga contenido real completo, se trata
-      // exactamente igual que "sin ficha" — el producto sigue apareciendo
-      // (Fase 31) pero solo con los datos del POS.
-      await test("producto con ficha completa pero published:false se muestra SOLO con datos del POS (comportamiento esperado)", async () => {
+      // Fase 43 — una fila con published:false, aunque tenga contenido
+      // real completo, se trata igual que "sin ficha": el producto NO
+      // aparece en el catálogo público (antes, Fase 31, aparecía con
+      // los datos del POS — ese era el bug "Publicado: No" visible).
+      await test("producto con ficha completa pero published:false NO aparece en el catálogo público", async () => {
         process.env.SUPABASE_URL = "https://example.supabase.co";
         process.env.SUPABASE_SERVICE_ROLE_KEY = "test-key-not-real";
         const originalFetch = global.fetch;
@@ -300,11 +294,8 @@ async function main() {
           const req = { method: "GET", headers: {}, query: {} };
           const res = mockRes();
           await handler(req, res);
-          const p = res.body.products.find((x) => x.id === 122);
-          assert.equal(p.name, "Rubor líquido");
-          assert.equal(p.brand, null);
-          assert.equal(p.commercialName, null);
-          assert.equal(p.image, null);
+          assert.equal(res.statusCode, 200);
+          assert.equal(res.body.products.some((x) => x.id === 122), false);
         } finally {
           global.fetch = originalFetch;
           delete process.env.SUPABASE_URL;

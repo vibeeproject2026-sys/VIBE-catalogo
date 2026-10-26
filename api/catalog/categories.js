@@ -2,11 +2,11 @@
 //
 // Returns the catalog's navigation structure: editorial group (static
 // mapping, see _lib/categoryGroups.js) -> POS category -> subcategories
-// actually present in the catalog. Fase 31: every POS product counts
-// here now, not only ones with a published editorial row (see
+// actually present in the catalog. Fase 43: only published products
+// count (same rule as /api/catalog/products, see
 // _lib/merge.js#joinCatalog) — a group/category only ever appears if at
-// least one real product (curated or not) exists in it, so this still
-// never leads a customer into a dead end.
+// least one published product exists in it, so this never leads a
+// customer into a dead end or reveals unpublished products.
 
 const { getEnv } = require("./_lib/env");
 const { pgrestSelect } = require("./_lib/supabaseRead");

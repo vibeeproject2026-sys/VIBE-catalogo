@@ -10,16 +10,24 @@
 
 const { parseDetails } = require("../../_lib/editorialDetails");
 
-// Fase 31 — LEFT JOIN: todo producto del POS se incluye, tenga o no una
-// fila editorial publicada. metadata queda null cuando no existe (o
-// cuando existe pero published !== true — metadataRows ya viene filtrada
-// a published=true, así que ambos casos llegan aquí como "sin fila" y
-// shapeProduct() los trata exactamente igual: el producto se muestra con
-// los datos del POS solamente, nunca se cae del catálogo por falta de
-// curaduría editorial).
+// Fase 43 — INNER JOIN sobre published = true (reemplaza el LEFT JOIN de
+// Fase 31, que exponía públicamente todo producto del POS aunque el
+// Admin mostrara "Publicado: No"). La publicación depende SOLO de la
+// decisión editorial: un producto sin fila de metadata, o con una fila
+// published !== true, no sale en la API pública — y como el frontend
+// (búsqueda, categorías, ofertas, destacados, PDP por URL directa) solo
+// conoce lo que esta API devuelve, tampoco existe para él. Las consultas
+// ya filtran published=eq.true; se vuelve a comprobar aquí a propósito
+// para que la regla no dependa de que cada llamador recuerde el filtro.
+// Disponibilidad (stock) sigue siendo independiente: un producto
+// publicado y agotado se devuelve con available: false, como antes.
 function joinCatalog(products, metadataRows) {
-  const metaByProductId = new Map(metadataRows.map((m) => [String(m.product_id), m]));
-  return products.map((product) => ({ product, metadata: metaByProductId.get(String(product.id)) || null }));
+  const metaByProductId = new Map(
+    metadataRows.filter((m) => m && m.published === true).map((m) => [String(m.product_id), m])
+  );
+  return products
+    .filter((product) => metaByProductId.has(String(product.id)))
+    .map((product) => ({ product, metadata: metaByProductId.get(String(product.id)) }));
 }
 
 // Fase 26 — resuelve la promoción del producto server-side: promo_active
@@ -38,12 +46,10 @@ function resolvePromoActive(product, now = new Date()) {
 // Fase 31 — name/price/available (derivado de stock) vienen siempre de
 // `product` (POS), nunca de metadata, y nunca se duplican en
 // catalog_metadata (ver migración 0001, comentario de la tabla). Todo lo
-// demás es editorial y estrictamente opcional: cuando metadata es null
-// (producto sin ficha, o con una fila aún no publicada — join Catalog ya
-// unifica ambos casos), cada campo cae a su valor "ausente" (null, []
-// o false) exactamente igual que cuando la fila existe pero un campo
-// puntual no fue llenado. El frontend ya sabe ocultar con elegancia
-// cualquier campo así.
+// demás es editorial: un campo puntual no llenado cae a su valor
+// "ausente" (null, [] o false) y el frontend ya sabe ocultarlo con
+// elegancia. Desde Fase 43 joinCatalog solo entrega productos con fila
+// publicada; shapeProduct sigue tolerando metadata null por robustez.
 function shapeProduct(product, metadata, resolveCategoryGroup) {
   const m = metadata || {};
   // Fase 34 — additional_info (columna text existente) guarda un JSON

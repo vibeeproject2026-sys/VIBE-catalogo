@@ -185,9 +185,9 @@ async function main() {
     });
   });
 
-  console.log("\npublicación controla la ficha editorial, no la existencia del producto (Fase 31)");
+  console.log("\npublicación controla la visibilidad pública del producto (Fase 43)");
 
-  await test("published=false -> el producto SÍ aparece (nombre/precio/stock del POS), pero sin su ficha editorial en borrador", async () => {
+  await test("published=false -> el producto NO aparece en el catálogo público (ni datos del POS ni ficha en borrador)", async () => {
     await withEnv(BASE_ENV, async () => {
       const { fetchImpl } = makeStatefulSupabase({
         products: [{ id: 63, name: "VIBE Glow Drops", price: 16000, stock: 4, category: "Rostro" }],
@@ -198,18 +198,10 @@ async function main() {
       try {
         const res = mockRes();
         await catalogProductsHandler({ method: "GET", headers: {}, query: {} }, res);
-        const found = (res.body.products || []).find((p) => p.id === 63);
-        // Fase 31: un producto nunca se cae del catálogo por no tener (o no
-        // tener publicada) su ficha editorial — sigue existiendo con los
-        // datos operativos del POS.
-        assert.ok(found, "el producto debe seguir apareciendo con sus datos del POS");
-        assert.equal(found.name, "VIBE Glow Drops");
-        assert.equal(found.price, 16000);
-        assert.equal(found.available, true);
-        // Pero la ficha editorial en borrador (published: false) nunca se
-        // expone públicamente — ni la categoría ni la descripción cargadas.
-        assert.equal(found.editorialCategory, null);
-        assert.equal(found.shortDescription, null);
+        // Fase 43: la publicación depende solo de la decisión editorial —
+        // un producto con published: false no existe para el público.
+        assert.equal(res.statusCode, 200);
+        assert.equal((res.body.products || []).some((p) => p.id === 63), false);
       } finally {
         global.fetch = originalFetch;
       }

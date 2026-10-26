@@ -1,13 +1,11 @@
 // GET /api/catalog/products — public, read-only.
 //
-// Fase 31: every product in the POS is returned — name/price/stock
-// (-> available) always come straight from products, the single
-// operational source of truth, and are never duplicated into
-// catalog_metadata. Editorial enrichment (image, description, etc.) is
-// strictly progressive: it's layered in from catalog_metadata only for
-// rows that exist and are published = true (see
-// _lib/merge.js#joinCatalog/shapeProduct); a product with no editorial
-// row at all is just as valid a catalog entry as a fully curated one.
+// Fase 43: only products whose catalog_metadata row has published = true
+// are returned (see _lib/merge.js#joinCatalog) — a product with no
+// editorial row, or with published = false, is not public. name/price/
+// stock (-> available) still always come straight from products, the
+// single operational source of truth, and are never duplicated into
+// catalog_metadata; availability stays independent of publication.
 // No write methods exist on this endpoint on purpose (Fase 6 is
 // read-only by design).
 
