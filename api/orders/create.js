@@ -27,6 +27,10 @@ const { sendOrderConfirmationEmail, sendInternalOrderNotificationEmail } = requi
 const { sendWhatsAppNotification } = require("./_lib/whatsappNotify");
 
 const PRODUCT_COLUMNS = "id,name,price,stock,category,promo_active,promo_price,promo_start,promo_end,promo_text";
+// Fase 43 — solo se necesita saber si la ficha está publicada; el resto
+// de la metadata no se usa aquí (el pedido sigue armándose solo con los
+// datos del POS, igual que antes).
+const METADATA_COLUMNS = "product_id,published";
 
 function effectivePrice(shaped) {
   return shaped.promoActive === true && shaped.promoPrice != null ? shaped.promoPrice : shaped.price;
@@ -67,15 +71,28 @@ module.exports = async function handler(req, res) {
   // texto no validado).
   const numericIds = [...new Set(submittedItems.map((it) => String(it.productId)).filter((id) => /^\d+$/.test(id)))];
 
+  // Fase 43 — misma regla que el catálogo público (ver
+  // api/catalog/_lib/merge.js#joinCatalog): solo se puede pedir un
+  // producto cuya fila de catalog_metadata tenga published = true. Se
+  // valida aquí, server-side, porque un request armado a mano puede
+  // incluir cualquier id del POS aunque el catálogo nunca lo muestre.
   let realProducts = [];
+  let publishedRows = [];
   try {
     if (numericIds.length) {
-      realProducts = await pgrestSelect({
-        table: "products",
-        columns: PRODUCT_COLUMNS,
-        filters: [["id", `in.(${numericIds.join(",")})`]],
-        env,
-      });
+      const idFilter = ["id", `in.(${numericIds.join(",")})`];
+      [realProducts, publishedRows] = await Promise.all([
+        pgrestSelect({ table: "products", columns: PRODUCT_COLUMNS, filters: [idFilter], env }),
+        pgrestSelect({
+          table: "catalog_metadata",
+          columns: METADATA_COLUMNS,
+          filters: [
+            ["product_id", `in.(${numericIds.join(",")})`],
+            ["published", "eq.true"],
+          ],
+          env,
+        }),
+      ]);
     }
   } catch (e) {
     console.error("[orders/create] " + (e && e.message ? e.message : e));
@@ -83,11 +100,18 @@ module.exports = async function handler(req, res) {
   }
 
   const realById = new Map(realProducts.map((p) => [String(p.id), shapeProduct(p, null, resolveCategoryGroup)]));
+  // published === true se vuelve a comprobar aquí, no solo en el filtro
+  // de la consulta, igual que joinCatalog.
+  const publishedIds = new Set(publishedRows.filter((m) => m && m.published === true).map((m) => String(m.product_id)));
 
   const unavailable = [];
   const shapedItems = submittedItems.map((it) => {
     const real = realById.get(String(it.productId));
-    if (!real || real.available === false) {
+    // Un producto no publicado (o sin ficha) se rechaza exactamente igual
+    // que uno inexistente o agotado: mismo 409 y mismo mensaje, para que
+    // el checkout actual lo maneje sin cambios y la respuesta no revele
+    // si existe un producto que el catálogo no muestra.
+    if (!real || real.available === false || !publishedIds.has(String(it.productId))) {
       unavailable.push(it.productId);
       return null;
     }

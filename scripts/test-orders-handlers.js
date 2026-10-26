@@ -86,6 +86,22 @@ function mockRealProduct({ id = 1, price = 15000, stock = 5, promoActive = false
   };
 }
 
+// Fase 43 — /api/orders/create ahora también consulta catalog_metadata
+// (product_id,published) para exigir published = true. Este mock responde
+// esa consulta respetando los filtros product_id=in.(...) y
+// published=eq.true; por defecto todos los ids pedidos están publicados,
+// para que los tests existentes conserven su intención original.
+// `rows` permite fijar exactamente qué filas existen.
+function metadataMock(url, rows = null) {
+  const u = new URL(String(url));
+  if (!u.pathname.endsWith("/catalog_metadata")) return null;
+  const inMatch = (u.searchParams.get("product_id") || "").match(/^in\.\((.*)\)$/);
+  const requested = inMatch ? inMatch[1].split(",") : [];
+  let result = rows ? rows.filter((r) => requested.includes(String(r.product_id))) : requested.map((id) => ({ product_id: Number(id), published: true }));
+  if (u.searchParams.get("published") === "eq.true") result = result.filter((r) => r.published === true);
+  return { ok: true, status: 200, text: async () => JSON.stringify(result) };
+}
+
 async function main() {
   delete require.cache[require.resolve("../api/orders/create")];
   const createHandler = require("../api/orders/create");
@@ -132,6 +148,8 @@ async function main() {
       let insertCalled = false;
       const originalFetch = global.fetch;
       global.fetch = async (url, opts) => {
+        const meta = metadataMock(url);
+        if (meta) return meta;
         if (String(url).includes("/rest/v1/products")) {
           return { ok: true, status: 200, text: async () => JSON.stringify([mockRealProduct({ stock: 0 })]) };
         }
@@ -159,6 +177,8 @@ async function main() {
     await withEnv(BASE_ENV, async () => {
       const originalFetch = global.fetch;
       global.fetch = async (url) => {
+        const meta = metadataMock(url);
+        if (meta) return meta;
         if (String(url).includes("/rest/v1/products")) return { ok: true, status: 200, text: async () => "[]" };
         return { ok: true, status: 200, text: async () => "[]" };
       };
@@ -182,6 +202,8 @@ async function main() {
       let insertedBody = null;
       const originalFetch = global.fetch;
       global.fetch = async (url, opts) => {
+        const meta = metadataMock(url);
+        if (meta) return meta;
         const u = String(url);
         if (u.includes("/rest/v1/products")) {
           return { ok: true, status: 200, text: async () => JSON.stringify([mockRealProduct({ price: 15000 })]) };
@@ -222,6 +244,8 @@ async function main() {
     await withEnv(BASE_ENV, async () => {
       const originalFetch = global.fetch;
       global.fetch = async (url, opts) => {
+        const meta = metadataMock(url);
+        if (meta) return meta;
         const u = String(url);
         if (u.includes("/rest/v1/products")) return { ok: true, status: 200, text: async () => JSON.stringify([mockRealProduct()]) };
         if (u.includes("/rest/v1/orders") && opts.method === "POST") {
@@ -259,6 +283,8 @@ async function main() {
         const resendRecipients = [];
         const originalFetch = global.fetch;
         global.fetch = async (url, opts) => {
+        const meta = metadataMock(url);
+        if (meta) return meta;
           const u = String(url);
           if (u.includes("/rest/v1/products")) return { ok: true, status: 200, text: async () => JSON.stringify([mockRealProduct()]) };
           if (u.includes("/rest/v1/orders") && opts.method === "POST") {
@@ -298,6 +324,8 @@ async function main() {
         let markPatchBody = null;
         const originalFetch = global.fetch;
         global.fetch = async (url, opts) => {
+        const meta = metadataMock(url);
+        if (meta) return meta;
           const u = String(url);
           if (u.includes("/rest/v1/products")) return { ok: true, status: 200, text: async () => JSON.stringify([mockRealProduct()]) };
           if (u.includes("/rest/v1/orders") && opts.method === "POST") {
@@ -329,6 +357,168 @@ async function main() {
         }
       }
     );
+  });
+
+  console.log("\n/api/orders/create — Fase 43: solo productos publicados");
+
+  // Simula Supabase para un pedido: `products` (POS) y `metaRows`
+  // (catalog_metadata). `honorPublishedFilter: false` simula una consulta
+  // que perdió el filtro published=eq.true (defensa en profundidad).
+  async function runOrder({ products, metaRows, items, honorPublishedFilter = true }) {
+    const calls = { inserted: null, supabase: 0 };
+    const originalFetch = global.fetch;
+    global.fetch = async (url, opts) => {
+      calls.supabase++;
+      const u = new URL(String(url));
+      if (u.pathname.endsWith("/catalog_metadata")) {
+        if (!honorPublishedFilter) u.searchParams.delete("published");
+        return metadataMock(u.toString(), metaRows);
+      }
+      if (u.pathname.endsWith("/products")) {
+        const inMatch = (u.searchParams.get("id") || "").match(/^in\.\((.*)\)$/);
+        const requested = inMatch ? inMatch[1].split(",") : [];
+        return { ok: true, status: 200, text: async () => JSON.stringify(products.filter((p) => requested.includes(String(p.id)))) };
+      }
+      if (u.pathname.endsWith("/orders") && opts && opts.method === "POST") {
+        calls.inserted = JSON.parse(opts.body);
+        return { ok: true, status: 201, text: async () => JSON.stringify({ ...calls.inserted, id: 99, created_at: "2026-10-26T00:00:00Z" }) };
+      }
+      return { ok: true, status: 204, text: async () => "" };
+    };
+    try {
+      const res = mockRes();
+      await createHandler({ method: "POST", headers: {}, body: { customer: VALID_CUSTOMER, contactConsent: true, items } }, res);
+      return { res, ...calls };
+    } finally {
+      global.fetch = originalFetch;
+    }
+  }
+
+  const PRODUCTS = [
+    mockRealProduct({ id: 10, price: 20000, stock: 5 }),
+    mockRealProduct({ id: 11, price: 30000, stock: 5, promoActive: true, promoPrice: 24000 }),
+    mockRealProduct({ id: 20, price: 15000, stock: 5 }),
+    mockRealProduct({ id: 30, price: 9000, stock: 5 }),
+    mockRealProduct({ id: 40, price: 18000, stock: 0 }),
+  ];
+  const META = [
+    { product_id: 10, published: true },
+    { product_id: 11, published: true },
+    { product_id: 20, published: false },
+    { product_id: 40, published: true },
+    // 30: sin fila de metadata
+  ];
+
+  await test("producto publicado y disponible -> 201, se registra con el precio del servidor", async () => {
+    await withEnv(BASE_ENV, async () => {
+      const { res, inserted } = await runOrder({ products: PRODUCTS, metaRows: META, items: [{ productId: 10, quantity: 2, price: 1 }] });
+      assert.equal(res.statusCode, 201);
+      assert.equal(inserted.items[0].price, 20000);
+      assert.equal(inserted.total, 40000);
+    });
+  });
+
+  await test("varios productos publicados (uno con promo) -> 201, total con precio efectivo del servidor", async () => {
+    await withEnv(BASE_ENV, async () => {
+      const { res, inserted } = await runOrder({
+        products: PRODUCTS,
+        metaRows: META,
+        items: [{ productId: 10, quantity: 1 }, { productId: 11, quantity: 2 }],
+      });
+      assert.equal(res.statusCode, 201);
+      assert.equal(inserted.items[1].price, 24000);
+      assert.equal(inserted.total, 20000 + 48000);
+    });
+  });
+
+  await test("producto con published:false -> 409, el pedido no se registra", async () => {
+    await withEnv(BASE_ENV, async () => {
+      const { res, inserted } = await runOrder({ products: PRODUCTS, metaRows: META, items: [{ productId: 20, quantity: 1 }] });
+      assert.equal(res.statusCode, 409);
+      assert.deepEqual(res.body.unavailableProductIds, [20]);
+      assert.equal(inserted, null);
+    });
+  });
+
+  await test("producto sin metadata editorial -> 409, el pedido no se registra", async () => {
+    await withEnv(BASE_ENV, async () => {
+      const { res, inserted } = await runOrder({ products: PRODUCTS, metaRows: META, items: [{ productId: 30, quantity: 1 }] });
+      assert.equal(res.statusCode, 409);
+      assert.deepEqual(res.body.unavailableProductIds, [30]);
+      assert.equal(inserted, null);
+    });
+  });
+
+  await test("mezcla publicado + no publicado -> 409 rechaza el pedido entero, solo señala el no publicado", async () => {
+    await withEnv(BASE_ENV, async () => {
+      const { res, inserted } = await runOrder({
+        products: PRODUCTS,
+        metaRows: META,
+        items: [{ productId: 10, quantity: 1 }, { productId: 20, quantity: 1 }],
+      });
+      assert.equal(res.statusCode, 409);
+      assert.deepEqual(res.body.unavailableProductIds, [20]);
+      assert.equal(inserted, null);
+    });
+  });
+
+  await test("mezcla publicado + sin metadata + publicado agotado + inexistente -> 409 con todos los inválidos", async () => {
+    await withEnv(BASE_ENV, async () => {
+      const { res, inserted } = await runOrder({
+        products: PRODUCTS,
+        metaRows: META,
+        items: [
+          { productId: 10, quantity: 1 },
+          { productId: 30, quantity: 1 },
+          { productId: 40, quantity: 1 },
+          { productId: 777, quantity: 1 },
+        ],
+      });
+      assert.equal(res.statusCode, 409);
+      assert.deepEqual(res.body.unavailableProductIds, [30, 40, 777]);
+      assert.equal(inserted, null);
+    });
+  });
+
+  await test("publicado pero agotado -> 409 (la validación de stock se conserva)", async () => {
+    await withEnv(BASE_ENV, async () => {
+      const { res, inserted } = await runOrder({ products: PRODUCTS, metaRows: META, items: [{ productId: 40, quantity: 1 }] });
+      assert.equal(res.statusCode, 409);
+      assert.deepEqual(res.body.unavailableProductIds, [40]);
+      assert.equal(inserted, null);
+    });
+  });
+
+  await test("no publicado responde igual que agotado/inexistente (no revela que el producto existe)", async () => {
+    await withEnv(BASE_ENV, async () => {
+      const unpub = await runOrder({ products: PRODUCTS, metaRows: META, items: [{ productId: 20, quantity: 1 }] });
+      const missing = await runOrder({ products: PRODUCTS, metaRows: META, items: [{ productId: 777, quantity: 1 }] });
+      assert.equal(unpub.res.body.error, missing.res.body.error);
+      assert.deepEqual(Object.keys(unpub.res.body).sort(), Object.keys(missing.res.body).sort());
+    });
+  });
+
+  await test("defensa en profundidad: si la consulta devolviera una fila published:false, igual se rechaza", async () => {
+    await withEnv(BASE_ENV, async () => {
+      const { res, inserted } = await runOrder({
+        products: PRODUCTS,
+        metaRows: META,
+        items: [{ productId: 20, quantity: 1 }],
+        honorPublishedFilter: false,
+      });
+      assert.equal(res.statusCode, 409);
+      assert.equal(inserted, null);
+    });
+  });
+
+  await test("cantidad inválida -> 400 antes de consultar Supabase (validación de payload se conserva)", async () => {
+    await withEnv(BASE_ENV, async () => {
+      for (const quantity of [0, -1, 1.5, "2"]) {
+        const { res, supabase } = await runOrder({ products: PRODUCTS, metaRows: META, items: [{ productId: 10, quantity }] });
+        assert.equal(res.statusCode, 400, "quantity " + JSON.stringify(quantity));
+        assert.equal(supabase, 0);
+      }
+    });
   });
 
   console.log("\n/api/admin/orders");
