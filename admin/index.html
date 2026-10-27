@@ -11,14 +11,15 @@
 <link rel="apple-touch-icon" href="/assets/favicon/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/admin/admin.css">
 </head>
 <body>
 
 <div id="loginGate" class="login-gate">
   <div class="login-box">
-    <p class="eyebrow">VIBE · Panel editorial</p>
+    <img class="login-logo" src="/assets/brand/logo/vibe-logo-light.png" alt="VIBE">
+    <p class="eyebrow">Panel editorial</p>
     <h1>Acceso administrativo</h1>
     <p class="hint">Herramienta interna para gestionar la información editorial del catálogo. No modifica precios, stock ni datos del POS.</p>
     <label>Token de administración
@@ -29,112 +30,149 @@
   </div>
 </div>
 
-<header class="admin-header hidden" id="adminHeader">
-  <div class="admin-brand">VIBE <span>· Panel editorial</span></div>
-  <nav class="admin-tabs" id="adminTabs">
-    <button type="button" class="admin-tab active" id="tabProducts" data-view="products">Productos</button>
-    <button type="button" class="admin-tab" id="tabHero" data-view="hero">Carrusel Hero</button>
-    <button type="button" class="admin-tab" id="tabOrders" data-view="orders">Pedidos</button>
-  </nav>
-  <button id="logoutButton" class="button outline-admin">Salir</button>
-</header>
+<!-- Fase 52 — Admin organizado por áreas de trabajo: barra lateral en
+     escritorio, navegación inferior en mobile. -->
+<div id="adminShell" class="admin-shell hidden">
+  <aside class="admin-sidebar" aria-label="Áreas del panel">
+    <div class="sidebar-brand">
+      <img src="/assets/brand/logo/vibe-logo-light.png" alt="VIBE">
+      <span>Panel editorial</span>
+    </div>
+    <nav class="sidebar-nav" id="adminNav">
+      <button type="button" class="nav-item active" data-view="home" id="navHome"><span class="nav-ico" aria-hidden="true">◇</span><span>Inicio</span></button>
+      <button type="button" class="nav-item" data-view="products" id="navProducts"><span class="nav-ico" aria-hidden="true">▢</span><span>Productos</span></button>
+      <button type="button" class="nav-item" data-view="taxonomy" id="navTaxonomy"><span class="nav-ico" aria-hidden="true">≡</span><span>Clasificación</span></button>
+      <button type="button" class="nav-item" data-view="hero" id="navHero"><span class="nav-ico" aria-hidden="true">◐</span><span>Carrusel</span></button>
+      <button type="button" class="nav-item" data-view="orders" id="navOrders"><span class="nav-ico" aria-hidden="true">✉</span><span>Pedidos</span></button>
+    </nav>
+    <button id="logoutButton" type="button" class="sidebar-logout">Salir</button>
+  </aside>
 
-<main id="app" class="admin-main hidden">
-  <section class="toolbar">
-    <input id="searchInput" type="search" placeholder="Buscar por id, nombre o categoría...">
-    <select id="filterStatus">
-      <option value="all">Todos</option>
-      <option value="published">Publicados</option>
-      <option value="unpublished">No publicados</option>
-      <option value="available">Disponibles</option>
-      <option value="unavailable">Agotados</option>
-      <option value="unclassified">Sin categoría VIBE</option>
-      <option value="published_unclassified">Publicados sin categoría VIBE</option>
-    </select>
-    <select id="filterCategory">
-      <option value="all">Todas las categorías</option>
-    </select>
-    <span id="resultCount" class="result-count"></span>
-  </section>
+  <div class="admin-content">
+    <!-- Inicio: cifras reales del catálogo y accesos a lo que estás trabajando. -->
+    <main id="homeApp" class="admin-main view-panel" data-view-panel="home">
+      <header class="view-head">
+        <div class="view-head-row"><p class="eyebrow">Inicio</p><button type="button" id="mobileLogout" class="mobile-logout">Salir</button></div>
+        <h1>Tu catálogo VIBE</h1>
+        <p class="view-sub">Resumen de lo que hoy se ve en el catálogo público. Tú decides qué productos trabajar y publicar.</p>
+      </header>
+      <p id="homeError" class="login-error hidden"></p>
+      <div class="home-stats" id="homeStats"></div>
+      <div class="home-grid">
+        <section class="home-panel">
+          <div class="panel-head"><h2>Publicados</h2><button type="button" class="link-btn" data-goto="products" data-status="published">Ver en Productos</button></div>
+          <div id="homePublished" class="home-list"></div>
+        </section>
+        <section class="home-panel">
+          <div class="panel-head"><h2>Pedidos recientes</h2><button type="button" class="link-btn" data-goto="orders">Ver todos</button></div>
+          <div id="homeOrders" class="home-list"></div>
+        </section>
+      </div>
+    </main>
 
-  <p id="loadError" class="login-error hidden"></p>
+    <!-- Productos -->
+    <main id="app" class="admin-main view-panel hidden" data-view-panel="products">
+      <header class="view-head">
+        <p class="eyebrow">Productos</p>
+        <h1>Productos del POS</h1>
+        <p class="view-sub">Nombre, precio y disponibilidad vienen del POS. Aquí trabajas la ficha editorial y decides qué se publica.</p>
+      </header>
+      <section class="toolbar">
+        <input id="searchInput" type="search" placeholder="Buscar por nombre, id o categoría" aria-label="Buscar productos">
+        <select id="filterCategory" aria-label="Filtrar por categoría">
+          <option value="all">Todas las categorías</option>
+        </select>
+      </section>
+      <div class="chip-row" id="statusChips" role="group" aria-label="Filtrar por estado">
+        <button type="button" class="chip active" data-status="all">Todos</button>
+        <button type="button" class="chip" data-status="published">Publicados</button>
+        <button type="button" class="chip" data-status="unpublished">No publicados</button>
+        <button type="button" class="chip" data-status="with_ficha">Con ficha</button>
+        <button type="button" class="chip" data-status="unclassified">Sin categoría VIBE</button>
+        <button type="button" class="chip" data-status="unavailable">Agotados</button>
+      </div>
+      <p class="result-line"><span id="resultCount" class="result-count"></span></p>
+      <p id="loadError" class="login-error hidden"></p>
+      <div id="productRows" class="product-list" role="list"></div>
+    </main>
 
-  <div class="table-wrap">
-    <table class="admin-table">
-      <thead>
-        <tr>
-          <th>Producto</th>
-          <th>Categoría POS</th>
-          <th>Clasificación VIBE</th>
-          <th>Precio</th>
-          <th>Disponibilidad</th>
-          <th>Ficha</th>
-          <th>Publicado</th>
-          <th>Destacado</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody id="productRows"></tbody>
-    </table>
+    <!-- Clasificación (consulta): cómo está organizado hoy el catálogo. -->
+    <main id="taxonomyApp" class="admin-main view-panel hidden" data-view-panel="taxonomy">
+      <header class="view-head">
+        <p class="eyebrow">Clasificación</p>
+        <h1>Clasificación VIBE</h1>
+        <p class="view-sub">Grupo › Categoría › Subcategoría de los productos con ficha. La categoría POS es el dato de origen y no se modifica. Para cambiar la clasificación de un producto, ábrelo desde aquí.</p>
+      </header>
+      <div id="taxonomyTree" class="taxonomy-tree"></div>
+      <section class="home-panel" id="taxonomyPosPanel">
+        <div class="panel-head"><h2>Categorías de origen (POS)</h2></div>
+        <div id="taxonomyPos" class="pos-chips"></div>
+      </section>
+    </main>
+
+    <main id="heroApp" class="admin-main view-panel hidden" data-view-panel="hero">
+      <header class="view-head">
+        <p class="eyebrow">Carrusel</p>
+        <h1>Carrusel del Home</h1>
+        <p class="view-sub">Los slides activos aparecen en el Home, en el orden mostrado. Un slide inactivo nunca se muestra públicamente.</p>
+      </header>
+      <section class="toolbar toolbar-end">
+        <button type="button" id="newSlideBtn" class="button dark">+ Nuevo slide</button>
+      </section>
+
+      <p id="heroLoadError" class="login-error hidden"></p>
+
+      <div class="table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Preview</th>
+              <th>Contenido</th>
+              <th>Orden</th>
+              <th>Activo</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="heroRows"></tbody>
+        </table>
+      </div>
+    </main>
+
+    <!-- Fase 39 — solo lectura: los pedidos entrantes, sin acciones ni
+         edición de estado. VIBE contacta manualmente por WhatsApp. -->
+    <main id="ordersApp" class="admin-main view-panel hidden" data-view-panel="orders">
+      <header class="view-head">
+        <p class="eyebrow">Pedidos</p>
+        <h1>Pedidos recibidos</h1>
+        <p class="view-sub">Más reciente primero. Sin edición de estado: VIBE contacta manualmente por WhatsApp Business usando el número del cliente.</p>
+      </header>
+
+      <p id="ordersLoadError" class="login-error hidden"></p>
+
+      <div class="table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Cliente</th>
+              <th>WhatsApp</th>
+              <th>Email</th>
+              <th>Ciudad</th>
+              <th>Total</th>
+              <th>Estado</th>
+              <th>Email enviado</th>
+            </tr>
+          </thead>
+          <tbody id="ordersRows"></tbody>
+        </table>
+      </div>
+    </main>
   </div>
-</main>
+</div>
 
-<main id="heroApp" class="admin-main hidden">
-  <section class="toolbar">
-    <p class="hero-admin-hint">Los slides activos aparecen en el Home, en el orden mostrado abajo. Un slide inactivo nunca se muestra públicamente.</p>
-    <button type="button" id="newSlideBtn" class="button dark">+ Nuevo slide</button>
-  </section>
-
-  <p id="heroLoadError" class="login-error hidden"></p>
-
-  <div class="table-wrap">
-    <table class="admin-table">
-      <thead>
-        <tr>
-          <th>Preview</th>
-          <th>Contenido</th>
-          <th>Orden</th>
-          <th>Activo</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody id="heroRows"></tbody>
-    </table>
-  </div>
-</main>
-
-<!-- Fase 39 — pestaña de solo lectura: mientras no exista una
-     credencial real de email/WhatsApp Business, este es el único lugar
-     donde Ana puede ver los pedidos entrantes sin entrar directo al
-     Table Editor de Supabase. Sin acciones, sin edición de estado. -->
-<main id="ordersApp" class="admin-main hidden">
-  <section class="toolbar">
-    <p class="hero-admin-hint">Pedidos recibidos, más reciente primero. Sin edición de estado — VIBE contacta manualmente por WhatsApp Business usando el número del cliente.</p>
-  </section>
-
-  <p id="ordersLoadError" class="login-error hidden"></p>
-
-  <div class="table-wrap">
-    <table class="admin-table">
-      <thead>
-        <tr>
-          <th>Fecha</th>
-          <th>Cliente</th>
-          <th>WhatsApp</th>
-          <th>Email</th>
-          <th>Ciudad</th>
-          <th>Total</th>
-          <th>Estado</th>
-          <th>Email enviado</th>
-        </tr>
-      </thead>
-      <tbody id="ordersRows"></tbody>
-    </table>
-  </div>
-</main>
-
-<dialog id="editDialog">
-  <button id="closeEdit" class="x">×</button>
+<!-- Editor de producto a página completa (Fase 52). -->
+<dialog id="editDialog" class="editor-page" aria-label="Editor de producto">
+  <button id="closeEdit" type="button" class="editor-back" aria-label="Volver a Productos">← Productos</button>
   <div id="editContent"></div>
 </dialog>
 

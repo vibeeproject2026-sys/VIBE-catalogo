@@ -16,7 +16,7 @@
 // sent anywhere except as the Authorization header on /api/admin/*
 // requests.
 
-import { getCategoriesInGroup, getSubcategories, VIBE_CATEGORY_GROUPS, subcategorySuggestions, publicPlacement } from "../js/taxonomy.js";
+import { getCategoriesInGroup, getSubcategories, VIBE_CATEGORY_GROUPS, SUBCATEGORIES_BY_CATEGORY, subcategorySuggestions, publicPlacement } from "../js/taxonomy.js";
 import { SECTION_DESTINATIONS, describeSlideDestination } from "../js/hero-links.js";
 
 const TOKEN_KEY = "vibe_admin_token";
@@ -206,13 +206,11 @@ async function adminFetch(path, options = {}) {
 
 function showApp() {
   $("#loginGate").classList.add("hidden");
-  $("#adminHeader").classList.remove("hidden");
-  $("#app").classList.remove("hidden");
+  $("#adminShell").classList.remove("hidden");
 }
 function showLogin(message) {
   $("#loginGate").classList.remove("hidden");
-  $("#adminHeader").classList.add("hidden");
-  $("#app").classList.add("hidden");
+  $("#adminShell").classList.add("hidden");
   if (message) {
     $("#loginError").textContent = message;
     $("#loginError").classList.remove("hidden");
@@ -241,6 +239,8 @@ async function loadProducts() {
   state.products = data.products || [];
   populateCategoryFilter();
   renderTable();
+  renderHome();
+  renderTaxonomy();
 }
 
 // Fase 51 — se puede filtrar por categoría VIBE (editorial, la que define
@@ -268,6 +268,7 @@ function filteredProducts() {
     if (state.status === "unpublished" && p.published) return false;
     if (state.status === "available" && !p.available) return false;
     if (state.status === "unavailable" && p.available) return false;
+    if (state.status === "with_ficha" && !p.hasMetadata) return false;
     if (state.status === "unclassified" && p.editorialCategory) return false;
     if (state.status === "published_unclassified" && (!p.published || p.editorialCategory)) return false;
     const haystack = [String(p.id), p.name, p.category, p.editorialCategory, p.subcategory].filter(Boolean).join(" ").toLowerCase();
@@ -288,23 +289,142 @@ function classificationCell(p) {
     <span class="class-where">${where ? `Se ve en: ${esc(where)} (por categoría POS)` : "Solo en «Todos» y búsqueda"}</span>`;
 }
 
+// Fase 52 — miniatura del producto (imagen de su ficha) o sus iniciales.
+function imageUrl(src) {
+  if (!src) return "";
+  return /^(https?:)?\/\//.test(src) || src.startsWith("/") || src.startsWith("data:") ? src : "/" + src;
+}
+function productThumb(p, cls = "pc-thumb") {
+  if (p.image) return `<span class="${cls}"><img src="${esc(imageUrl(p.image))}" alt="" loading="lazy"></span>`;
+  const initials = p.name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
+  return `<span class="${cls} pc-thumb-empty" aria-hidden="true">${esc(initials)}</span>`;
+}
+
+// Estado editorial de un producto, en lenguaje neutro: "Solo POS" no es
+// un pendiente, es un producto que todavía no decidiste trabajar.
+function stateChips(p) {
+  const chips = [];
+  if (!p.hasMetadata) chips.push(`<span class="pill pill-muted">Solo POS</span>`);
+  else chips.push(p.published ? `<span class="pill pill-pink">Publicado</span>` : `<span class="pill pill-muted">No publicado</span>`);
+  if (!p.available) chips.push(`<span class="pill pill-warn">Agotado</span>`);
+  if (p.featured) chips.push(`<span class="pill pill-pink">★ Más elegidos</span>`);
+  if (p.badge) chips.push(`<span class="pill pill-outline">${esc(p.badge)}</span>`);
+  return chips.join("");
+}
+
 function renderTable() {
   const list = filteredProducts();
   $("#resultCount").textContent = `${list.length} de ${state.products.length} productos`;
-  $("#productRows").innerHTML = list
-    .map(
-      (p) => `<tr>
-        <td><span class="prod-name">${esc(p.name)}</span><span class="prod-id">#${p.id}</span></td>
-        <td>${esc(p.category)}</td>
-        <td class="class-cell">${classificationCell(p)}</td>
-        <td>${money(p.price)}</td>
-        <td>${p.available ? `<span class="pill pill-ok">Disponible</span>` : `<span class="pill pill-warn">Agotado</span>`}</td>
-        <td>${p.hasMetadata ? `<span class="pill pill-ok">Creada</span>` : `<span class="pill pill-muted">Sin ficha</span>`}</td>
-        <td>${p.published ? `<span class="pill pill-pink">Sí</span>` : `<span class="pill pill-muted">No</span>`}</td>
-        <td>${p.featured ? `<span class="pill pill-pink">★</span>` : `<span class="pill pill-muted">—</span>`}</td>
-        <td><button class="edit-link" data-edit="${p.id}">Editar</button></td>
-      </tr>`
-    )
+  $("#productRows").innerHTML = list.length
+    ? list
+        .map(
+          (p) => `<article class="product-card" role="listitem">
+        <button type="button" class="product-card-btn" data-edit="${p.id}" aria-label="Abrir ${esc(p.name)}">
+          ${productThumb(p)}
+          <span class="pc-main">
+            <span class="pc-name">${esc(p.name)} <span class="prod-id">#${p.id}</span></span>
+            <span class="pc-meta">POS: ${esc(p.category)} · ${money(p.price)}</span>
+            <span class="pc-class class-cell">${classificationCell(p)}</span>
+          </span>
+          <span class="pc-state">${stateChips(p)}</span>
+        </button>
+      </article>`
+        )
+        .join("")
+    : `<p class="empty-state">Ningún producto coincide con la búsqueda o el filtro.</p>`;
+}
+
+// ---- Fase 52 — Inicio: cifras reales y lo que hoy se ve en el catálogo ----
+function renderHome() {
+  if (!$("#homeStats")) return;
+  const products = state.products;
+  const published = products.filter((p) => p.published);
+  const withFicha = products.filter((p) => p.hasMetadata).length;
+  const inStock = products.filter((p) => p.available).length;
+  const weekAgo = Date.now() - 7 * 24 * 3600 * 1000;
+  const recentOrders = ordersState.loaded ? ordersState.orders.filter((o) => new Date(o.created_at).getTime() >= weekAgo).length : null;
+  const stat = (value, label, sub = "") => `<div class="stat-card"><b>${value}</b><span>${label}</span>${sub ? `<small>${sub}</small>` : ""}</div>`;
+  $("#homeStats").innerHTML =
+    stat(published.length, "publicados en el catálogo") +
+    stat(withFicha, "fichas editoriales") +
+    stat(products.length, "productos en el POS", `${inStock} con stock`) +
+    stat(recentOrders === null ? "—" : recentOrders, "pedidos en los últimos 7 días");
+
+  $("#homePublished").innerHTML = published.length
+    ? published
+        .map((p) => {
+          const where = placementText(p);
+          return `<button type="button" class="home-item" data-edit="${p.id}">
+          ${productThumb(p, "hi-thumb")}
+          <span class="hi-main"><span class="hi-name">${esc(p.name)}</span><span class="hi-sub">${where ? esc(where) : "Solo en «Todos» y búsqueda"}${p.editorialCategory ? "" : " · por categoría POS"}</span></span>
+          <span class="hi-chips">${p.available ? "" : `<span class="pill pill-warn">Agotado</span>`}${p.featured ? `<span class="pill pill-pink">★</span>` : ""}</span>
+        </button>`;
+        })
+        .join("")
+    : `<p class="empty-state">Todavía no publicaste ningún producto.</p>`;
+
+  if (!ordersState.loaded) {
+    $("#homeOrders").innerHTML = ordersState.failed ? `<p class="empty-state">No se pudieron cargar los pedidos. Abre Pedidos para reintentar.</p>` : `<p class="empty-state">Cargando pedidos…</p>`;
+    return;
+  }
+  const latest = ordersState.orders.slice(0, 5);
+  $("#homeOrders").innerHTML = latest.length
+    ? latest
+        .map((o) => `<div class="home-item home-order">
+          <span class="hi-main"><span class="hi-name">${esc(o.customer_name)}</span><span class="hi-sub">${esc(formatOrderDate(o.created_at))} · ${esc(o.customer_city || "")}</span></span>
+          <span class="hi-chips"><b>${money(Number(o.total))}</b><span class="pill pill-muted">${esc(ORDER_STATUS_LABELS[o.status] || o.status)}</span></span>
+        </div>`)
+        .join("")
+    : `<p class="empty-state">Todavía no hay pedidos registrados.</p>`;
+}
+
+// ---- Fase 52 — Clasificación (consulta) ----
+function renderTaxonomy() {
+  if (!$("#taxonomyTree")) return;
+  const classified = state.products.filter((p) => p.editorialCategory);
+  const productLink = (p) => `<button type="button" class="tax-product" data-edit="${p.id}">${esc(p.name)}${p.published ? "" : ` <span class="tax-muted">(no publicado)</span>`}</button>`;
+  const groups = VIBE_CATEGORY_GROUPS.map(({ group, categories }) => {
+    const inGroup = classified.filter((p) => categories.includes(p.editorialCategory));
+    const cats = categories
+      .map((c) => {
+        const inCat = classified.filter((p) => p.editorialCategory === c);
+        const approved = SUBCATEGORIES_BY_CATEGORY[c] || [];
+        const subChips = approved
+          .map((sub) => {
+            const n = inCat.filter((p) => p.subcategory === sub).length;
+            return `<span class="sub-chip${n ? "" : " sub-zero"}">${esc(sub)}<b>${n}</b></span>`;
+          })
+          .join("");
+        const historical = [...new Set(inCat.map((p) => p.subcategory).filter((v) => v && !approved.includes(v)))];
+        const histChips = historical
+          .map((v) => `<span class="sub-chip sub-hist" title="Valor guardado que no está en la lista aprobada; se conserva hasta que lo revises">${esc(v)}<b>${inCat.filter((p) => p.subcategory === v).length}</b></span>`)
+          .join("");
+        const noSub = inCat.filter((p) => !p.subcategory).length;
+        return `<div class="tax-cat">
+          <div class="tax-cat-head"><b>${esc(c)}</b><span class="tax-count">${inCat.length} ${inCat.length === 1 ? "producto" : "productos"}</span></div>
+          <div class="sub-chips">${subChips}${histChips}${noSub ? `<span class="sub-chip sub-none">Sin subcategoría<b>${noSub}</b></span>` : ""}</div>
+          ${inCat.length ? `<div class="tax-products">${inCat.map(productLink).join("")}</div>` : ""}
+        </div>`;
+      })
+      .join("");
+    return `<section class="tax-group"><div class="tax-group-head"><h2>${esc(group)}</h2><span class="tax-count">${inGroup.length} con clasificación VIBE</span></div>${cats}</section>`;
+  }).join("");
+  const unclassifiedPublished = state.products.filter((p) => p.published && !p.editorialCategory);
+  const legend = `<p class="tax-legend"><span class="sub-chip sub-hist">Fuera de la lista<b>n</b></span> valor guardado que no coincide con las subcategorías aprobadas: se conserva hasta que decidas.</p>`;
+  const unclassified = unclassifiedPublished.length
+    ? `<section class="tax-group tax-note"><div class="tax-group-head"><h2>Publicados sin categoría VIBE</h2><span class="tax-count">aparecen por su categoría POS</span></div><div class="tax-products">${unclassifiedPublished.map((p) => `${productLink(p)}<span class="tax-muted">${esc(placementText(p) || "Solo «Todos»")}</span>`).join("")}</div></section>`
+    : "";
+  $("#taxonomyTree").innerHTML = legend + groups + unclassified;
+
+  const byPos = {};
+  for (const p of state.products) {
+    byPos[p.category] = byPos[p.category] || { total: 0, ficha: 0 };
+    byPos[p.category].total++;
+    if (p.hasMetadata) byPos[p.category].ficha++;
+  }
+  $("#taxonomyPos").innerHTML = Object.entries(byPos)
+    .sort((a, b) => a[0].localeCompare(b[0], "es"))
+    .map(([c, v]) => `<span class="pos-chip"><b>${esc(c)}</b>${v.total} en el POS · ${v.ficha} con ficha</span>`)
     .join("");
 }
 
@@ -368,9 +488,27 @@ async function openEdit(productId) {
   $("#editContent").innerHTML = `
     <div class="edit-actionbar">
       <div class="edit-actionbar-title"><strong>${esc(product.name)}</strong><span class="prod-id">#${product.id}</span></div>
+      <span id="editStatusChip" class="pill ${m.published ? "pill-pink" : "pill-muted"}">${metadata ? (m.published ? "Publicado" : "No publicado") : "Solo POS"}</span>
       <span id="saveStatusTop" class="save-status" role="status"></span>
       <button type="button" id="saveTopBtn" class="button dark">Guardar cambios</button>
     </div>
+    <section class="editor-summary" data-tab="summary">
+      ${productThumb({ name: product.name, image: m.image }, "es-thumb")}
+      <div class="es-main">
+        <p class="eyebrow">Resumen</p>
+        <h1 class="es-name">${esc(product.name)}</h1>
+        <p class="es-pos">POS: ${esc(product.category)} · ${money(product.price)} · ${Number(product.stock) > 0 ? "Disponible" : "Agotado"}</p>
+        <p class="es-place">Clasificación VIBE: <b id="summaryClassification">${m.category ? esc(m.category) + (m.subcategory ? " › " + esc(m.subcategory) : "") : "sin categoría VIBE"}</b></p>
+        <p class="es-place" id="summaryPlacement"></p>
+        <div class="es-content">${[
+          ["Imagen", m.image],
+          ["Descripción", m.description || m.short_description],
+          ["Beneficios", (m.benefits || []).length],
+          ["Modo de uso", m.usage],
+          ["Ingredientes", m.ingredients],
+        ].map(([label, has]) => `<span class="pill ${has ? "pill-ok" : "pill-muted"}">${has ? "✓" : "—"} ${label}</span>`).join("")}</div>
+      </div>
+    </section>
     <div class="edit-pos">
       <h2>1. Información del POS <span class="section-hint">(solo lectura)</span></h2>
       <div class="edit-pos-grid">
@@ -587,6 +725,8 @@ async function openEdit(productId) {
     </form>
   `;
 
+  organizeEditorTabs();
+
   // Fase 34 — el <form> real (#editForm) solo envuelve la sección de
   // Publicación (así el submit por Enter no queda atado a un acordeón en
   // particular), pero necesita leer TODOS los campos de arriba en el
@@ -768,10 +908,15 @@ async function openEdit(productId) {
       ? `Se verá en el catálogo público en: ${where}${category ? "" : " (por categoría POS)"}.`
       : "Sin categoría VIBE, este producto solo aparece en «Todos» y en la búsqueda.";
     $("#placementHint").classList.toggle("placement-warn", !category);
+    $("#summaryPlacement").textContent = $("#placementHint").textContent;
+    $("#summaryClassification").textContent = category ? category + (sub ? " › " + sub : "") : "sin categoría VIBE";
     const suggestions = subcategorySuggestions(category);
     $("#subcategoryHint").textContent =
       category && sub && !suggestions.includes(sub) ? `«${sub}» no está entre las sugeridas para ${category}; se guardará tal cual.` : "";
     const published = $('[name="published"]').checked;
+    const chip = $("#editStatusChip");
+    chip.textContent = published ? "Publicado" : "No publicado";
+    chip.className = `pill ${published ? "pill-pink" : "pill-muted"}`;
     const hint = $("#publishHint");
     hint.classList.toggle("hidden", !(published && !category));
     if (published && !category) {
@@ -921,17 +1066,93 @@ async function openEdit(productId) {
 
 let heroState = { slides: [], loaded: false };
 
+// Fase 52 — cinco áreas de trabajo (barra lateral / navegación inferior).
+const ADMIN_VIEWS = ["home", "products", "taxonomy", "hero", "orders"];
 function switchAdminView(view) {
-  const isHero = view === "hero";
-  const isOrders = view === "orders";
-  $("#tabProducts").classList.toggle("active", !isHero && !isOrders);
-  $("#tabHero").classList.toggle("active", isHero);
-  $("#tabOrders").classList.toggle("active", isOrders);
-  $("#app").classList.toggle("hidden", isHero || isOrders);
-  $("#heroApp").classList.toggle("hidden", !isHero);
-  $("#ordersApp").classList.toggle("hidden", !isOrders);
-  if (isHero && !heroState.loaded) loadHeroSlides();
-  if (isOrders && !ordersState.loaded) loadOrders();
+  if (!ADMIN_VIEWS.includes(view)) view = "home";
+  document.querySelectorAll("[data-view-panel]").forEach((el) => el.classList.toggle("hidden", el.dataset.viewPanel !== view));
+  document.querySelectorAll("#adminNav .nav-item").forEach((el) => {
+    const on = el.dataset.view === view;
+    el.classList.toggle("active", on);
+    if (on) el.setAttribute("aria-current", "page");
+    else el.removeAttribute("aria-current");
+  });
+  window.scrollTo({ top: 0 });
+  if (view === "hero" && !heroState.loaded) loadHeroSlides();
+  if ((view === "orders" || view === "home") && !ordersState.loaded) loadOrders().then(renderHome);
+  if (view === "home") renderHome();
+  if (view === "taxonomy") renderTaxonomy();
+}
+
+// Fase 52 — reparte las secciones del editor en pestañas. Solo MUEVE los
+// nodos existentes (nunca los recrea ni elimina): todos los campos siguen
+// dentro del editor, así readAllFields() y el guardado envían exactamente
+// lo mismo que antes, aunque la pestaña esté oculta.
+const EDITOR_TABS = [
+  ["summary", "Resumen"],
+  ["identity", "Identidad y clasificación"],
+  ["images", "Imágenes"],
+  ["content", "Contenido"],
+  ["formula", "Fórmula"],
+  ["promo", "Promoción"],
+  ["merch", "Merchandising"],
+];
+const SECTION_TAB = {
+  "Promoción VIBE": "promo",
+  "2. Identificación": "identity",
+  "3. Imágenes": "images",
+  "4. Descripción": "content",
+  "5. Beneficios": "content",
+  "6. Modo de uso": "content",
+  "7. Ingredientes": "formula",
+  "8. Fórmula y acabado": "formula",
+  "9. Tipo de piel": "formula",
+  "10. Información adicional": "formula",
+  "11. Merchandising VIBE": "merch",
+};
+function organizeEditorTabs() {
+  const root = $("#editContent");
+  root.querySelectorAll("details.admin-accordion").forEach((details) => {
+    const title = details.querySelector("summary").textContent.trim();
+    const section = document.createElement("section");
+    section.className = "editor-section " + [...details.classList].filter((c) => c !== "admin-accordion").join(" ");
+    section.dataset.tab = SECTION_TAB[title] || "content";
+    const h = document.createElement("h2");
+    h.className = "editor-section-title";
+    h.textContent = title.replace(/^\d+\.\s*/, "");
+    section.appendChild(h);
+    const body = details.querySelector(".admin-accordion-body");
+    while (body.firstChild) section.appendChild(body.firstChild);
+    details.replaceWith(section);
+  });
+  const pos = root.querySelector(".edit-pos");
+  if (pos) pos.dataset.tab = "summary";
+  const form = root.querySelector("#editForm");
+  if (form) form.dataset.tab = "summary";
+  // Sin la numeración de la ficha larga anterior (1. … 12.): ahora el orden lo dan las pestañas.
+  root.querySelectorAll(".edit-pos > h2, #editForm > h2").forEach((h) => {
+    if (h.firstChild && h.firstChild.nodeType === Node.TEXT_NODE) h.firstChild.textContent = h.firstChild.textContent.replace(/^\d+\.\s*/, "");
+  });
+
+  const tabbar = document.createElement("nav");
+  tabbar.className = "editor-tabs";
+  tabbar.setAttribute("role", "tablist");
+  tabbar.innerHTML = EDITOR_TABS.map(([key, label], i) => `<button type="button" role="tab" class="editor-tab${i === 0 ? " active" : ""}" data-tab-target="${key}" aria-selected="${i === 0}">${label}</button>`).join("");
+  root.querySelector(".edit-actionbar").after(tabbar);
+  const show = (key) => {
+    root.querySelectorAll("[data-tab]").forEach((el) => (el.hidden = el.dataset.tab !== key));
+    tabbar.querySelectorAll(".editor-tab").forEach((b) => {
+      const on = b.dataset.tabTarget === key;
+      b.classList.toggle("active", on);
+      b.setAttribute("aria-selected", on ? "true" : "false");
+    });
+    $("#editDialog").scrollTop = 0;
+  };
+  tabbar.addEventListener("click", (e) => {
+    const b = e.target.closest(".editor-tab");
+    if (b) show(b.dataset.tabTarget);
+  });
+  show("summary");
 }
 
 async function loadHeroSlides() {
@@ -1435,6 +1656,7 @@ async function loadOrders() {
   if (!res.ok) {
     $("#ordersLoadError").textContent = "No se pudo cargar el listado de pedidos. Intenta de nuevo.";
     $("#ordersLoadError").classList.remove("hidden");
+    ordersState.failed = true;
     return;
   }
   const data = await res.json();
@@ -1473,9 +1695,28 @@ function renderOrdersTable() {
     : `<tr><td colspan="8"><span class="section-hint">Todavía no hay ningún pedido registrado.</span></td></tr>`;
 }
 
-$("#tabProducts").addEventListener("click", () => switchAdminView("products"));
-$("#tabHero").addEventListener("click", () => switchAdminView("hero"));
-$("#tabOrders").addEventListener("click", () => switchAdminView("orders"));
+// En mobile la barra lateral es navegación inferior (sin "Salir"): el
+// botón de Inicio reutiliza exactamente el mismo cierre de sesión.
+$("#mobileLogout").addEventListener("click", () => $("#logoutButton").click());
+$("#adminNav").addEventListener("click", (e) => {
+  const item = e.target.closest(".nav-item");
+  if (item) switchAdminView(item.dataset.view);
+});
+// Accesos desde Inicio ("Ver en Productos", "Ver todos").
+$("#homeApp").addEventListener("click", (e) => {
+  const go = e.target.closest("[data-goto]");
+  if (go) {
+    if (go.dataset.status) setStatusFilter(go.dataset.status);
+    switchAdminView(go.dataset.goto);
+    return;
+  }
+  const item = e.target.closest("[data-edit]");
+  if (item) openEdit(Number(item.dataset.edit));
+});
+$("#taxonomyApp").addEventListener("click", (e) => {
+  const item = e.target.closest("[data-edit]");
+  if (item) openEdit(Number(item.dataset.edit));
+});
 $("#newSlideBtn").addEventListener("click", async (e) => {
   if (e.currentTarget.disabled) return;
   // Fase 39 — bug real encontrado al probar la creación de varios
@@ -1596,13 +1837,15 @@ $("#tokenSubmit").addEventListener("click", async () => {
   setToken(value);
   $("#loginError").classList.add("hidden");
   showApp();
+  switchAdminView("home");
   await loadProducts();
 });
 
 $("#logoutButton").addEventListener("click", () => {
   clearToken();
   heroState = { slides: [], loaded: false };
-  switchAdminView("products");
+  ordersState.loaded = false;
+  switchAdminView("home");
   showLogin();
 });
 
@@ -1610,9 +1853,18 @@ $("#searchInput").addEventListener("input", (e) => {
   state.search = e.target.value;
   renderTable();
 });
-$("#filterStatus").addEventListener("change", (e) => {
-  state.status = e.target.value;
+function setStatusFilter(status) {
+  state.status = status;
+  document.querySelectorAll("#statusChips .chip").forEach((c) => {
+    const on = c.dataset.status === status;
+    c.classList.toggle("active", on);
+    c.setAttribute("aria-pressed", on ? "true" : "false");
+  });
   renderTable();
+}
+$("#statusChips").addEventListener("click", (e) => {
+  const chip = e.target.closest(".chip");
+  if (chip) setStatusFilter(chip.dataset.status);
 });
 $("#filterCategory").addEventListener("change", (e) => {
   state.category = e.target.value;
@@ -1647,6 +1899,7 @@ $("#editDialog").addEventListener("close", () => {
 (async function init() {
   if (getToken()) {
     showApp();
+    switchAdminView("home");
     await loadProducts();
   } else {
     showLogin();

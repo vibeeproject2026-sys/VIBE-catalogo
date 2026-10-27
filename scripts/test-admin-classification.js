@@ -148,6 +148,30 @@ async function main() {
     assert.match(src, /\$\("textarea\[name=usage\]"\)\.value = m\.usage \|\| "";/);
   });
 
+  console.log("Editor por pestañas (Fase 52)");
+  const adminSrc = require("fs").readFileSync(require("path").join(__dirname, "..", "admin", "admin.js"), "utf8");
+  await test("cada sección de la ficha tiene una pestaña asignada (ninguna queda fuera)", () => {
+    const summaries = [...adminSrc.matchAll(/<details class="admin-accordion[^"]*"[^>]*>\s*<summary>([^<]+)<\/summary>/g)].map((m) => m[1].trim());
+    const mapBlock = adminSrc.match(/const SECTION_TAB = \{([\s\S]*?)\};/);
+    assert.ok(mapBlock, "no se encontró SECTION_TAB");
+    const mapped = new Set([...mapBlock[1].matchAll(/"([^"]+)":\s*"[a-z]+"/g)].map((m) => m[1]));
+    assert.ok(summaries.length >= 10, "no se encontraron las secciones de la ficha");
+    const missing = summaries.filter((t) => !mapped.has(t));
+    assert.deepEqual(missing, [], "secciones sin pestaña: " + missing.join(", "));
+  });
+  await test("las pestañas solo mueven nodos: organizeEditorTabs no elimina ni recrea campos", () => {
+    const fn = adminSrc.match(/function organizeEditorTabs\(\) \{([\s\S]*?)\n\}/);
+    assert.ok(fn, "no se encontró organizeEditorTabs");
+    assert.match(fn[1], /while \(body\.firstChild\) section\.appendChild\(body\.firstChild\)/);
+    assert.doesNotMatch(fn[1], /\.remove\(\)|innerHTML\s*=\s*""|removeChild/);
+  });
+  await test("el panel tiene las 5 áreas aprobadas", () => {
+    const html = require("fs").readFileSync(require("path").join(__dirname, "..", "admin", "index.html"), "utf8");
+    const views = [...html.matchAll(/class="nav-item[^"]*" data-view="([a-z]+)"/g)].map((m) => m[1]);
+    assert.deepEqual(views, ["home", "products", "taxonomy", "hero", "orders"]);
+    for (const v of views) assert.match(html, new RegExp(`data-view-panel="${v}"`));
+  });
+
   console.log(`\n${passed} passed, ${failed} failed`);
   if (failed > 0) process.exit(1);
 }
