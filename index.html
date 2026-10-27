@@ -91,24 +91,29 @@
      (ver assets/discover/CREDITS.md). Conteos/
      enlaces 100% reales, mismo goToFilter()/bindWorldNav() de siempre
      (ver renderDiscoverVibe() en app.js). -->
-<!-- Fase 47 — franja editorial animada entre Hero y "Descubre tu VIBE".
-     Solo mensajes de marca (sin promesas comerciales). La lista se repite
-     una vez (aria-hidden) para que el desplazamiento CSS sea continuo;
-     los lectores de pantalla leen solo la primera. Sin animación con
-     prefers-reduced-motion (ver .vibe-ticker en styles.css). -->
+<!-- Fase 47/48 — franja editorial animada entre Hero y "Descubre tu VIBE".
+     Fase 48: más presencia (64–76px), iconos lineales propios (SVG
+     inline, sin dependencias) y mensajes de identidad/descubrimiento con
+     "Tu ritual. Tu VIBE." como hilo conductor. Sin certificaciones ni
+     promesas comerciales: no hay evidencia verificable para afirmarlas
+     a nivel de marca. La lista se repite una vez (aria-hidden) para que
+     el bucle CSS sea continuo; los lectores de pantalla leen solo la
+     primera. Estática con prefers-reduced-motion. -->
 <div class="vibe-ticker" role="region" aria-label="Mensajes de VIBE">
   <div class="vibe-ticker-track">
     <ul class="vibe-ticker-group">
-      <li>Tu ritual. Tu VIBE.</li>
-      <li>Descubre tus esenciales de belleza.</li>
-      <li>Explora. Combina. Exprésate.</li>
-      <li>Encuentra tu próximo VIBE.</li>
+      <li><span class="ticker-icon"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg></span><span class="ticker-text">Tu ritual. Tu <span class="ticker-accent">VIBE.</span></span></li>
+      <li><span class="ticker-icon"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 16l.7 1.8L21.5 18.5l-1.8.7L19 21l-.7-1.8-1.8-.7 1.8-.7z"/></svg></span><span class="ticker-text">Beauty for your <span class="ticker-accent">VIBE.</span></span></li>
+      <li><span class="ticker-icon"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8L3.5 9.7l5.9-.9z"/></svg></span><span class="ticker-text">Encuentra tu próximo favorito.</span></li>
+      <li><span class="ticker-icon"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19L15 9"/><path d="M14 5v2M19 10h-2M17.5 6.5l-1.4 1.4M10 5.5V4M18.5 14H20"/></svg></span><span class="ticker-text">Explora. Combina. Exprésate.</span></li>
+      <li><span class="ticker-icon"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M8.5 13.5a4 4 0 0 0 7 0M9.5 9.5h.01M14.5 9.5h.01"/></svg></span><span class="ticker-text">Belleza a tu manera.</span></li>
     </ul>
     <ul class="vibe-ticker-group" aria-hidden="true">
-      <li>Tu ritual. Tu VIBE.</li>
-      <li>Descubre tus esenciales de belleza.</li>
-      <li>Explora. Combina. Exprésate.</li>
-      <li>Encuentra tu próximo VIBE.</li>
+      <li><span class="ticker-icon"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg></span><span class="ticker-text">Tu ritual. Tu <span class="ticker-accent">VIBE.</span></span></li>
+      <li><span class="ticker-icon"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 16l.7 1.8L21.5 18.5l-1.8.7L19 21l-.7-1.8-1.8-.7 1.8-.7z"/></svg></span><span class="ticker-text">Beauty for your <span class="ticker-accent">VIBE.</span></span></li>
+      <li><span class="ticker-icon"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8L3.5 9.7l5.9-.9z"/></svg></span><span class="ticker-text">Encuentra tu próximo favorito.</span></li>
+      <li><span class="ticker-icon"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19L15 9"/><path d="M14 5v2M19 10h-2M17.5 6.5l-1.4 1.4M10 5.5V4M18.5 14H20"/></svg></span><span class="ticker-text">Explora. Combina. Exprésate.</span></li>
+      <li><span class="ticker-icon"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M8.5 13.5a4 4 0 0 0 7 0M9.5 9.5h.01M14.5 9.5h.01"/></svg></span><span class="ticker-text">Belleza a tu manera.</span></li>
     </ul>
   </div>
 </div>
@@ -132,9 +137,19 @@
     <!-- Fase 47 — se retira el breadcrumb de texto ("Inicio" / "Inicio /
          Accesorios"): no era navegable y repetía el título y los chips de
          filtro. El encabezado pasa a una composición tipo masthead. -->
+    <!-- Fase 48 — sin bloque negro: encabezado editorial luminoso en dos
+         zonas. Izquierda: etiqueta, título (lo actualiza app.js según el
+         grupo o vista) y descripción. Derecha: mensaje de marca. -->
     <div class="heading heading-catalog">
-      <div><p class="eyebrow">COLECCIÓN</p><h2 id="catalogTitle">Catálogo</h2></div>
-      <p id="catalogSubtitle">Esenciales de belleza seleccionados para elevar tu ritual.</p>
+      <div class="catalog-heading-main">
+        <p class="eyebrow">COLECCIÓN</p>
+        <h2 id="catalogTitle">Catálogo</h2>
+        <p id="catalogSubtitle" class="catalog-lead">Explora por categoría y encuentra tu próximo esencial.</p>
+      </div>
+      <div class="catalog-brand">
+        <p class="catalog-brand-title">Beauty for your <span class="title-accent">VIBE.</span></p>
+        <p class="catalog-brand-text">Esenciales de belleza seleccionados para elevar tu ritual.</p>
+      </div>
     </div>
     <div class="tools">
       <div id="groupTabs" class="tabs"></div>

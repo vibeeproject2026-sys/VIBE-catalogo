@@ -693,7 +693,8 @@ footer .wrap.footer-grid{display:grid;grid-template-columns:1.1fr 1fr 1.3fr;gap:
      insuficiente en la revisión visual — subido a 18px, dentro del
      rango 16-20px pedido. Desktop no tiene esta regla — el spacing ahí
      ya era correcto y no se toca. */
-  .hero{padding:0;margin-top:18px}
+  /* Fase 48 — el Hero arranca pegado al header (antes 18px de hueco). */
+  .hero{padding:0;margin-top:0}
   .hero-copy{display:none}
   .hero-grid{gap:0}
 
@@ -794,7 +795,9 @@ footer .wrap.footer-grid{display:grid;grid-template-columns:1.1fr 1fr 1.3fr;gap:
 .heading h2{font-size:clamp(38px,4.6vw,56px);line-height:.98;letter-spacing:-.045em;margin:0}
 .heading h2::after{content:"";display:inline-block;width:.15em;height:.15em;margin-left:.07em;border-radius:50%;background:var(--pink)}
 .title-accent{color:var(--pink)}
-.heading>p{max-width:34ch;margin:0;padding-left:14px;border-left:2px solid var(--pink);color:#6e6e6e;font-size:13px;line-height:1.5}
+/* Fase 48 — las frases complementarias pasaban inadvertidas (13px, gris
+   claro): ahora 15px, casi negro, peso medio y filete rosa de 3px. */
+.heading>p{max-width:36ch;margin:0;padding-left:14px;border-left:3px solid var(--pink);color:#2a2a2a;font-size:15px;font-weight:500;line-height:1.5}
 .heading>p:empty{display:none}
 .eyebrow.eyebrow-chip{color:#fff;background:var(--pink);padding:6px 12px 6px 10px;border-radius:999px}
 .eyebrow.eyebrow-chip::before,#ofertasHome .eyebrow.eyebrow-chip::before{width:14px;background:#fff}
@@ -827,7 +830,7 @@ footer .wrap.footer-grid{display:grid;grid-template-columns:1.1fr 1fr 1.3fr;gap:
 }
 @media(max-width:640px){
   .heading{margin-bottom:26px;gap:12px}
-  .heading>p{font-size:12px}
+  .heading>p{font-size:14px}
   .faq{padding:56px 0}
   .faq-q{font-size:15px}
   footer .wrap.footer-grid{grid-template-columns:1fr;gap:24px}
@@ -846,44 +849,55 @@ footer .wrap.footer-grid{display:grid;grid-template-columns:1.1fr 1fr 1.3fr;gap:
   .empty-actions .button{width:100%}
 }
 
-/* Fase 47 — franja editorial animada (Hero → Descubre tu VIBE). Rosa
-   claro con texto negro y destellos rosa VIBE; desplazamiento continuo
-   con CSS (la segunda lista es copia aria-hidden), overflow:hidden para
-   no generar scroll horizontal. Sin movimiento si el usuario lo pide. */
-.vibe-ticker{position:relative;overflow:hidden;height:44px;display:flex;align-items:center;background:#FFB8D0;color:#111;border-top:1px solid #ff9cc0;border-bottom:1px solid #ff9cc0}
-.vibe-ticker-track{display:flex;width:max-content;animation:vibe-ticker 34s linear infinite}
+/* Fase 47/48 — franja editorial animada (Hero → Descubre tu VIBE). Fase
+   48: más presencia (64px mobile / 76px desktop), cada mensaje con un
+   icono lineal en un círculo blanco translúcido y trazo rosa VIBE;
+   texto negro firme, "VIBE." en rosa, separador vertical sutil.
+   Desplazamiento continuo con CSS: las dos listas son idénticas y cada
+   ítem lleva su propio espacio final, así -50% coincide exactamente con
+   el inicio de la copia (sin salto al reiniciar). overflow:hidden evita
+   scroll horizontal. Con prefers-reduced-motion: estática y en varias
+   líneas, sin la copia. */
+.vibe-ticker{position:relative;overflow:hidden;height:76px;display:flex;align-items:center;background:#FFB8D0;color:#111;border-top:1px solid #ff9cc0;border-bottom:1px solid #ff9cc0}
+.vibe-ticker-track{display:flex;width:max-content;animation:vibe-ticker 42s linear infinite}
 .vibe-ticker:hover .vibe-ticker-track{animation-play-state:paused}
 .vibe-ticker-group{display:flex;flex-shrink:0;margin:0;padding:0;list-style:none}
-.vibe-ticker-group li{display:flex;align-items:center;white-space:nowrap;font-size:13px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
-.vibe-ticker-group li::after{content:"✦";margin:0 26px;color:var(--pink);font-size:12px}
+.vibe-ticker-group li{display:flex;align-items:center;gap:12px;padding-right:44px;white-space:nowrap}
+.vibe-ticker-group li::after{content:"";width:1px;height:26px;margin-left:32px;background:#ff007a59}
+.ticker-icon{display:grid;place-items:center;width:40px;height:40px;flex-shrink:0;border-radius:50%;background:#ffffff8c;color:var(--pink);box-shadow:inset 0 0 0 1px #ff007a33}
+.ticker-text{font-size:17px;font-weight:800;letter-spacing:-.01em}
+.ticker-accent{color:var(--pink)}
 @keyframes vibe-ticker{from{transform:translateX(0)}to{transform:translateX(-50%)}}
-@media(prefers-reduced-motion:reduce){
-  .vibe-ticker-track{animation:none}
-  .vibe-ticker{justify-content:center}
-  .vibe-ticker-group[aria-hidden="true"]{display:none}
-}
+/* (versión estática con prefers-reduced-motion: al final del archivo,
+   para que gane también sobre las alturas responsive) */
 
-/* Fase 47 — "Descubre tu VIBE" con menos aire para que las categorías
-   aparezcan tras un desplazamiento corto (las tarjetas no cambian). */
+/* Fase 47/48 — "Descubre tu VIBE" con jerarquía secundaria al Hero (las
+   tarjetas no cambian). */
 .discover-vibe-visual{padding:40px 0 48px}
 .discover-vibe-visual .heading{margin-bottom:24px}
 
-/* Fase 47 — encabezado de Ofertas: titular editorial en dos tiempos
-   (negro + rosa), complemento legible con filete rosa. El punto rosa del
-   sistema de títulos no se añade: el titular ya termina en punto. */
+/* Fase 47/48 — encabezado de Ofertas: titular editorial en dos tiempos
+   (negro + rosa) y complemento bien visible con filete rosa. El punto
+   rosa del sistema de títulos no se añade: el titular ya termina en
+   punto. */
 .heading-ofertas h2{font-size:clamp(34px,4.2vw,54px);line-height:1;max-width:14ch}
 .heading-ofertas h2::after{content:none}
-.heading-ofertas>p{max-width:30ch;color:#222;font-size:16px;font-weight:600;line-height:1.45;border-left-width:3px}
+.heading-ofertas>p{max-width:28ch;color:#111;font-size:18px;font-weight:600;line-height:1.4}
 
-/* Fase 47 — encabezado del Catálogo tipo masthead: bloque negro con
-   título en mayúsculas de gran peso, etiqueta rosa y frase en alto
-   contraste. Misma familia que Ofertas (etiqueta + titular + filete
-   rosa), personalidad propia; compacto para que los productos aparezcan
-   pronto en mobile. */
-.heading-catalog{align-items:center;padding:28px 32px;border-radius:var(--radius);background:#0b0b0b;color:#fff}
-.heading-catalog .eyebrow{color:var(--pink);margin-bottom:10px}
-.heading-catalog h2{color:#fff;font-size:clamp(40px,5.4vw,68px);text-transform:uppercase;letter-spacing:-.035em;line-height:.92}
-.heading-catalog>p{color:#e8e8e8;font-size:15px;font-weight:500;max-width:32ch}
+/* Fase 48 — encabezado del Catálogo: sin el bloque negro. Composición
+   editorial luminosa en dos zonas sobre el fondo blanco de la sección:
+   izquierda etiqueta + título negro (punto rosa del sistema) +
+   descripción; derecha, mensaje de marca con filete rosa. Un filete
+   inferior con tramo rosa separa encabezado y herramientas. */
+.heading-catalog{align-items:flex-end;gap:40px;padding-bottom:26px;border-bottom:1px solid #ececec;position:relative}
+.heading-catalog::after{content:"";position:absolute;left:0;bottom:-1px;width:72px;height:3px;background:var(--pink)}
+.catalog-heading-main .eyebrow{color:var(--pink);margin-bottom:10px}
+.heading-catalog h2{font-size:clamp(42px,5vw,64px);line-height:.95}
+.catalog-lead{margin:12px 0 0;max-width:34ch;color:#222;font-size:17px;font-weight:500;line-height:1.45}
+.catalog-lead:empty{display:none}
+.catalog-brand{max-width:34ch;padding-left:20px;border-left:3px solid var(--pink)}
+.catalog-brand-title{margin:0 0 6px;color:#111;font-size:22px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;line-height:1.15}
+.catalog-brand-text{margin:0;color:#333;font-size:15px;font-weight:500;line-height:1.5}
 
 /* Fase 47 — botón Eliminar visible (papelera + etiqueta) en la columna
    del precio; contraste y foco claros sin dominar la fila. Solo el del
@@ -900,17 +914,52 @@ footer .wrap.footer-grid{display:grid;grid-template-columns:1.1fr 1fr 1.3fr;gap:
 @media(prefers-reduced-motion:reduce){.cart-item-inner,.cart-item .remove{transition:none}}
 
 @media(max-width:640px){
-  .vibe-ticker{height:40px}
-  .vibe-ticker-group li{font-size:12px}
-  .vibe-ticker-group li::after{margin:0 18px}
-  .discover-vibe-visual{padding:28px 0 32px}
-  .discover-vibe-visual .heading{margin-bottom:18px}
-  .heading-ofertas>p{font-size:15px}
-  .heading-catalog{padding:22px 20px;gap:10px}
-  .heading-catalog>p{font-size:14px}
+  .vibe-ticker{height:64px}
+  .ticker-icon{width:34px;height:34px}
+  .ticker-icon svg{width:18px;height:18px}
+  .ticker-text{font-size:15px}
+  .vibe-ticker-group li{gap:10px;padding-right:30px}
+  .vibe-ticker-group li::after{height:22px;margin-left:20px}
+  /* Fase 48 — Descubre tu VIBE más compacto en mobile para que el Hero
+     domine la primera impresión (mismas tarjetas). */
+  .discover-vibe-visual{padding:20px 0 26px}
+  .discover-vibe-visual .heading{margin-bottom:14px;gap:8px}
+  .discover-vibe-visual .eyebrow{margin-bottom:6px}
+  .discover-vibe-visual .heading h2{font-size:30px}
+  .heading-ofertas>p{font-size:16px}
+  .heading-catalog{gap:14px;padding-bottom:18px}
+  .heading-catalog h2{font-size:38px}
+  .catalog-lead{font-size:15px;margin-top:8px}
+  .catalog-brand{padding-left:14px}
+  .catalog-brand-title{font-size:15px;margin-bottom:4px}
+  .catalog-brand-text{font-size:14px}
   /* En mobile el gesto es el atajo principal: el botón queda como icono
      compacto (sigue visible y accesible por su aria-label). */
   .cart-item .remove{padding:0 10px}
   .cart-item .remove span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 }
-@media(max-width:900px){.heading-catalog{align-items:flex-start;padding:22px 24px;gap:10px}}
+@media(max-width:900px){
+  .heading-catalog{align-items:flex-start;gap:16px}
+  .catalog-lead{font-size:16px}
+  .catalog-brand-title{font-size:18px}
+}
+/* Fase 48 — franja estática con prefers-reduced-motion: sin animación ni
+   copia, y en varias líneas a todo el ancho para que se lean todos los
+   mensajes (alto automático, por eso va al final y gana sobre las
+   alturas fijas de cada breakpoint). */
+@media(prefers-reduced-motion:reduce){
+  .vibe-ticker{height:auto;padding:12px 16px;justify-content:center}
+  .vibe-ticker-track{animation:none;width:100%;justify-content:center}
+  .vibe-ticker-group{flex-shrink:1;width:100%;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px 14px;max-width:1180px}
+  .vibe-ticker-group[aria-hidden="true"]{display:none}
+  .vibe-ticker-group li{gap:8px;padding:0;white-space:normal;line-height:1.2}
+  .vibe-ticker-group li::after{content:none}
+  .ticker-icon{width:28px;height:28px}
+  .ticker-icon svg{width:16px;height:16px}
+  .ticker-text{font-size:14px}
+}
+/* Fase 48 — en tablet hay ancho para mantener las dos zonas del
+   encabezado del Catálogo en fila (apiladas quedaba demasiado alto). */
+@media(min-width:641px) and (max-width:900px){
+  .heading-catalog{flex-direction:row;align-items:flex-end;justify-content:space-between}
+}

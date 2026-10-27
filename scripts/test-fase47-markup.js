@@ -38,33 +38,53 @@ test("existe entre el Hero y Descubre tu VIBE", () => {
   const iDiscover = html.indexOf('<section id="discoverVibe"');
   assert.ok(iHero < iTicker && iTicker < iDiscover);
 });
-test("los 4 mensajes de marca, una copia visible y otra aria-hidden para el bucle", () => {
+test("Fase 48 — 5 mensajes de marca, cada uno con icono; copia aria-hidden para el bucle", () => {
   const groups = [...ticker[0].matchAll(/<ul class="vibe-ticker-group"([^>]*)>([\s\S]*?)<\/ul>/g)];
   assert.equal(groups.length, 2);
   assert.equal(groups[0][1].trim(), "");
   assert.match(groups[1][1], /aria-hidden="true"/);
-  const items = (g) => [...g.matchAll(/<li>([^<]+)<\/li>/g)].map((m) => m[1]);
-  assert.deepEqual(items(groups[0][2]), ["Tu ritual. Tu VIBE.", "Descubre tus esenciales de belleza.", "Explora. Combina. Exprésate.", "Encuentra tu próximo VIBE."]);
-  assert.deepEqual(items(groups[1][2]), items(groups[0][2]));
+  const items = (g) => [...g.matchAll(/<li>([\s\S]*?)<\/li>/g)].map((m) => m[1]);
+  const text = (li) => li.replace(/<svg[\s\S]*?<\/svg>/g, "").replace(/<[^>]+>/g, "").trim();
+  const first = items(groups[0][2]);
+  assert.deepEqual(first.map(text), ["Tu ritual. Tu VIBE.", "Beauty for your VIBE.", "Encuentra tu próximo favorito.", "Explora. Combina. Exprésate.", "Belleza a tu manera."]);
+  for (const li of first) assert.match(li, /<span class="ticker-icon"><svg[^>]*aria-hidden="true"/);
+  assert.deepEqual(items(groups[1][2]), first);
 });
-test("sin afirmaciones comerciales (descuentos, envíos, precios)", () => {
-  assert.doesNotMatch(ticker[0], /%|gratis|envío|descuento|\$|oferta/i);
+test("sin afirmaciones comerciales ni certificaciones sin evidencia", () => {
+  assert.doesNotMatch(ticker[0], /%|gratis|envío|descuento|\$|oferta|cruelty|vegan|sostenib|certific|dermatol|hipoalerg/i);
 });
 test("rosa claro, animación CSS, sin scroll horizontal y con prefers-reduced-motion", () => {
   assert.match(css, /\.vibe-ticker\{[^}]*overflow:hidden[^}]*background:#FFB8D0/);
   assert.match(css, /@keyframes vibe-ticker/);
-  assert.match(css, /prefers-reduced-motion:reduce\)\{\s*\.vibe-ticker-track\{animation:none\}/);
+  const rm = css.match(/@media\(prefers-reduced-motion:reduce\)\{\s*\.vibe-ticker\{[\s\S]*?\n\}/);
+  assert.ok(rm, "bloque reduced-motion del ticker");
+  assert.match(rm[0], /\.vibe-ticker-track\{animation:none/);
+  assert.match(rm[0], /\.vibe-ticker-group\[aria-hidden="true"\]\{display:none\}/);
 });
-test("altura objetivo en mobile (38–46px)", () => {
-  const m = css.match(/\.vibe-ticker\{height:(\d+)px\}/);
-  assert.ok(m && Number(m[1]) >= 38 && Number(m[1]) <= 46, m && m[1]);
+test("Fase 48 — altura: 64–76px en mobile y 68–84px en tablet/escritorio", () => {
+  const mobile = css.match(/\.vibe-ticker\{height:(\d+)px\}/);
+  const base = css.match(/\.vibe-ticker\{position:relative;overflow:hidden;height:(\d+)px/);
+  assert.ok(mobile && Number(mobile[1]) >= 64 && Number(mobile[1]) <= 76, mobile && mobile[1]);
+  assert.ok(base && Number(base[1]) >= 68 && Number(base[1]) <= 84, base && base[1]);
 });
 
 console.log("Encabezados");
-test("Catálogo: sin el breadcrumb aislado «Inicio» y con encabezado masthead", () => {
+test("Catálogo: sin breadcrumb «Inicio» ni bloque negro; dos zonas (título y marca)", () => {
   assert.doesNotMatch(html, /id="catalogBreadcrumb"/);
   assert.doesNotMatch(app, /catalogBreadcrumb/);
-  assert.match(html, /<div class="heading heading-catalog">[\s\S]*?COLECCIÓN[\s\S]*?id="catalogTitle"/);
+  const block = html.match(/<div class="heading heading-catalog">[\s\S]*?<\/div>\s*<\/div>/)[0];
+  assert.match(block, /COLECCIÓN[\s\S]*?id="catalogTitle">Catálogo<[\s\S]*?class="catalog-lead">Explora por categoría y encuentra tu próximo esencial\./);
+  assert.match(block, /class="catalog-brand-title">Beauty for your <span class="title-accent">VIBE\.<\/span>/);
+  assert.match(block, /Esenciales de belleza seleccionados para elevar tu ritual\./);
+  const rule = css.match(/\.heading-catalog\{[^}]*\}/)[0];
+  assert.doesNotMatch(rule, /background:#0b0b0b|background:#000/);
+});
+test("frases complementarias visibles (≥15px, texto casi negro, filete rosa 3px)", () => {
+  const p = css.match(/\.heading>p\{max-width[^}]*\}/)[0];
+  assert.match(p, /font-size:15px/);
+  assert.match(p, /color:#2a2a2a/);
+  assert.match(p, /border-left:3px solid var\(--pink\)/);
+  assert.match(css, /\.heading-ofertas>p\{[^}]*font-size:18px/);
 });
 test("Ofertas (página): copy neutro por defecto, sin sugerir descuentos", () => {
   const block = html.match(/<section id="ofertas"[\s\S]*?<\/section>/)[0];

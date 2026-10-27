@@ -178,7 +178,9 @@ function renderCatalogHeading() {
   // Sin descripción editorial por categoría en el modelo de datos actual
   // (ver docs/fase27-plp.md) — se muestra la intro general solo en "Todos"
   // y se deja limpio en vez de inventar un texto por categoría.
-  $("#catalogSubtitle").textContent = isAll ? "Esenciales de belleza seleccionados para elevar tu ritual." : "";
+  // Fase 48 — el mensaje "Esenciales de belleza…" pasó a la zona de marca
+  // (columna derecha del encabezado, fija en el HTML).
+  $("#catalogSubtitle").textContent = isAll ? "Explora por categoría y encuentra tu próximo esencial." : "";
 }
 
 function renderActiveFilters() {
