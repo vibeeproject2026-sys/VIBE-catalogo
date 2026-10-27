@@ -663,10 +663,26 @@ function moveGalleryBy(delta) {
   if (thumbs[nextIndex]) thumbs[nextIndex].click();
 }
 
+// Fase 45 — al cerrar el PDP el foco vuelve a la tarjeta que lo abrió.
+// Se guarda (grid, id) y no el nodo: cerrar dispara history.back() →
+// popstate → renderProducts(), que reemplaza las tarjetas, así que el
+// nodo original deja de existir. Tampoco se usa document.activeElement:
+// Safari no enfoca botones al tocarlos/clickearlos.
+let productTrigger = null;
+let pendingTriggerFocus = null;
+
+function restoreProductTriggerFocus(trigger) {
+  if (!trigger || $("#productDialog").open || $("#cartDrawer").classList.contains("open")) return;
+  const el = document.querySelector(`${trigger.grid} [data-product="${CSS.escape(trigger.productId)}"]`);
+  if (el) el.focus({ preventScroll: true });
+}
+
 function bindProductGrid(id) {
   $(id).addEventListener("click", e => {
     const b = e.target.closest("[data-product]");
-    if (b) openProduct(b.dataset.product);
+    if (!b) return;
+    if (!$("#productDialog").open) productTrigger = { grid: id, productId: b.dataset.product };
+    openProduct(b.dataset.product);
   });
 }
 
@@ -1050,12 +1066,17 @@ $("#productDialog").addEventListener(
 let suppressHistoryOnClose = false;
 $("#productDialog").addEventListener("close", () => {
   state.product = null;
+  const trigger = productTrigger;
+  productTrigger = null;
+  restoreProductTriggerFocus(trigger);
   if (suppressHistoryOnClose) {
     suppressHistoryOnClose = false;
     return;
   }
   try {
     if (window.history.state && window.history.state.vibeProduct) {
+      // popstate re-renderiza las tarjetas: el foco se restaura de nuevo ahí.
+      pendingTriggerFocus = trigger;
       window.history.back();
     } else {
       window.history.replaceState(null, "", buildUrl(window.location.pathname, { ...state, product: null }));
@@ -1375,6 +1396,10 @@ window.addEventListener("popstate", () => {
     suppressHistoryOnClose = true;
     $("#productDialog").close();
   }
+
+  // Fase 45 — renderProducts() acaba de reemplazar las tarjetas.
+  restoreProductTriggerFocus(pendingTriggerFocus);
+  pendingTriggerFocus = null;
 });
 
 async function loadCatalog() {

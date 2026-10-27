@@ -258,8 +258,15 @@ header.scrolled .logo-image{width:114px}
 
 /* Fase 41 — Instagram: bloque estático oscuro, sin feed embebido. */
 .instagram-vibe{background:#0b0b0b;color:#fff;padding:96px 0;position:relative;overflow:hidden}
-.instagram-vibe:after{content:"";position:absolute;width:320px;height:320px;border-radius:50%;background:#FF007A22;filter:blur(90px);right:8%;top:20%}
-.instagram-vibe-inner{position:relative;text-align:center;max-width:560px;margin:0 auto}
+/* Fase 45 — bug real: en mobile este círculo (320px, absoluto, pintado
+   después del contenido) quedaba ENCIMA del botón "Seguir en Instagram"
+   y recibía el toque (elementFromPoint en el centro del botón devolvía
+   la <section>, no el <a>). En desktop queda al costado de la columna
+   centrada, por eso allí funcionaba. pointer-events:none lo vuelve
+   puramente decorativo y z-index:1 deja el contenido siempre encima. */
+.instagram-vibe:after{content:"";position:absolute;width:320px;height:320px;border-radius:50%;background:#FF007A22;filter:blur(90px);right:8%;top:20%;pointer-events:none}
+.instagram-vibe-inner{position:relative;z-index:1;text-align:center;max-width:560px;margin:0 auto}
+.instagram-handle{margin:16px 0 0;font-size:12px;font-weight:700;letter-spacing:.14em;color:#ffffff99}
 .instagram-vibe-inner h2{font-size:clamp(30px,4vw,44px);line-height:1.05;letter-spacing:-.02em;color:#fff;margin:14px 0 26px}
 .button.outline.light{color:#fff;border-color:#ffffff77}
 .button.outline.light:hover{background:#fff;color:#111}
@@ -388,7 +395,21 @@ header.scrolled .logo-image{width:114px}
 
 dialog{border:1px solid #333;border-radius:22px;padding:0;width:min(860px,calc(100% - 28px));max-height:calc(100dvh - 28px);overflow:auto;background:#0b0b0b;color:#fff;box-shadow:0 20px 60px #000b}
 dialog::backdrop{background:#000d}
-.dialog-x{position:absolute;right:15px;top:15px;z-index:2}
+/* Fase 45 — X del PDP. Antes: transparente con X blanca (invisible sobre
+   fotos claras, que en mobile quedan justo debajo), 31×32px, y absoluta
+   dentro del <dialog> — que es el contenedor con scroll — así que se iba
+   con el contenido al bajar por la ficha. Ahora: círculo oscuro
+   translúcido con X blanca (contraste sobre blanco, negro y fotos),
+   44×44px, sticky arriba a la derecha del propio diálogo (siempre a la
+   vista; el margen negativo evita que empuje el contenido). Sin el azul
+   nativo: sin tap-highlight y sin outline en :focus, pero con un
+   :focus-visible propio para teclado (blanco + halo rosa, visible sobre
+   cualquier fondo). */
+.dialog-x{position:sticky;top:12px;z-index:5;display:grid;place-items:center;width:44px;height:44px;margin:12px 12px -56px auto;padding:0;border-radius:50%;border:1px solid #ffffff40;background:#0b0b0bd9;color:#fff;box-shadow:0 6px 18px #00000066;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);-webkit-tap-highlight-color:transparent;touch-action:manipulation;transition:background .2s ease}
+.dialog-x:hover{background:#000}
+.dialog-x:focus{outline:none}
+.dialog-x:focus-visible{outline:2px solid #fff;outline-offset:2px;box-shadow:0 0 0 5px var(--pink)}
+@media(prefers-reduced-motion:reduce){.dialog-x{transition:none}}
 /* Fase 35.1 — align-items:start evita que la columna de imagen se
    estire para igualar el alto de .detail-copy (que ahora puede ser muy
    larga con toda la ficha editorial): esa estirada era la causa real de
@@ -595,10 +616,21 @@ footer .wrap{display:flex;justify-content:space-between;align-items:end;gap:20px
 .footer-logo-image{width:150px;aspect-ratio:504/207;overflow:hidden}
 .footer-logo-image img{width:100%;height:100%;object-fit:contain;display:block}
 footer small{letter-spacing:.25em;font-size:7px}
-.footer-nav{display:flex;gap:18px}
-.footer-nav a{color:#aaa}
-.footer-nav a:hover{color:#fff}
-.footer-note{color:#777;font-size:11px}
+/* Fase 45 — footer en columnas: marca · Explora · Contacto. Cada enlace
+   con min-height 44px (objetivo táctil cómodo en mobile). */
+footer .wrap.footer-grid{display:grid;grid-template-columns:1.1fr 1fr 1.3fr;gap:40px;align-items:start}
+.footer-title{display:flex;align-items:center;gap:10px;margin:0 0 10px;font-size:11px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:#fff}
+.footer-title::before{content:"";width:18px;height:2px;background:var(--pink)}
+.footer-links{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.footer-links a{display:inline-flex;align-items:center;min-height:44px;color:#aaa;font-size:13px;transition:color .2s ease}
+.footer-links a:hover{color:#fff}
+.footer-links a:focus{outline:none}
+.footer-links a:focus-visible{outline:2px solid var(--pink);outline-offset:3px;border-radius:4px}
+.footer-contact a{flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;min-height:52px}
+.footer-contact-label{font-size:10px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--pink)}
+.footer-contact-value{color:#e6e6e6;font-size:14px;overflow-wrap:anywhere}
+.footer-contact a:hover .footer-contact-value{color:#fff}
+@media(prefers-reduced-motion:reduce){.footer-links a{transition:none}}
 
 @media(max-width:900px){
   .grid{grid-template-columns:repeat(2,1fr)}
@@ -733,4 +765,55 @@ footer small{letter-spacing:.25em;font-size:7px}
   .checkout-confirmation-actions{flex-direction:column}
   .checkout-confirmation-actions .button{width:100%}
   footer .wrap{flex-direction:column;align-items:flex-start;gap:16px}
+}
+
+/* Fase 45 — sistema de títulos de sección. Mismo lenguaje para todos
+   (etiqueta editorial con guion rosa + título dominante + punto rosa
+   como firma + descriptor con filete rosa), con un acento propio por
+   sección: palabra "VIBE" en rosa (Descubre/Ofertas/Instagram),
+   etiqueta tipo chip para la urgencia de Ofertas. El punto es un
+   ::after (no texto): no lo leen los lectores de pantalla y sobrevive a
+   que app.js reescriba #catalogTitle con textContent. Tamaño fluido:
+   menos alto que antes en mobile (46px → 38px) y algo más contenido en
+   desktop (58px → 56px máx.), presencia sin más scroll. */
+.heading h2{font-size:clamp(38px,4.6vw,56px);line-height:.98;letter-spacing:-.045em;margin:0}
+.heading h2::after{content:"";display:inline-block;width:.15em;height:.15em;margin-left:.07em;border-radius:50%;background:var(--pink)}
+.title-accent{color:var(--pink)}
+.heading>p{max-width:34ch;margin:0;padding-left:14px;border-left:2px solid var(--pink);color:#6e6e6e;font-size:13px;line-height:1.5}
+.heading>p:empty{display:none}
+.eyebrow.eyebrow-chip{color:#fff;background:var(--pink);padding:6px 12px 6px 10px;border-radius:999px}
+.eyebrow.eyebrow-chip::before,#ofertasHome .eyebrow.eyebrow-chip::before{width:14px;background:#fff}
+
+/* Fase 45 — Preguntas frecuentes: acordeón compacto sobre blanco, que
+   separa el bloque oscuro de Instagram del footer. */
+.faq{background:#fff;color:#111;padding:80px 0}
+/* El header es sticky: al llegar por ancla (#ayuda desde el footer,
+   #contacto desde la FAQ) el inicio de la sección no queda debajo. */
+#ayuda,#contacto{scroll-margin-top:80px}
+.faq .eyebrow{color:var(--pink)}
+.faq-list{max-width:860px;border-top:1px solid #e6e6e6}
+.faq-item{border-bottom:1px solid #e6e6e6}
+.faq-item h3{margin:0;font-size:inherit}
+.faq-q{width:100%;display:flex;justify-content:space-between;align-items:center;gap:16px;min-height:60px;padding:16px 4px;border:0;background:none;color:#111;text-align:left;font-size:16px;font-weight:700;line-height:1.35;-webkit-tap-highlight-color:transparent;transition:color .2s ease}
+.faq-q::after{content:"";flex:0 0 auto;width:28px;height:28px;border-radius:50%;border:1px solid #d9d9d9;background:linear-gradient(#111,#111) center/10px 2px no-repeat,linear-gradient(#111,#111) center/2px 10px no-repeat;transition:background-color .2s ease,border-color .2s ease}
+.faq-q:hover{color:var(--pink)}
+.faq-q[aria-expanded="true"]::after{border-color:var(--pink);background:var(--pink) linear-gradient(#fff,#fff) center/10px 2px no-repeat}
+.faq-q:focus{outline:none}
+.faq-q:focus-visible{outline:2px solid var(--pink);outline-offset:2px;border-radius:8px}
+.faq-a{padding:0 4px 20px;max-width:68ch;color:#555;font-size:14px;line-height:1.65}
+.faq-a p{margin:0}
+.faq-a strong{color:#111}
+.faq-a a{color:var(--pink);font-weight:700;text-decoration:underline;text-underline-offset:2px}
+@media(prefers-reduced-motion:reduce){.faq-q,.faq-q::after{transition:none}}
+
+@media(max-width:900px){
+  footer .wrap.footer-grid{grid-template-columns:1fr 1fr;gap:32px}
+  .footer-brand{grid-column:1/-1}
+}
+@media(max-width:640px){
+  .heading{margin-bottom:26px;gap:12px}
+  .heading>p{font-size:12px}
+  .faq{padding:56px 0}
+  .faq-q{font-size:15px}
+  footer .wrap.footer-grid{grid-template-columns:1fr;gap:24px}
 }
