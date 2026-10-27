@@ -19,6 +19,7 @@ const { pickEditorialFields } = require("./_lib/editorialFields");
 const { parseDetails, serializeDetails } = require("../_lib/editorialDetails");
 const { requireAdmin } = require("./_lib/auth");
 const { sendJson, sendError, methodNotAllowed } = require("../catalog/_lib/http");
+const { resolveCategoryGroup } = require("../catalog/_lib/categoryGroups");
 
 const PRODUCT_COLUMNS = "id,name,price,stock,category";
 const METADATA_COLUMNS =
@@ -60,7 +61,10 @@ module.exports = async function handler(req, res) {
       const metadata = metadataRows[0] || null;
       if (metadata) metadata.additional_info = parseDetails(metadata.additional_info);
       res.setHeader("Cache-Control", "no-store");
-      return sendJson(res, 200, { product: products[0], metadata });
+      // Fase 51 — categoryGroup (solo lectura) para la vista previa de
+      // "dónde aparecerá" en el formulario del Admin.
+      const product = { ...products[0], categoryGroup: resolveCategoryGroup(products[0].category) };
+      return sendJson(res, 200, { product, metadata });
     } catch (e) {
       console.error("[admin/catalog-metadata] " + (e && e.message ? e.message : e));
       return sendError(res, 502, "No se pudo obtener el producto.");

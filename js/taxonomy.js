@@ -51,6 +51,36 @@ function groupOf(p) {
   return isCatchAll ? null : posGroup;
 }
 
+// Fase 51 — subcategorías aprobadas por categoría editorial (Fase 20.2,
+// docs/fase20-curaduria-editorial-decisiones.md, con la fusión del punto
+// 6). Son SUGERENCIAS para el Admin: el campo sigue siendo texto libre y
+// nada se reclasifica automáticamente.
+export const SUBCATEGORIES_BY_CATEGORY = {
+  Rostro: ["Base y corrector", "Polvo y fijador", "Iluminador", "Rubor"],
+  Ojos: ["Sombras", "Delineado", "Pestañas", "Cejas", "Kits de ojos"],
+  Labios: ["Labiales", "Gloss y oils", "Kits de labios"],
+  Limpieza: ["Limpiadores", "Tónicos"],
+  Tratamiento: ["Cremas faciales", "Contorno de ojos", "Cuello y escote", "Pestañas (crecimiento)", "Papel matificante", "Mascarillas", "Kits"],
+  "Herramientas de aplicación": ["Brochas", "Esponjas"],
+  "Complementos de belleza": ["Accesorios para el cabello", "Cuidado personal"],
+};
+
+// Sugerencias de subcategoría para una categoría editorial; sin
+// categoría (o con una desconocida), todas.
+export function subcategorySuggestions(category) {
+  return SUBCATEGORIES_BY_CATEGORY[category] || Object.values(SUBCATEGORIES_BY_CATEGORY).flat();
+}
+
+// Fase 51 — dónde aparece un producto en el catálogo público, con la
+// MISMA lógica que la navegación pública (groupOf/categoryOf). group es
+// null cuando el producto solo se ve en "Todos" y en la búsqueda (p. ej.
+// categoría POS "Otro" sin categoría editorial). Espera la forma que ya
+// entregan la API pública y la del Admin: { category, categoryGroup,
+// editorialCategory }.
+export function publicPlacement(p) {
+  return { group: groupOf(p), category: categoryOf(p) };
+}
+
 // Fase 46 — "Novedades" se activa con el badge editorial "Nuevo" desde
 // Admin. El campo es texto libre (la ayuda de Admin sugería "NUEVO"), así
 // que se compara sin distinguir mayúsculas ni espacios.

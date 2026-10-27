@@ -18,6 +18,7 @@ const { getEnv } = require("../catalog/_lib/env");
 const { pgrestSelect } = require("../catalog/_lib/supabaseRead");
 const { requireAdmin } = require("./_lib/auth");
 const { sendJson, sendError, methodNotAllowed } = require("../catalog/_lib/http");
+const { resolveCategoryGroup } = require("../catalog/_lib/categoryGroups");
 
 const PRODUCT_COLUMNS = "id,name,price,stock,category";
 // Fase 39 — se agrega `category` (columna editorial, distinta de la
@@ -55,6 +56,10 @@ module.exports = async function handler(req, res) {
         id: p.id,
         name: p.name,
         category: p.category,
+        // Fase 51 — grupo derivado del POS, el mismo que recibe el catálogo
+        // público (shapeProduct → categoryGroup). Solo lectura: permite que
+        // el Admin muestre dónde aparecerá el producto sin duplicar el mapeo.
+        categoryGroup: resolveCategoryGroup(p.category),
         price: Number(p.price),
         stock: Number(p.stock),
         available: Number(p.stock) > 0,

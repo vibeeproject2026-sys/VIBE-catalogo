@@ -731,33 +731,34 @@ footer .wrap.footer-grid{display:grid;grid-template-columns:1.1fr 1fr 1.3fr;gap:
      contenedor en la misma proporción, "contain" no genera
      letterboxing perceptible. */
   .hero-slide img{object-fit:contain}
-  /* Fase 49 — más protagonismo sin recortar: las piezas actuales son
-     horizontales (16:9) y ya ocupan todo el ancho, así que la imagen no
-     puede crecer sin recortarse. El marco crece moderadamente hasta 4:3
-     (min-height:75vw, +34% de alto) y la pieza se sigue viendo COMPLETA
-     y centrada (contain); las bandas se rellenan con la misma imagen
-     desenfocada y oscurecida, así el marco se lee como una sola pieza.
-     Si algún día existe la "Imagen mobile (4:5)" de Admin, su proporción
-     es más alta que 4:3 y manda el aspect-ratio medido (sin bandas). */
-  .hero-carousel{min-height:75vw}
+  /* Fase 49/51 — Hero mobile. Las piezas actuales son 16:9 y ya ocupan
+     todo el ancho: la imagen nítida no puede crecer sin recortarse.
+     Fase 49 agrandaba el MARCO a 4:3 con bandas desenfocadas arriba y
+     abajo (75% imagen / 25% bandas en 390px), y la banda superior se
+     leía como un vacío oscuro entre el header y la pieza. Fase 51: el
+     marco mide exactamente la pieza (aspect-ratio medido en
+     .hero-slides, la imagen arranca pegada al header) + una franja
+     compacta de 36px para flechas e indicadores (≈86% imagen nítida,
+     sin bandas desenfocadas visibles). El fondo desenfocado se conserva
+     solo como respaldo: si una pieza tuviera otra proporción (o mientras
+     se mide la primera), rellena sus bandas en vez de dejar negro. */
+  .hero-carousel{min-height:0;aspect-ratio:auto;padding-bottom:36px}
+  .hero-slides{height:auto;aspect-ratio:var(--hero-mobile-ratio, 4/5)}
   .hero-slide .hero-slide-backdrop{display:block;position:absolute;inset:-24px;width:calc(100% + 48px);height:calc(100% + 48px);object-fit:cover;filter:blur(22px) brightness(.42) saturate(1.15);transform:scale(1.08)}
   .hero-slide picture{position:relative;z-index:1}
-  /* Indicadores en la banda inferior: ya no tapan el texto de la pieza.
-     Fase 50 — su contenedor ocupa todo el ancho de la banda, donde ahora
-     también están las flechas: solo los botones de los indicadores
-     reciben toques, el contenedor no intercepta los de las flechas. */
-  .hero-dots{bottom:4px;pointer-events:none}
+  /* Indicadores centrados en la franja de controles. Fase 50 — su
+     contenedor ocupa todo el ancho, donde también están las flechas:
+     solo los botones de los indicadores reciben toques. */
+  .hero-dots{bottom:7px;pointer-events:none}
   .hero-dot{pointer-events:auto}
   .hero-slide-copy{padding:20px 18px 26px}
   .hero-slide-subtitle{display:none}
-  /* Fase 50 — centradas en vertical, las flechas tapaban texto integrado
-     en las piezas (la primera empieza a ~22px del borde izquierdo, justo
-     a media altura). Ahora viven en la banda inferior del marco, a los
-     lados de los indicadores: el botón es un área táctil transparente de
-     44×44 dentro del marco y el círculo visible (30px, ::before) queda
-     entero en la banda, alineado con los indicadores. */
-  .hero-arrow{top:auto;bottom:0;transform:none;width:44px;height:44px;border:0;border-radius:0;background:transparent;-webkit-backdrop-filter:none;backdrop-filter:none;place-items:end center;padding:0 0 9px;font-size:15px}
-  .hero-arrow::before{content:"";position:absolute;left:7px;bottom:2px;z-index:-1;width:30px;height:30px;box-sizing:border-box;border-radius:50%;border:1px solid #ffffff33;background:#00000055;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+  /* Fase 50/51 — flechas en la franja de controles, a los lados de los
+     indicadores y alineadas con ellos: el botón es un área táctil
+     transparente de 44×44 (sobresale 8px hacia la pieza, sin taparla) y
+     el círculo visible de 30px queda entero en la franja. */
+  .hero-arrow{top:auto;bottom:0;transform:none;width:44px;height:44px;border:0;border-radius:0;background:transparent;-webkit-backdrop-filter:none;backdrop-filter:none;place-items:end center;padding:0 0 10px;font-size:15px}
+  .hero-arrow::before{content:"";position:absolute;left:7px;bottom:3px;z-index:-1;width:30px;height:30px;box-sizing:border-box;border-radius:50%;border:1px solid #ffffff33;background:#00000055;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
   .hero-arrow:hover{background:transparent}
   .hero-arrow:hover::before{background:#00000088}
   .hero-arrow:focus-visible{outline:none}

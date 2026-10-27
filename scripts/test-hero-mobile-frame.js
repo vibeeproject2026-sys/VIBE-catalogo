@@ -29,11 +29,13 @@ function test(name, fn) {
 
 // Bloque mobile principal (el que contiene las reglas del Hero mobile).
 const mobileBlocks = [...css.matchAll(/@media\(max-width:640px\)\{([\s\S]*?)\n\}/g)].map((m) => m[1]);
-const heroMobile = mobileBlocks.find((b) => b.includes(".hero-carousel{min-height:75vw}")) || "";
+const heroMobile = mobileBlocks.find((b) => b.includes(".hero-carousel{min-height:0;aspect-ratio:auto;padding-bottom:36px}")) || "";
 
-test("el marco mobile crece hasta 4:3 como mínimo (min-height:75vw), no una altura rígida", () => {
+test("Fase 51 — el marco mide la pieza (proporción medida) + franja de controles de 36px; sin bandas forzadas", () => {
   assert.ok(heroMobile, "no se encontró el bloque mobile del Hero");
-  assert.match(heroMobile, /\.hero-carousel\{min-height:75vw\}/);
+  assert.match(heroMobile, /\.hero-carousel\{min-height:0;aspect-ratio:auto;padding-bottom:36px\}/);
+  assert.match(heroMobile, /\.hero-slides\{height:auto;aspect-ratio:var\(--hero-mobile-ratio, 4\/5\)\}/);
+  assert.doesNotMatch(heroMobile, /min-height:75vw/);
   assert.doesNotMatch(heroMobile, /\.hero-carousel\{[^}]*height:\d+px/);
 });
 test("la pieza real se sigue mostrando completa (contain) y nunca con cover", () => {
@@ -42,7 +44,7 @@ test("la pieza real se sigue mostrando completa (contain) y nunca con cover", ()
   assert.doesNotMatch(css, /\.hero-slide img\{[^}]*object-fit:cover/);
   assert.doesNotMatch(css, /\.hero-slide picture[^{]*\{[^}]*object-fit:cover/);
 });
-test("el fondo desenfocado solo existe en mobile (oculto en tablet/desktop)", () => {
+test("el fondo desenfocado (respaldo para piezas de otra proporción) solo existe en mobile", () => {
   assert.match(css, /\.hero-slide \.hero-slide-backdrop\{display:none\}/);
   assert.match(heroMobile, /\.hero-slide \.hero-slide-backdrop\{display:block;[^}]*object-fit:cover;filter:blur\(/);
   assert.match(heroMobile, /\.hero-slide picture\{position:relative;z-index:1\}/);
@@ -51,14 +53,15 @@ test("el fondo es decorativo: misma imagen que la pieza mobile, alt vacío y ari
   assert.match(js, /const backdropSrc = hasMobileVariant \? s\.mobileImage : s\.image;/);
   assert.match(js, /<img class="hero-slide-backdrop" src="\$\{esc\(backdropSrc\)\}" alt="" aria-hidden="true"/);
 });
-test("los indicadores bajan a la banda inferior en mobile", () => {
-  assert.match(heroMobile, /\.hero-dots\{bottom:4px;pointer-events:none\}/);
+test("los indicadores quedan centrados en la franja de controles (7px + 11px = centro a 18px)", () => {
+  assert.match(heroMobile, /\.hero-dots\{bottom:7px;pointer-events:none\}/);
   // Fase 50 — el contenedor no intercepta los toques destinados a las flechas.
   assert.match(heroMobile, /\.hero-dot\{pointer-events:auto\}/);
 });
 test("Fase 50 — flechas mobile en la banda inferior: área táctil 44×44 y círculo visible de 30px", () => {
   assert.match(heroMobile, /\.hero-arrow\{top:auto;bottom:0;transform:none;width:44px;height:44px;[^}]*background:transparent/);
-  assert.match(heroMobile, /\.hero-arrow::before\{content:"";position:absolute;left:7px;bottom:2px;z-index:-1;width:30px;height:30px;/);
+  // Fase 51 — círculo centrado en la franja de 36px (3px + 15px = 18px), alineado con los indicadores.
+  assert.match(heroMobile, /\.hero-arrow::before\{content:"";position:absolute;left:7px;bottom:3px;z-index:-1;width:30px;height:30px;/);
   assert.match(heroMobile, /\.hero-arrow:focus-visible::before\{outline:2px solid #fff/);
   assert.doesNotMatch(heroMobile, /\.hero-arrow\{width:34px;height:34px/);
 });

@@ -16,7 +16,7 @@
 // sent anywhere except as the Authorization header on /api/admin/*
 // requests.
 
-import { getCategoriesInGroup, getSubcategories, VIBE_CATEGORY_GROUPS } from "../js/taxonomy.js";
+import { getCategoriesInGroup, getSubcategories, VIBE_CATEGORY_GROUPS, subcategorySuggestions, publicPlacement } from "../js/taxonomy.js";
 import { SECTION_DESTINATIONS, describeSlideDestination } from "../js/hero-links.js";
 
 const TOKEN_KEY = "vibe_admin_token";
@@ -131,19 +131,20 @@ async function deleteSecondaryImage(productId, url, statusEl) {
 // nunca se asignan automáticamente. "Sin categoría" siempre disponible;
 // la administradora puede dejarlo vacío si no lo sabe.
 
-// Subcategorías propuestas en la Fase 20 — ofrecidas como sugerencias en
-// un <datalist>, nunca forzadas: el campo sigue siendo texto libre, así
-// que la administradora puede escribir cualquier otro valor o dejarlo
-// vacío.
-const VIBE_SUBCATEGORY_SUGGESTIONS = [
-  "Base y corrector", "Polvo y fijador", "Iluminador", "Rubor",
-  "Sombras", "Delineado", "Pestañas", "Cejas", "Kits de ojos",
-  "Labiales", "Gloss y oils", "Kits de labios",
-  "Limpiadores", "Tónicos", "Cremas faciales", "Contorno de ojos",
-  "Cuello y escote", "Pestañas (crecimiento)", "Papel matificante",
-  "Mascarillas", "Kits",
-  "Brochas", "Esponjas", "Accesorios para el cabello", "Cuidado personal",
-];
+// Subcategorías propuestas en la Fase 20 — sugerencias en un <datalist>,
+// nunca forzadas: el campo sigue siendo texto libre. Fase 51: se filtran
+// según la Categoría VIBE elegida (SUBCATEGORIES_BY_CATEGORY en
+// js/taxonomy.js) en vez de ofrecer las 25 mezcladas.
+function subcategoryOptionsHtml(category) {
+  return subcategorySuggestions(category).map((s) => `<option value="${esc(s)}">`).join("");
+}
+
+// Fase 51 — "dónde se verá" en el catálogo público, con la misma lógica
+// que la navegación pública (publicPlacement en js/taxonomy.js).
+function placementText(p) {
+  const { group, category } = publicPlacement(p);
+  return group ? `${group} › ${category}` : null;
+}
 
 function renderCategoryOptions(selected) {
   const opts = [`<option value="">Sin categoría</option>`];
@@ -242,29 +243,49 @@ async function loadProducts() {
   renderTable();
 }
 
+// Fase 51 — se puede filtrar por categoría VIBE (editorial, la que define
+// dónde aparece el producto) o por categoría POS (operativa).
 function populateCategoryFilter() {
   const select = $("#filterCategory");
   const current = select.value;
-  const categories = [...new Set(state.products.map((p) => p.category))].sort((a, b) => a.localeCompare(b, "es"));
+  const posCategories = [...new Set(state.products.map((p) => p.category))].sort((a, b) => a.localeCompare(b, "es"));
+  const vibeOptions = VIBE_CATEGORY_GROUPS.map(
+    ({ group, categories }) => `<optgroup label="VIBE · ${esc(group)}">${categories.map((c) => `<option value="vibe:${esc(c)}">${esc(c)}</option>`).join("")}</optgroup>`
+  ).join("");
   select.innerHTML =
     `<option value="all">Todas las categorías</option>` +
-    categories.map((c) => `<option value="${esc(c)}">${esc(c)}</option>`).join("");
-  if (categories.includes(current)) select.value = current;
+    vibeOptions +
+    `<optgroup label="Categoría POS">${posCategories.map((c) => `<option value="pos:${esc(c)}">${esc(c)}</option>`).join("")}</optgroup>`;
+  if ([...select.options].some((o) => o.value === current)) select.value = current;
 }
 
 function filteredProducts() {
   const q = state.search.toLowerCase();
   return state.products.filter((p) => {
-    if (state.category !== "all" && p.category !== state.category) return false;
+    if (state.category.startsWith("vibe:") && p.editorialCategory !== state.category.slice(5)) return false;
+    if (state.category.startsWith("pos:") && p.category !== state.category.slice(4)) return false;
     if (state.status === "published" && !p.published) return false;
     if (state.status === "unpublished" && p.published) return false;
     if (state.status === "available" && !p.available) return false;
     if (state.status === "unavailable" && p.available) return false;
-    if (q && !(String(p.id).includes(q) || p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q))) {
-      return false;
-    }
+    if (state.status === "unclassified" && p.editorialCategory) return false;
+    if (state.status === "published_unclassified" && (!p.published || p.editorialCategory)) return false;
+    const haystack = [String(p.id), p.name, p.category, p.editorialCategory, p.subcategory].filter(Boolean).join(" ").toLowerCase();
+    if (q && !haystack.includes(q)) return false;
     return true;
   });
+}
+
+// Fase 51 — clasificación VIBE de una fila: categoría editorial (o aviso
+// si falta) y dónde se verá públicamente.
+function classificationCell(p) {
+  const where = placementText(p);
+  if (p.editorialCategory) {
+    return `<span class="class-main">${esc(p.editorialCategory)}${p.subcategory ? ` › ${esc(p.subcategory)}` : ""}</span>
+      <span class="class-where">Se ve en: ${where ? esc(where) : "solo «Todos» y búsqueda"}</span>`;
+  }
+  return `<span class="pill pill-warn">Sin categoría VIBE</span>
+    <span class="class-where">${where ? `Se ve en: ${esc(where)} (por categoría POS)` : "Solo en «Todos» y búsqueda"}</span>`;
 }
 
 function renderTable() {
@@ -275,9 +296,10 @@ function renderTable() {
       (p) => `<tr>
         <td><span class="prod-name">${esc(p.name)}</span><span class="prod-id">#${p.id}</span></td>
         <td>${esc(p.category)}</td>
+        <td class="class-cell">${classificationCell(p)}</td>
         <td>${money(p.price)}</td>
         <td>${p.available ? `<span class="pill pill-ok">Disponible</span>` : `<span class="pill pill-warn">Agotado</span>`}</td>
-        <td>${p.hasMetadata ? `<span class="pill pill-ok">Completa</span>` : `<span class="pill pill-muted">Pendiente</span>`}</td>
+        <td>${p.hasMetadata ? `<span class="pill pill-ok">Creada</span>` : `<span class="pill pill-muted">Sin ficha</span>`}</td>
         <td>${p.published ? `<span class="pill pill-pink">Sí</span>` : `<span class="pill pill-muted">No</span>`}</td>
         <td>${p.featured ? `<span class="pill pill-pink">★</span>` : `<span class="pill pill-muted">—</span>`}</td>
         <td><button class="edit-link" data-edit="${p.id}">Editar</button></td>
@@ -344,6 +366,11 @@ async function openEdit(productId) {
   const d = m.additional_info || {};
 
   $("#editContent").innerHTML = `
+    <div class="edit-actionbar">
+      <div class="edit-actionbar-title"><strong>${esc(product.name)}</strong><span class="prod-id">#${product.id}</span></div>
+      <span id="saveStatusTop" class="save-status" role="status"></span>
+      <button type="button" id="saveTopBtn" class="button dark">Guardar cambios</button>
+    </div>
     <div class="edit-pos">
       <h2>1. Información del POS <span class="section-hint">(solo lectura)</span></h2>
       <div class="edit-pos-grid">
@@ -355,7 +382,7 @@ async function openEdit(productId) {
       </div>
     </div>
 
-    <details class="admin-accordion" open>
+    <details class="admin-accordion promo-section" open>
       <summary>Promoción VIBE</summary>
       <div class="admin-accordion-body">
         <p class="section-hint">
@@ -398,7 +425,9 @@ async function openEdit(productId) {
             <input name="subcategory" list="subcategorySuggestions" value="${esc(m.subcategory || "")}" placeholder="Elige una sugerencia o escribe la tuya">
           </label>
         </div>
-        <datalist id="subcategorySuggestions">${VIBE_SUBCATEGORY_SUGGESTIONS.map((s) => `<option value="${esc(s)}">`).join("")}</datalist>
+        <datalist id="subcategorySuggestions">${subcategoryOptionsHtml(m.category || "")}</datalist>
+        <p id="placementHint" class="placement-hint" role="status"></p>
+        <p id="subcategoryHint" class="section-hint"></p>
         <div class="edit-row">
           ${textField("product_type", "Tipo de producto", d.productType, "Ej. Rubor líquido")}
           ${textField("presentation", "Presentación", m.presentation, "Ej. 30ml, set de 5 unidades...")}
@@ -549,6 +578,7 @@ async function openEdit(productId) {
     <form id="editForm" class="edit-form">
       <h2>12. Publicación</h2>
       <label class="checkbox-field"><input type="checkbox" name="published" ${m.published ? "checked" : ""}> Publicado</label>
+      <p id="publishHint" class="publish-hint hidden" role="status"></p>
       <div class="save-row">
         <span id="saveStatus" class="save-status"></span>
         <button type="button" id="cancelEdit" class="outline-admin">Cancelar</button>
@@ -592,6 +622,10 @@ async function openEdit(productId) {
   $("textarea[name=description]").value = m.description || "";
   $("textarea[name=characteristics]").value = d.characteristics || "";
   $("textarea[name=benefits]").value = arrayFieldToText(m.benefits);
+  // Fase 51 — bug real: "Modo de uso" nunca se precargaba, así que el
+  // textarea abría vacío y cualquier guardado enviaba usage:null,
+  // borrando el texto existente aunque nadie lo hubiera tocado.
+  $("textarea[name=usage]").value = m.usage || "";
   $("textarea[name=application_tips]").value = d.applicationTips || "";
   $("textarea[name=ingredients]").value = m.ingredients || "";
   $("textarea[name=highlighted_ingredients]").value = arrayFieldToText(d.highlightedIngredients);
@@ -670,7 +704,7 @@ async function openEdit(productId) {
       },
     };
 
-    $("#saveStatus").textContent = "Guardando...";
+    setSaveStatus("Guardando...");
     const saveRes = await adminFetch("/api/admin/catalog-metadata", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -682,15 +716,77 @@ async function openEdit(productId) {
       return;
     }
     if (!saveRes.ok) {
-      $("#saveStatus").textContent = "Error al guardar.";
+      const errPayload = await saveRes.json().catch(() => ({}));
+      setSaveStatus(`No se guardó: ${(errPayload && errPayload.error) || "error del servidor"}. Tus cambios siguen en el formulario.`, true);
       return;
     }
-    $("#saveStatus").textContent = "Guardado.";
+    editState.fichaDirty = false;
     await loadProducts();
+    if (editState.promoDirty) {
+      setSaveStatus("Ficha guardada. La promoción tiene cambios sin guardar: usa «Guardar promoción».");
+      return;
+    }
+    setSaveStatus("Guardado.");
     setTimeout(() => $("#editDialog").close(), 500);
   });
 
-  $("#cancelEdit").addEventListener("click", () => $("#editDialog").close());
+  $("#cancelEdit").addEventListener("click", requestCloseEdit);
+
+  // Fase 51 — guardar desde la barra superior (mismo envío que el botón
+  // del final), estado visible arriba y abajo.
+  function setSaveStatus(text, isError = false) {
+    for (const id of ["#saveStatus", "#saveStatusTop"]) {
+      const el = $(id);
+      if (!el) continue;
+      el.textContent = text;
+      el.classList.toggle("save-error", isError);
+    }
+  }
+  $("#saveTopBtn").addEventListener("click", () => $("#editForm").requestSubmit());
+
+  // Fase 51 — cambios sin guardar: la ficha (este formulario) y la
+  // promoción se guardan por separado; se rastrean por separado.
+  editState.fichaDirty = false;
+  editState.promoDirty = false;
+  $("#editContent").addEventListener("input", (e) => {
+    if (e.target.closest(".promo-section")) editState.promoDirty = true;
+    else if (e.target.name) editState.fichaDirty = true;
+  });
+  $("#editContent").addEventListener("change", (e) => {
+    if (e.target.closest(".promo-section")) editState.promoDirty = true;
+    else if (e.target.name) editState.fichaDirty = true;
+  });
+
+  // Fase 51 — ubicación pública en vivo, sugerencias de subcategoría por
+  // categoría y aviso al publicar sin categoría VIBE.
+  const placementBase = { category: product.category, categoryGroup: product.categoryGroup };
+  function refreshClassificationHints() {
+    const category = $('[name="category"]').value || null;
+    const sub = $('[name="subcategory"]').value.trim();
+    const where = placementText({ ...placementBase, editorialCategory: category });
+    $("#placementHint").textContent = where
+      ? `Se verá en el catálogo público en: ${where}${category ? "" : " (por categoría POS)"}.`
+      : "Sin categoría VIBE, este producto solo aparece en «Todos» y en la búsqueda.";
+    $("#placementHint").classList.toggle("placement-warn", !category);
+    const suggestions = subcategorySuggestions(category);
+    $("#subcategoryHint").textContent =
+      category && sub && !suggestions.includes(sub) ? `«${sub}» no está entre las sugeridas para ${category}; se guardará tal cual.` : "";
+    const published = $('[name="published"]').checked;
+    const hint = $("#publishHint");
+    hint.classList.toggle("hidden", !(published && !category));
+    if (published && !category) {
+      hint.textContent = where
+        ? `Se publicará sin categoría VIBE: aparecerá en ${where} solo por su categoría POS.`
+        : "Se publicará sin categoría VIBE: solo aparecerá en «Todos» y en la búsqueda, no en Maquillaje, Skincare ni Accesorios.";
+    }
+  }
+  $('[name="category"]').addEventListener("change", () => {
+    $("#subcategorySuggestions").innerHTML = subcategoryOptionsHtml($('[name="category"]').value);
+    refreshClassificationHints();
+  });
+  $('[name="subcategory"]').addEventListener("input", refreshClassificationHints);
+  $('[name="published"]').addEventListener("change", refreshClassificationHints);
+  refreshClassificationHints();
 
   // Fase 41 — resumen en vivo + validación (promo_price siempre menor
   // al precio base, igual regla que ya aplica el servidor — se
@@ -762,6 +858,7 @@ async function openEdit(productId) {
         return;
       }
       $("#promoSaveStatus").textContent = "Guardado.";
+      editState.promoDirty = false;
       await loadProducts();
     } finally {
       btn.disabled = false;
@@ -1525,7 +1622,27 @@ $("#productRows").addEventListener("click", (e) => {
   const btn = e.target.closest("[data-edit]");
   if (btn) openEdit(Number(btn.dataset.edit));
 });
-$("#closeEdit").addEventListener("click", () => $("#editDialog").close());
+// Fase 51 — cerrar la ficha (X, Cancelar o Escape) con cambios sin
+// guardar pide confirmación en vez de descartarlos en silencio.
+const editState = { fichaDirty: false, promoDirty: false };
+function unsavedChangesMessage() {
+  const parts = [editState.fichaDirty && "la ficha", editState.promoDirty && "la promoción"].filter(Boolean);
+  return parts.length ? `Tienes cambios sin guardar en ${parts.join(" y ")}. ¿Cerrar sin guardar?` : null;
+}
+function requestCloseEdit() {
+  const msg = unsavedChangesMessage();
+  if (msg && !confirm(msg)) return;
+  $("#editDialog").close();
+}
+$("#closeEdit").addEventListener("click", requestCloseEdit);
+$("#editDialog").addEventListener("cancel", (e) => {
+  const msg = unsavedChangesMessage();
+  if (msg && !confirm(msg)) e.preventDefault();
+});
+$("#editDialog").addEventListener("close", () => {
+  editState.fichaDirty = false;
+  editState.promoDirty = false;
+});
 
 (async function init() {
   if (getToken()) {
