@@ -52,7 +52,18 @@ test("el fondo es decorativo: misma imagen que la pieza mobile, alt vacío y ari
   assert.match(js, /<img class="hero-slide-backdrop" src="\$\{esc\(backdropSrc\)\}" alt="" aria-hidden="true"/);
 });
 test("los indicadores bajan a la banda inferior en mobile", () => {
-  assert.match(heroMobile, /\.hero-dots\{bottom:4px\}/);
+  assert.match(heroMobile, /\.hero-dots\{bottom:4px;pointer-events:none\}/);
+  // Fase 50 — el contenedor no intercepta los toques destinados a las flechas.
+  assert.match(heroMobile, /\.hero-dot\{pointer-events:auto\}/);
+});
+test("Fase 50 — flechas mobile en la banda inferior: área táctil 44×44 y círculo visible de 30px", () => {
+  assert.match(heroMobile, /\.hero-arrow\{top:auto;bottom:0;transform:none;width:44px;height:44px;[^}]*background:transparent/);
+  assert.match(heroMobile, /\.hero-arrow::before\{content:"";position:absolute;left:7px;bottom:2px;z-index:-1;width:30px;height:30px;/);
+  assert.match(heroMobile, /\.hero-arrow:focus-visible::before\{outline:2px solid #fff/);
+  assert.doesNotMatch(heroMobile, /\.hero-arrow\{width:34px;height:34px/);
+});
+test("Fase 50 — tablet/desktop conservan las flechas centradas en vertical", () => {
+  assert.match(css, /\.hero-arrow\{position:absolute;top:50%;transform:translateY\(-50%\);z-index:2;width:38px;height:38px;/);
 });
 test("desktop conserva su marco (proporción medida, sin min-height nuevo)", () => {
   assert.match(css, /\.hero-carousel\{position:relative;aspect-ratio:var\(--hero-desktop-ratio, 16\/9\);height:auto;min-height:260px;/);
