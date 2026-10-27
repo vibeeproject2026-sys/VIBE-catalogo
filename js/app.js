@@ -100,12 +100,22 @@ function renderNav() {
   }
 
   const effectiveCategory = state.category !== "Todos" ? state.category : (categoriesHere.length === 1 ? categoriesHere[0] : "Todos");
-  const subcategoriesHere = getSubcategories(state.products, state.group, effectiveCategory);
+  // Fase 54 — las subcategorías solo se ofrecen dentro de una categoría
+  // concreta: en «Todos» (o en un grupo con varias categorías sin elegir)
+  // mezclaban subcategorías de categorías distintas y la fila parecía
+  // duplicar a la de grupos. Una subcategoría ya aplicada (p. ej. desde
+  // la URL o un slide del Hero) sigue filtrando y visible en los chips
+  // de filtros activos.
+  const subcategoriesHere = effectiveCategory !== "Todos" ? getSubcategories(state.products, state.group, effectiveCategory) : [];
   const showSubcategoryRow = subcategoriesHere.length > 1;
   $("#subcategoryTabs").classList.toggle("hidden", !showSubcategoryRow);
+  $("#subcategorySelectWrap").classList.toggle("hidden", !showSubcategoryRow);
   if (showSubcategoryRow) {
     const options = ["Todos", ...subcategoriesHere];
     $("#subcategoryTabs").innerHTML = options.map(s => tabButton(s, state.subcategory === s, "subcategory")).join("");
+    // En mobile la misma lista va en un selector compacto (CSS decide
+    // cuál de los dos se ve; ambos aplican exactamente el mismo filtro).
+    $("#subcategorySelect").innerHTML = options.map(s => `<option value="${esc(s)}" ${state.subcategory === s ? "selected" : ""}>${s === "Todos" ? "Todas" : esc(s)}</option>`).join("");
   }
 }
 
@@ -845,6 +855,11 @@ $("#subcategoryTabs").addEventListener("click", e => {
   const b = e.target.closest("[data-subcategory]");
   if (!b) return;
   state.subcategory = b.dataset.subcategory;
+  applyFiltersAndRender();
+});
+
+$("#subcategorySelect").addEventListener("change", e => {
+  state.subcategory = e.target.value;
   applyFiltersAndRender();
 });
 

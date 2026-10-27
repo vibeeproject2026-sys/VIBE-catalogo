@@ -66,9 +66,6 @@ const STRING_FIELDS = [
   "usageOccasion",
   // Imágenes
   "mainImageAlt",
-  // Fase 53 — clasificación: justificación de una subcategoría «Otra»
-  // (fuera de la lista controlada). Nota interna, nunca pública.
-  "subcategoryOtherReason",
 ];
 
 // Multivalor — sección 8: "uno por línea" en Admin, arreglo en el dato
@@ -78,10 +75,12 @@ const ARRAY_FIELDS = ["highlightedIngredients", "claims", "certifications"];
 const ALL_FIELDS = [...STRING_FIELDS, ...ARRAY_FIELDS];
 
 // Fase 53 — campos de uso interno del Admin: se guardan y el Admin los
-// lee, pero la API pública nunca los expone (publicDetails). Los dos de
-// merchandising ya se presentaban en el Admin como «nota interna — no se
-// muestra en el catálogo público»; ahora tampoco viajan en el JSON.
-const INTERNAL_FIELDS = ["commercialAngle", "usageOccasion", "subcategoryOtherReason"];
+// lee, pero la API pública nunca los expone (publicDetails). Ya se
+// presentaban en el Admin como «nota interna — no se muestra en el
+// catálogo público»; tampoco viajan en el JSON. (Fase 54 — se retira
+// subcategoryOtherReason junto con «Otra»: ninguna ficha lo tenía
+// guardado, verificado en producción antes del cambio.)
+const INTERNAL_FIELDS = ["commercialAngle", "usageOccasion"];
 const PUBLIC_FIELDS = ALL_FIELDS.filter((k) => !INTERNAL_FIELDS.includes(k));
 
 function emptyDetails() {

@@ -16,7 +16,7 @@
 // sent anywhere except as the Authorization header on /api/admin/*
 // requests.
 
-import { getCategoriesInGroup, getSubcategories, VIBE_CATEGORY_GROUPS, SUBCATEGORIES_BY_CATEGORY, publicPlacement, isListedSubcategory, needsClassificationReview } from "../js/taxonomy.js";
+import { getCategoriesInGroup, getSubcategories, VIBE_CATEGORY_GROUPS, SUBCATEGORIES_BY_CATEGORY, publicPlacement, isListedSubcategory, needsClassificationReview, suggestClassification } from "../js/taxonomy.js";
 import { SECTION_DESTINATIONS, describeSlideDestination } from "../js/hero-links.js";
 
 const TOKEN_KEY = "vibe_admin_token";
@@ -131,16 +131,14 @@ async function deleteSecondaryImage(productId, url, statusEl) {
 // nunca se asignan automáticamente. "Sin categoría" siempre disponible;
 // la administradora puede dejarlo vacío si no lo sabe.
 
-// Fase 53 — subcategoría CONTROLADA: un <select> con la lista de la
-// Categoría VIBE elegida (SUBCATEGORIES_BY_CATEGORY en js/taxonomy.js),
-// más dos casos explícitos, ambos marcados como revisión pendiente:
-// - SUB_HISTORICAL: el valor ya guardado que no está en la lista; se
-//   conserva tal cual mientras no elijas otra cosa (nunca se reasigna);
-// - SUB_OTHER: «Otra», con nombre y justificación obligatoria (nota
-//   interna, nunca pública). El servidor vuelve a validar todo esto.
+// Fase 53/54 — subcategoría CONTROLADA: un <select> con la lista de la
+// Categoría VIBE elegida (SUBCATEGORIES_BY_CATEGORY en js/taxonomy.js).
+// Sin «Otra» (Fase 54). Único caso extra: SUB_HISTORICAL, el valor ya
+// guardado que no está en la lista; se conserva tal cual (revisión
+// pendiente) mientras no elijas otra cosa, nunca se reasigna solo y no es
+// una opción nueva: solo aparece en el producto que ya lo tenía. El
+// editor propone una sugerencia editable. El servidor valida igual.
 const SUB_HISTORICAL = "__historical__";
-const SUB_OTHER = "__other__";
-const MIN_OTHER_REASON = 10;
 function subcategoryOptionsHtml(category, { selected = "", historical = "" } = {}) {
   const list = SUBCATEGORIES_BY_CATEGORY[category] || [];
   const opt = (value, label) => `<option value="${esc(value)}" ${selected === value ? "selected" : ""}>${esc(label)}</option>`;
@@ -148,7 +146,6 @@ function subcategoryOptionsHtml(category, { selected = "", historical = "" } = {
     opt("", category ? "Sin subcategoría" : "Sin subcategoría (elige primero una categoría VIBE)"),
     ...list.map((sub) => opt(sub, sub)),
     historical ? opt(SUB_HISTORICAL, `${historical} — valor guardado, revisión pendiente`) : "",
-    opt(SUB_OTHER, "Otra… (requiere justificación)"),
   ].join("");
 }
 
@@ -159,8 +156,14 @@ function placementText(p) {
   return group ? `${group} › ${category}` : null;
 }
 
+// Fase 54 — una categoría guardada que no es de las 7 aprobadas se
+// conserva como opción propia (revisión pendiente) en vez de perderse al
+// guardar.
 function renderCategoryOptions(selected) {
   const opts = [`<option value="">Sin categoría</option>`];
+  if (selected && !VIBE_CATEGORY_GROUPS.some((g) => g.categories.includes(selected))) {
+    opts.push(`<option value="${esc(selected)}" selected>${esc(selected)} — valor guardado, revisión pendiente</option>`);
+  }
   for (const { group, categories } of VIBE_CATEGORY_GROUPS) {
     opts.push(`<optgroup label="${esc(group)}">`);
     for (const c of categories) {
@@ -425,7 +428,7 @@ function renderTaxonomy() {
     return `<section class="tax-group"><div class="tax-group-head"><h2>${esc(group)}</h2><span class="tax-count">${inGroup.length} con clasificación VIBE</span></div>${cats}</section>`;
   }).join("");
   const unclassifiedPublished = state.products.filter((p) => p.published && !p.editorialCategory);
-  const legend = `<p class="tax-legend"><span class="sub-chip sub-hist">Revisión pendiente<b>n</b></span> subcategoría fuera de la lista controlada (valor histórico o «Otra» con justificación): se conserva hasta que decidas.</p>`;
+  const legend = `<p class="tax-legend"><span class="sub-chip sub-hist">Revisión pendiente<b>n</b></span> subcategoría guardada que no está en la lista controlada: se conserva hasta que la revises desde el editor del producto (con una sugerencia editable).</p>`;
   const unclassified = unclassifiedPublished.length
     ? `<section class="tax-group tax-note"><div class="tax-group-head"><h2>Publicados sin categoría VIBE</h2><span class="tax-count">aparecen por su categoría POS</span></div><div class="tax-products">${unclassifiedPublished.map((p) => `${productLink(p)}<span class="tax-muted">${esc(placementText(p) || "Solo «Todos»")}</span>`).join("")}</div></section>`
     : "";
@@ -500,15 +503,14 @@ async function openEdit(productId) {
   // poblarse sin checks extra.
   const d = m.additional_info || {};
 
-  // Fase 53 — estado inicial del selector de subcategoría.
+  // Fase 53/54 — estado inicial del selector de subcategoría.
   const storedSub = (m.subcategory || "").trim();
   const subInitial = !storedSub
-    ? { selected: "", historical: "", otherName: "" }
+    ? { selected: "", historical: "" }
     : isListedSubcategory(m.category || "", storedSub)
-      ? { selected: storedSub, historical: "", otherName: "" }
-      : d.subcategoryOtherReason
-        ? { selected: SUB_OTHER, historical: "", otherName: storedSub }
-        : { selected: SUB_HISTORICAL, historical: storedSub, otherName: "" };
+      ? { selected: storedSub, historical: "" }
+      : { selected: SUB_HISTORICAL, historical: storedSub };
+  const suggestion = subInitial.historical ? suggestClassification(subInitial.historical, m.category || null) : null;
   $("#editContent").innerHTML = `
     <div class="edit-actionbar">
       <div class="edit-actionbar-title"><strong>${esc(product.name)}</strong><span class="prod-id">#${product.id}</span></div>
@@ -587,10 +589,7 @@ async function openEdit(productId) {
             <select name="subcategory_choice">${subcategoryOptionsHtml(m.category || "", subInitial)}</select>
           </label>
         </div>
-        <div id="subcategoryOther" class="sub-other${subInitial.selected === SUB_OTHER ? "" : " hidden"}">
-          ${textField("subcategory_other", "Nombre de la subcategoría «Otra»", subInitial.otherName, "Ej. Fijadores de maquillaje")}
-          ${textareaField("subcategory_other_reason", "Justificación (obligatoria, nota interna)", `Por qué ninguna subcategoría de la lista sirve — mínimo ${MIN_OTHER_REASON} caracteres. No se muestra en el catálogo público.`, 2)}
-        </div>
+        ${suggestion ? `<p id="classSuggestion" class="class-suggestion">Sugerencia: <b>${esc(suggestion.category)} › ${esc(suggestion.subcategory)}</b> <button type="button" id="applySuggestion" class="link-btn">Usar sugerencia</button> <span class="section-hint">(puedes elegir otra; nada cambia hasta que guardes)</span></p>` : ""}
         <p id="placementHint" class="placement-hint" role="status"></p>
         <p id="subcategoryHint" class="section-hint"></p>
         <div class="edit-row">
@@ -761,7 +760,7 @@ async function openEdit(productId) {
   // estén dentro de <form> (los <details> viven fuera de él a propósito,
   // para que cada acordeón se pueda abrir/cerrar sin afectar el formulario).
   const ALL_FIELD_NAMES = [
-    "image", "commercial_name", "brand", "line", "category", "subcategory_choice", "subcategory_other", "subcategory_other_reason", "product_type", "presentation",
+    "image", "commercial_name", "brand", "line", "category", "subcategory_choice", "product_type", "presentation",
     "net_content", "sku", "tone", "tone_code", "color", "variant", "main_image_alt",
     "what_is", "short_description", "description", "characteristics",
     "benefits", "usage", "recommended_amount", "application_area", "recommended_tool", "application_order", "application_tips",
@@ -803,24 +802,17 @@ async function openEdit(productId) {
   $("textarea[name=certifications]").value = arrayFieldToText(d.certifications);
   $("textarea[name=manufacturer_info]").value = d.manufacturerInfo || "";
   $("textarea[name=search_keywords]").value = arrayFieldToText(m.search_keywords);
-  $("textarea[name=subcategory_other_reason]").value = d.subcategoryOtherReason || "";
 
   // Fase 53 — subcategoría efectiva según el selector.
   function currentSubcategory() {
     const choice = $('[name="subcategory_choice"]').value;
     if (choice === SUB_HISTORICAL) return subInitial.historical;
-    if (choice === SUB_OTHER) return $('[name="subcategory_other"]').value.trim();
     return choice;
   }
 
   $("#editForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     const fd = readAllFields();
-    const isOther = fd.subcategory_choice === SUB_OTHER;
-    if (isOther && (!fd.subcategory_other.trim() || fd.subcategory_other_reason.trim().length < MIN_OTHER_REASON)) {
-      setSaveStatus(`No se guardó: «Otra» necesita un nombre y una justificación de al menos ${MIN_OTHER_REASON} caracteres (pestaña Identificación).`, true);
-      return;
-    }
     const payload = {
       product_id: product.id,
       image: fd.image || null,
@@ -882,7 +874,6 @@ async function openEdit(productId) {
         manufacturerInfo: fd.manufacturer_info || null,
         commercialAngle: fd.commercial_angle || null,
         usageOccasion: fd.usage_occasion || null,
-        subcategoryOtherReason: isOther ? fd.subcategory_other_reason.trim() : fd.subcategory_choice === SUB_HISTORICAL ? d.subcategoryOtherReason || null : null,
       },
     };
 
@@ -946,7 +937,6 @@ async function openEdit(productId) {
     const category = $('[name="category"]').value || null;
     const sub = currentSubcategory();
     const choice = $('[name="subcategory_choice"]').value;
-    $("#subcategoryOther").classList.toggle("hidden", choice !== SUB_OTHER);
     const where = placementText({ ...placementBase, editorialCategory: category });
     $("#placementHint").textContent = where
       ? `Se verá en el catálogo público en: ${where}${category ? "" : " (por categoría POS)"}.`
@@ -956,11 +946,9 @@ async function openEdit(productId) {
     $("#summaryClassification").textContent = category ? category + (sub ? " › " + sub : "") : "sin categoría VIBE";
     $("#subcategoryHint").textContent =
       choice === SUB_HISTORICAL
-        ? `Revisión pendiente: «${sub}» no está en la lista${category ? " de " + category : ""}. Se conserva tal cual hasta que elijas otra opción.`
-        : choice === SUB_OTHER
-          ? "Revisión pendiente: «Otra» se guarda con su justificación (interna) y queda marcada para revisar."
-          : "";
-    $("#subcategoryHint").classList.toggle("review-hint", choice === SUB_HISTORICAL || choice === SUB_OTHER);
+        ? `Revisión pendiente: «${sub}» no está en la lista${category ? " de " + category : ""}. Se conserva tal cual hasta que elijas otra opción; el resto de la ficha se guarda con normalidad.`
+        : "";
+    $("#subcategoryHint").classList.toggle("review-hint", choice === SUB_HISTORICAL);
     const published = $('[name="published"]').checked;
     const chip = $("#editStatusChip");
     chip.textContent = published ? "Publicado" : "No publicado";
@@ -975,15 +963,26 @@ async function openEdit(productId) {
   }
   $('[name="category"]').addEventListener("change", () => {
     // Conserva la elección si sigue siendo válida en la nueva categoría;
-    // el valor histórico y «Otra» siempre siguen disponibles.
+    // el valor histórico sigue disponible.
     const category = $('[name="category"]').value;
     const prev = $('[name="subcategory_choice"]').value;
-    const keep = prev === SUB_HISTORICAL || prev === SUB_OTHER || isListedSubcategory(category, prev) ? prev : isListedSubcategory(category, storedSub) ? storedSub : "";
+    const keep = prev === SUB_HISTORICAL || isListedSubcategory(category, prev) ? prev : isListedSubcategory(category, storedSub) ? storedSub : "";
     $('[name="subcategory_choice"]').innerHTML = subcategoryOptionsHtml(category, { selected: keep, historical: subInitial.historical });
     refreshClassificationHints();
   });
   $('[name="subcategory_choice"]').addEventListener("change", refreshClassificationHints);
-  $('[name="subcategory_other"]').addEventListener("input", refreshClassificationHints);
+  // Fase 54 — aplica la sugerencia en el formulario (no guarda nada).
+  const applyBtn = $("#applySuggestion");
+  if (applyBtn) {
+    applyBtn.addEventListener("click", () => {
+      const cat = $('[name="category"]');
+      cat.value = suggestion.category;
+      cat.dispatchEvent(new Event("change", { bubbles: true }));
+      const sub = $('[name="subcategory_choice"]');
+      sub.value = suggestion.subcategory;
+      sub.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+  }
   $('[name="published"]').addEventListener("change", refreshClassificationHints);
   refreshClassificationHints();
 

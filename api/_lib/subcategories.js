@@ -1,16 +1,16 @@
-// Fase 53 — subcategorías controladas (taxonomía v2), espejo para el
-// servidor de SUBCATEGORIES_BY_CATEGORY en js/taxonomy.js (el navegador
-// no puede requerir este módulo ni Node importar ese ESM de forma
-// síncrona). scripts/test-taxonomy-v2.mjs verifica que ambas listas sean
-// idénticas: si cambias una, cambia la otra.
+// Fase 53/54 — taxonomía VIBE controlada (v2), espejo para el servidor de
+// SUBCATEGORIES_BY_CATEGORY en js/taxonomy.js (el navegador no puede
+// requerir este módulo ni Node importar ese ESM de forma síncrona).
+// scripts/test-taxonomy-v2.js verifica que ambas listas sean idénticas:
+// si cambias una, cambia la otra.
 //
-// Reglas de guardado (validateSubcategory):
-// - vacío, o una subcategoría de la lista de su categoría → válido;
-// - el MISMO valor que ya estaba guardado (valor histórico fuera de la
-//   lista) → válido: se conserva hasta que se revise, nunca se reasigna
-//   ni bloquea un guardado que no lo toca;
-// - cualquier otro valor = «Otra»: solo con justificación (nota interna,
-//   nunca pública) y queda marcado como revisión pendiente en el Admin.
+// Reglas de guardado (validateClassification):
+// - categoría: vacía, una de las 7 aprobadas, o la MISMA ya guardada;
+// - subcategoría: vacía, una de la lista de su categoría, o la MISMA ya
+//   guardada (valor histórico fuera de la lista: se conserva hasta que se
+//   revise, nunca se reasigna ni bloquea un guardado que no lo toca).
+// Fase 54 — ya no existe «Otra»: cualquier otro valor se rechaza y el
+// Admin ofrece la lista (y una sugerencia editable para los históricos).
 
 const SUBCATEGORIES_BY_CATEGORY = {
   Rostro: ["Base y corrector", "Polvo y fijador", "Iluminador", "Rubor", "Kits de rostro"],
@@ -22,27 +22,31 @@ const SUBCATEGORIES_BY_CATEGORY = {
   "Complementos de belleza": ["Accesorios para el cabello", "Cuidado personal"],
 };
 
-const MIN_REASON_LENGTH = 10;
+const trimmed = (v) => (typeof v === "string" ? v.trim() : "");
 
 function isListedSubcategory(category, subcategory) {
   const list = SUBCATEGORIES_BY_CATEGORY[category];
   return Boolean(list && list.includes(subcategory));
 }
 
-// Devuelve { ok: true, other: boolean } o { ok: false, error }.
-function validateSubcategory({ category, subcategory, storedSubcategory, reason }) {
-  const sub = typeof subcategory === "string" ? subcategory.trim() : "";
-  if (!sub) return { ok: true, other: false };
-  if (isListedSubcategory(category, sub)) return { ok: true, other: false };
-  if (typeof storedSubcategory === "string" && sub === storedSubcategory.trim()) return { ok: true, other: true, historical: true };
-  const why = typeof reason === "string" ? reason.trim() : "";
-  if (why.length >= MIN_REASON_LENGTH) return { ok: true, other: true };
+function isApprovedCategory(category) {
+  return Object.prototype.hasOwnProperty.call(SUBCATEGORIES_BY_CATEGORY, category);
+}
+
+// Devuelve { ok: true } o { ok: false, error }.
+function validateClassification({ category, subcategory, stored = {} }) {
+  const cat = trimmed(category);
+  const sub = trimmed(subcategory);
+  if (cat && !isApprovedCategory(cat) && cat !== trimmed(stored.category)) {
+    return { ok: false, error: `«${cat}» no es una categoría VIBE. Elige una de la lista.` };
+  }
+  if (!sub || isListedSubcategory(cat, sub) || sub === trimmed(stored.subcategory)) return { ok: true };
   return {
     ok: false,
-    error: category
-      ? `«${sub}» no está en las subcategorías de ${category}. Elige una de la lista o usa «Otra» con una justificación (mínimo ${MIN_REASON_LENGTH} caracteres).`
-      : `Para usar la subcategoría «${sub}» sin categoría VIBE, usa «Otra» con una justificación (mínimo ${MIN_REASON_LENGTH} caracteres).`,
+    error: cat
+      ? `«${sub}» no está en las subcategorías de ${cat}. Elige una de la lista.`
+      : `Para asignar la subcategoría «${sub}» elige primero una categoría VIBE.`,
   };
 }
 
-module.exports = { SUBCATEGORIES_BY_CATEGORY, MIN_REASON_LENGTH, isListedSubcategory, validateSubcategory };
+module.exports = { SUBCATEGORIES_BY_CATEGORY, isListedSubcategory, isApprovedCategory, validateClassification };

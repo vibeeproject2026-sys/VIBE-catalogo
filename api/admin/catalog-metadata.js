@@ -20,46 +20,40 @@ const { parseDetails, serializeDetails } = require("../_lib/editorialDetails");
 const { requireAdmin } = require("./_lib/auth");
 const { sendJson, sendError, methodNotAllowed } = require("../catalog/_lib/http");
 const { resolveCategoryGroup } = require("../catalog/_lib/categoryGroups");
-const { isListedSubcategory, validateSubcategory } = require("../_lib/subcategories");
+const { isListedSubcategory, isApprovedCategory, validateClassification } = require("../_lib/subcategories");
 
 const PRODUCT_COLUMNS = "id,name,price,stock,category";
 const METADATA_COLUMNS =
   "product_id,image,images,short_description,description,benefits,ingredients,usage,presentation,category,subcategory,brand,badge,search_keywords,featured,editorial_order,published,additional_info";
 
-// Fase 53 — subcategoría controlada (ver api/_lib/subcategories.js).
-// Solo se valida cuando el guardado envía subcategory; la fila guardada
-// se lee únicamente si hace falta (valor fuera de la lista), para
-// permitir conservar un valor histórico sin cambios. Devuelve un mensaje
-// de error o null; normaliza fields en el lugar.
-async function checkSubcategory(fields, productId, env) {
-  if (!("subcategory" in fields)) return null;
-  const sub = typeof fields.subcategory === "string" ? fields.subcategory.trim() : "";
-  fields.subcategory = sub || null;
-  const sentInfo = "additional_info" in fields && fields.additional_info && typeof fields.additional_info === "object";
-  const clearReason = () => {
-    if (sentInfo) fields.additional_info = { ...fields.additional_info, subcategoryOtherReason: null };
-  };
-  if (!sub) {
-    clearReason();
-    return null;
+// Fase 53/54 — clasificación controlada (ver api/_lib/subcategories.js).
+// Solo se valida cuando el guardado envía category o subcategory; la fila
+// guardada se lee únicamente si hace falta (algún valor fuera de las
+// listas), para permitir conservar un valor histórico sin cambios.
+// Devuelve un mensaje de error o null; normaliza fields en el lugar.
+async function checkClassification(fields, productId, env) {
+  if (!("subcategory" in fields) && !("category" in fields)) return null;
+  for (const k of ["category", "subcategory"]) {
+    if (k in fields) fields[k] = typeof fields[k] === "string" && fields[k].trim() ? fields[k].trim() : null;
   }
-  if ("category" in fields && isListedSubcategory(fields.category, sub)) {
-    clearReason();
-    return null;
-  }
+  const catSent = "category" in fields;
+  const subSent = "subcategory" in fields;
+  const catOk = !catSent || !fields.category || isApprovedCategory(fields.category);
+  const subOk = !subSent || !fields.subcategory || (catSent && isListedSubcategory(fields.category, fields.subcategory));
+  if (catOk && subOk) return null;
   const rows = await pgrestSelect({
     table: "catalog_metadata",
-    columns: "category,subcategory,additional_info",
+    columns: "category,subcategory",
     filters: [["product_id", `eq.${productId}`]],
     env,
   });
   const stored = rows[0] || {};
-  const category = "category" in fields ? fields.category : stored.category;
-  const reason = sentInfo ? fields.additional_info.subcategoryOtherReason : parseDetails(stored.additional_info).subcategoryOtherReason;
-  const result = validateSubcategory({ category, subcategory: sub, storedSubcategory: stored.subcategory, reason });
-  if (!result.ok) return result.error;
-  if (!result.other) clearReason();
-  return null;
+  const result = validateClassification({
+    category: catSent ? fields.category : stored.category,
+    subcategory: subSent ? fields.subcategory : null,
+    stored,
+  });
+  return result.ok ? null : result.error;
 }
 
 module.exports = async function handler(req, res) {
@@ -116,11 +110,11 @@ module.exports = async function handler(req, res) {
   }
   const fields = pickEditorialFields(body);
   try {
-    const subError = await checkSubcategory(fields, productId, env);
-    if (subError) return sendError(res, 400, subError);
+    const classError = await checkClassification(fields, productId, env);
+    if (classError) return sendError(res, 400, classError);
   } catch (e) {
     console.error("[admin/catalog-metadata] " + (e && e.message ? e.message : e));
-    return sendError(res, 502, "No se pudo validar la subcategoría. No se guardó nada.");
+    return sendError(res, 502, "No se pudo validar la clasificación. No se guardó nada.");
   }
   // Fase 34 — el Admin envía additional_info como un objeto (no un
   // string ya serializado): se serializa aquí, en el único lugar que

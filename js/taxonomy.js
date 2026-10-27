@@ -57,8 +57,9 @@ function groupOf(p) {
 // «Kits de rostro», «Sérums» y «Rizadores de pestañas»; «Pestañas» pasa a
 // «Máscara de pestañas» y «Pestañas (crecimiento)» a «Pestañas y cejas
 // (crecimiento)»). Nada se reclasifica automáticamente: un valor guardado
-// que no está en la lista se conserva tal cual (revisión pendiente) y
-// «Otra» exige justificación. Espejo del servidor:
+// que no está en la lista se conserva tal cual (revisión pendiente) y el
+// Admin propone una sugerencia editable. Fase 54 — sin «Otra». Espejo del
+// servidor:
 // api/_lib/subcategories.js (deben coincidir).
 export const SUBCATEGORIES_BY_CATEGORY = {
   Rostro: ["Base y corrector", "Polvo y fijador", "Iluminador", "Rubor", "Kits de rostro"],
@@ -75,10 +76,35 @@ export function isListedSubcategory(category, subcategory) {
   return Boolean(SUBCATEGORIES_BY_CATEGORY[category] && SUBCATEGORIES_BY_CATEGORY[category].includes(subcategory));
 }
 
-// Fase 53 — una subcategoría fuera de la lista (valor histórico o «Otra»)
-// queda en revisión pendiente hasta que la administradora decida.
+// Fase 53 — una subcategoría fuera de la lista (valor histórico) queda en
+// revisión pendiente hasta que la administradora decida.
 export function needsClassificationReview(p) {
   return Boolean(p && p.subcategory && !isListedSubcategory(p.editorialCategory, p.subcategory));
+}
+
+// Fase 54 — sugerencia (nunca automática) para un valor histórico: la
+// subcategoría aprobada que comparte más palabras con él (sin acentos,
+// singular), prefiriendo la categoría actual en caso de empate. Devuelve
+// { category, subcategory } o null si ninguna palabra coincide.
+const STOPWORDS = new Set(["de", "y", "para", "el", "la", "los", "las"]);
+function words(text) {
+  return String(text || "")
+    .normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((w) => w && !STOPWORDS.has(w))
+    .map((w) => (w === "set" ? "kit" : w.replace(/(es|s)$/, "")));
+}
+export function suggestClassification(subcategory, currentCategory = null) {
+  const target = new Set(words(subcategory));
+  if (!target.size) return null;
+  let best = null;
+  for (const [category, list] of Object.entries(SUBCATEGORIES_BY_CATEGORY)) {
+    for (const sub of list) {
+      const score = words(sub).filter((w) => target.has(w)).length + (words(category).some((w) => target.has(w)) ? 0.5 : 0) + (category === currentCategory ? 0.25 : 0);
+      if (score >= 1 && (!best || score > best.score)) best = { category, subcategory: sub, score };
+    }
+  }
+  return best ? { category: best.category, subcategory: best.subcategory } : null;
 }
 
 // Sugerencias de subcategoría para una categoría editorial; sin

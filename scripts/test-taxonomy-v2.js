@@ -4,11 +4,10 @@
 // Fase 53 — taxonomía v2 con subcategorías controladas:
 // - js/taxonomy.js y api/_lib/subcategories.js tienen exactamente las
 //   mismas listas;
-// - PATCH /api/admin/catalog-metadata acepta una subcategoría de la
-//   lista, conserva un valor histórico sin cambios, exige justificación
-//   para «Otra» y no escribe nada cuando rechaza;
-// - la justificación (y las notas internas de merchandising) nunca
-//   llegan a la API pública.
+// - PATCH /api/admin/catalog-metadata acepta valores de la lista,
+//   conserva un valor histórico sin cambios y rechaza cualquier otro
+//   (Fase 54: ya no existe «Otra») sin escribir nada;
+// - las notas internas de merchandising nunca llegan a la API pública.
 
 const assert = require("assert/strict");
 
@@ -96,62 +95,72 @@ async function main() {
     assert.equal(t.isListedSubcategory("Ojos", "Rizadores de pestañas"), false);
     assert.equal(t.isListedSubcategory(null, "Rubor"), false);
   });
-  await test("needsClassificationReview marca solo valores fuera de la lista (histórico u «Otra»)", () => {
+  await test("needsClassificationReview marca solo valores fuera de la lista (históricos)", () => {
     assert.equal(t.needsClassificationReview({ editorialCategory: "Rostro", subcategory: "Rubor" }), false);
     assert.equal(t.needsClassificationReview({ editorialCategory: "Rostro", subcategory: null }), false);
     assert.equal(t.needsClassificationReview({ editorialCategory: "Limpieza", subcategory: "Crema Facial" }), true);
     assert.equal(t.needsClassificationReview({ editorialCategory: "Herramientas de aplicación", subcategory: "Pestañas" }), true);
     assert.equal(t.needsClassificationReview({ editorialCategory: null, subcategory: "Algo" }), true);
   });
+  await test("Fase 54 — ninguna lista ofrece «Otra»", () => {
+    for (const list of Object.values(t.SUBCATEGORIES_BY_CATEGORY)) assert.ok(!list.some((s) => /^otra/i.test(s)), list.join());
+  });
+  await test("Fase 54 — sugerencia editable para históricos = decisiones ya aprobadas", () => {
+    assert.deepEqual(t.suggestClassification("Crema Facial", "Limpieza"), { category: "Tratamiento", subcategory: "Cremas faciales" });
+    assert.deepEqual(t.suggestClassification("Set ojos y cejas", "Ojos"), { category: "Ojos", subcategory: "Kits de ojos" });
+    assert.deepEqual(t.suggestClassification("Pestañas", "Herramientas de aplicación"), { category: "Herramientas de aplicación", subcategory: "Rizadores de pestañas" });
+    assert.equal(t.suggestClassification("Algo raro", null), null);
+    assert.equal(t.suggestClassification("", "Ojos"), null);
+  });
 
-  console.log("validateSubcategory (servidor)");
-  const v = server.validateSubcategory;
+  console.log("validateClassification (servidor)");
+  const v = server.validateClassification;
   await test("vacío o de la lista: válido", () => {
-    assert.deepEqual(v({ category: "Ojos", subcategory: "" }), { ok: true, other: false });
-    assert.deepEqual(v({ category: "Ojos", subcategory: "Kits de ojos" }), { ok: true, other: false });
+    assert.deepEqual(v({ category: "Ojos", subcategory: "" }), { ok: true });
+    assert.deepEqual(v({ category: "Ojos", subcategory: "Kits de ojos" }), { ok: true });
+    assert.deepEqual(v({ category: "", subcategory: "" }), { ok: true });
   });
-  await test("valor histórico sin cambios: válido aunque no esté en la lista y sin justificación", () => {
-    assert.equal(v({ category: "Limpieza", subcategory: "Crema Facial", storedSubcategory: "Crema Facial" }).ok, true);
+  await test("valor histórico sin cambios: válido aunque no esté en la lista", () => {
+    assert.equal(v({ category: "Limpieza", subcategory: "Crema Facial", stored: { category: "Limpieza", subcategory: "Crema Facial" } }).ok, true);
+    assert.equal(v({ category: "Tratamiento", subcategory: "Crema Facial", stored: { category: "Limpieza", subcategory: "Crema Facial" } }).ok, true);
+    assert.equal(v({ category: "Cosas viejas", subcategory: "", stored: { category: "Cosas viejas" } }).ok, true);
   });
-  await test("«Otra» sin justificación (o demasiado corta): rechazada", () => {
+  await test("cualquier otro valor (antes «Otra») se rechaza, con o sin texto adicional", () => {
     assert.equal(v({ category: "Ojos", subcategory: "Fijadores" }).ok, false);
-    assert.equal(v({ category: "Ojos", subcategory: "Fijadores", reason: "corta" }).ok, false);
-  });
-  await test("«Otra» con justificación suficiente: válida y marcada como otra", () => {
-    assert.deepEqual(v({ category: "Ojos", subcategory: "Fijadores", reason: "No encaja en ninguna de la lista" }), { ok: true, other: true });
+    assert.equal(v({ category: "Ojos", subcategory: "Fijadores", reason: "una justificación larga cualquiera" }).ok, false);
+    assert.equal(v({ category: "Inventada", subcategory: "" }).ok, false);
+    assert.equal(v({ category: "", subcategory: "Rubor" }).ok, false);
   });
 
-  console.log("PATCH /api/admin/catalog-metadata (Fase 53)");
+  console.log("PATCH /api/admin/catalog-metadata (Fase 53/54)");
   const base = { product_id: 99, category: "Tratamiento", additional_info: { tone: null } };
-  await test("subcategoría de la lista: se guarda sin leer la fila y limpia una justificación vieja", async () => {
-    const { res, calls, written } = await patchWith({ ...base, subcategory: "Cremas faciales", additional_info: { subcategoryOtherReason: "antes era otra cosa" } }, null);
+  await test("categoría y subcategoría de la lista: se guardan sin leer la fila", async () => {
+    const { res, calls, written } = await patchWith({ ...base, subcategory: "Cremas faciales" }, null);
     assert.equal(res.statusCode, 200);
     assert.equal(calls.filter((c) => c.method === "GET").length, 0);
+    assert.equal(written.category, "Tratamiento");
     assert.equal(written.subcategory, "Cremas faciales");
-    assert.equal(written.additional_info, null);
   });
   await test("valor histórico SIN cambios (#99 «Crema Facial»): se conserva y el guardado no se bloquea", async () => {
-    const stored = { category: "Limpieza", subcategory: "Crema Facial", additional_info: null };
+    const stored = { category: "Limpieza", subcategory: "Crema Facial" };
     const { res, written } = await patchWith({ product_id: 99, category: "Limpieza", subcategory: "Crema Facial", usage: "Modo de uso intacto", additional_info: {} }, stored);
     assert.equal(res.statusCode, 200);
     assert.equal(written.subcategory, "Crema Facial");
     assert.equal(written.usage, "Modo de uso intacto");
   });
-  await test("valor fuera de la lista y distinto del guardado, sin justificación: 400 y NADA se escribe", async () => {
-    const stored = { category: "Ojos", subcategory: "Set ojos y cejas", additional_info: null };
+  await test("valor fuera de la lista y distinto del guardado: 400 y NADA se escribe", async () => {
+    const stored = { category: "Ojos", subcategory: "Set ojos y cejas" };
     const { res, writes } = await patchWith({ product_id: 106, category: "Ojos", subcategory: "Inventada", additional_info: {} }, stored);
     assert.equal(res.statusCode, 400);
-    assert.match(res.body.error, /Otra/);
+    assert.match(res.body.error, /Elige una de la lista/);
     assert.equal(writes.length, 0);
   });
-  await test("«Otra» con justificación: se guarda, con la justificación dentro de additional_info", async () => {
-    const reason = "Producto sin equivalente en la lista actual";
-    const { res, written } = await patchWith({ product_id: 5, category: "Ojos", subcategory: "Fijadores", additional_info: { subcategoryOtherReason: reason } }, { category: "Ojos", subcategory: null, additional_info: null });
-    assert.equal(res.statusCode, 200);
-    assert.equal(written.subcategory, "Fijadores");
-    assert.equal(JSON.parse(written.additional_info).subcategoryOtherReason, reason);
+  await test("categoría que no es VIBE (y no es la guardada): 400 y nada se escribe", async () => {
+    const { res, writes } = await patchWith({ product_id: 5, category: "Inventada", additional_info: {} }, { category: "Labios", subcategory: null });
+    assert.equal(res.statusCode, 400);
+    assert.equal(writes.length, 0);
   });
-  await test("guardado parcial sin subcategory: no valida ni lee nada (otros campos no se ven afectados)", async () => {
+  await test("guardado parcial sin clasificación: no valida ni lee nada (otros campos no se ven afectados)", async () => {
     const { res, calls } = await patchWith({ product_id: 5, published: true }, null);
     assert.equal(res.statusCode, 200);
     assert.equal(calls.filter((c) => c.method === "GET").length, 0);
@@ -165,14 +174,14 @@ async function main() {
   console.log("Notas internas fuera de la API pública");
   const { shapeProduct } = require("../api/catalog/_lib/merge");
   const details = require("../api/_lib/editorialDetails");
-  await test("la justificación y las notas de merchandising no salen en el producto público", () => {
-    const p = shapeProduct({ id: 1, name: "x", price: 1, stock: 1, category: "Labios" }, { additional_info: JSON.stringify({ tone: "Rojo", commercialAngle: "interno", usageOccasion: "interno", subcategoryOtherReason: "interna larga" }) }, () => "Maquillaje");
+  await test("las notas internas de merchandising no salen en el producto público", () => {
+    const p = shapeProduct({ id: 1, name: "x", price: 1, stock: 1, category: "Labios" }, { additional_info: JSON.stringify({ tone: "Rojo", commercialAngle: "interno", usageOccasion: "interno" }) }, () => "Maquillaje");
     assert.equal(p.tone, "Rojo");
     for (const k of details.INTERNAL_FIELDS) assert.equal(k in p, false, k);
+    assert.equal(details.PUBLIC_FIELDS.length + details.INTERNAL_FIELDS.length, details.ALL_FIELDS.length);
   });
-  await test("el Admin sí recibe la justificación guardada (parseDetails completo)", () => {
-    assert.equal(details.parseDetails(JSON.stringify({ subcategoryOtherReason: "interna larga" })).subcategoryOtherReason, "interna larga");
-    assert.deepEqual(details.PUBLIC_FIELDS.length + details.INTERNAL_FIELDS.length, details.ALL_FIELDS.length);
+  await test("Fase 54 — la justificación de «Otra» ya no es un campo editorial", () => {
+    assert.equal(details.ALL_FIELDS.includes("subcategoryOtherReason"), false);
   });
 
   console.log("Formulario del Admin");
@@ -181,12 +190,16 @@ async function main() {
     assert.match(src, /<select name="subcategory_choice">/);
     assert.doesNotMatch(src, /list="subcategorySuggestions"/);
   });
-  await test("«Otra» exige nombre y justificación antes de enviar", () => {
-    assert.match(src, /isOther && \(!fd\.subcategory_other\.trim\(\) \|\| fd\.subcategory_other_reason\.trim\(\)\.length < MIN_OTHER_REASON\)/);
-    assert.equal(server.MIN_REASON_LENGTH, Number(src.match(/const MIN_OTHER_REASON = (\d+);/)[1]));
+  await test("Fase 54 — el editor ya no ofrece «Otra» ni pide justificación", () => {
+    assert.doesNotMatch(src, /SUB_OTHER|subcategory_other|MIN_OTHER_REASON|subcategoryOtherReason/);
   });
-  await test("el valor histórico se ofrece tal cual y se envía sin cambios si no se toca", () => {
+  await test("el valor histórico se ofrece tal cual, se envía sin cambios si no se toca, y hay sugerencia editable", () => {
     assert.match(src, /if \(choice === SUB_HISTORICAL\) return subInitial\.historical;/);
+    assert.match(src, /suggestClassification\(subInitial\.historical/);
+    assert.match(src, /id="applySuggestion"/);
+  });
+  await test("una categoría guardada fuera de las 7 aprobadas se conserva en el selector", () => {
+    assert.match(src, /if \(selected && !VIBE_CATEGORY_GROUPS\.some\(\(g\) => g\.categories\.includes\(selected\)\)\)/);
   });
 
   console.log(`\n${passed} passed, ${failed} failed`);

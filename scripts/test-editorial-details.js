@@ -24,11 +24,11 @@ function test(name, fn) {
 }
 
 console.log("cobertura de campos (sección 2/3 — ficha real de Product Studio)");
-// Fase 53 — +1: subcategoryOtherReason (justificación interna de «Otra»).
-test("41 campos en total, sin duplicados", () => {
-  assert.equal(ALL_FIELDS.length, 41);
-  assert.equal(new Set(ALL_FIELDS).size, 41);
-  assert.ok(STRING_FIELDS.includes("subcategoryOtherReason"));
+// Fase 54 — vuelve a 40: se retiró subcategoryOtherReason junto con «Otra».
+test("40 campos en total, sin duplicados", () => {
+  assert.equal(ALL_FIELDS.length, 40);
+  assert.equal(new Set(ALL_FIELDS).size, 40);
+  assert.ok(!STRING_FIELDS.includes("subcategoryOtherReason"));
 });
 test("incluye los campos clave de la ficha real (tono, acabado, cruelty-free, etc.)", () => {
   for (const key of ["commercialName", "tone", "toneCode", "finish", "coverage", "duration", "skinType", "crueltyFree", "vegan", "dermatologicallyTested", "countryOfManufacture", "commercialAngle"]) {

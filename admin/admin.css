@@ -386,10 +386,10 @@ dialog.confirm-dialog{width:min(460px,calc(100% - 32px))}
 .orders-notice{margin:0 0 14px;padding:10px 14px;border-radius:10px;background:#e6f8ee;color:#1a7f4c;font-weight:600}
 .orders-notice.is-error{background:#fff0f0;color:#b00020}
 
-/* Fase 53 — subcategoría controlada: «Otra» con justificación y marca
-   visible de revisión pendiente. */
+/* Fase 53/54 — subcategoría controlada: marca visible de revisión
+   pendiente y sugerencia editable para valores históricos. */
 .pill-review{background:#fff1df;color:#8a4b00;border:1px solid #f3c98f}
-.sub-other{display:grid;gap:10px;margin:4px 0 6px;padding:12px 14px;border:1px dashed #f3c98f;border-radius:12px;background:#fffaf2}
+.class-suggestion{margin:0;padding:10px 14px;border:1px dashed #f3c98f;border-radius:12px;background:#fffaf2;font-size:13px}
 .review-hint{color:#8a4b00;font-weight:600}
 
 /* Fase 53 — corrección de la Fase 52: organizeEditorTabs mueve los campos
