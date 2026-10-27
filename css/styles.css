@@ -173,6 +173,8 @@ header.scrolled .logo-image{width:128px}
    rompería la transición de crossfade entre slides superpuestos. */
 .hero-slide picture{display:block;width:100%;height:100%}
 .hero-slide img{width:100%;height:100%;object-fit:contain;display:block}
+/* Fase 49 — fondo desenfocado del marco mobile; oculto fuera de mobile. */
+.hero-slide .hero-slide-backdrop{display:none}
 
 @media(prefers-reduced-motion:reduce){
   .hero-slide{transition:none}
@@ -729,6 +731,19 @@ footer .wrap.footer-grid{display:grid;grid-template-columns:1.1fr 1fr 1.3fr;gap:
      contenedor en la misma proporción, "contain" no genera
      letterboxing perceptible. */
   .hero-slide img{object-fit:contain}
+  /* Fase 49 — más protagonismo sin recortar: las piezas actuales son
+     horizontales (16:9) y ya ocupan todo el ancho, así que la imagen no
+     puede crecer sin recortarse. El marco crece moderadamente hasta 4:3
+     (min-height:75vw, +34% de alto) y la pieza se sigue viendo COMPLETA
+     y centrada (contain); las bandas se rellenan con la misma imagen
+     desenfocada y oscurecida, así el marco se lee como una sola pieza.
+     Si algún día existe la "Imagen mobile (4:5)" de Admin, su proporción
+     es más alta que 4:3 y manda el aspect-ratio medido (sin bandas). */
+  .hero-carousel{min-height:75vw}
+  .hero-slide .hero-slide-backdrop{display:block;position:absolute;inset:-24px;width:calc(100% + 48px);height:calc(100% + 48px);object-fit:cover;filter:blur(22px) brightness(.42) saturate(1.15);transform:scale(1.08)}
+  .hero-slide picture{position:relative;z-index:1}
+  /* Indicadores en la banda inferior: ya no tapan el texto de la pieza. */
+  .hero-dots{bottom:4px}
   .hero-slide-copy{padding:20px 18px 26px}
   .hero-slide-subtitle{display:none}
   .hero-arrow{width:34px;height:34px;font-size:17px}

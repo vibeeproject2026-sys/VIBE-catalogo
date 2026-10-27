@@ -48,7 +48,14 @@ function heroSlideHtml(s, i) {
   const hasCopy = s.eyebrow || s.title || s.subtitle || s.ctaText;
   const tag = href ? "a" : "div";
   const hrefAttr = href ? ` href="${esc(href)}"` : "";
+  // Fase 49 — fondo decorativo del marco mobile: la MISMA imagen que se
+  // muestra en mobile (mismo archivo, ya en caché), desenfocada por CSS
+  // para rellenar las bandas cuando la pieza es horizontal y el marco
+  // mobile es más alto que ella. La pieza real sigue completa encima
+  // (object-fit:contain). Oculto en tablet/desktop (ver .hero-slide-backdrop).
+  const backdropSrc = hasMobileVariant ? s.mobileImage : s.image;
   return `<${tag} class="hero-slide${i === 0 ? " active" : ""}"${hrefAttr} data-index="${i}">
+    <img class="hero-slide-backdrop" src="${esc(backdropSrc)}" alt="" aria-hidden="true" loading="${i === 0 ? "eager" : "lazy"}" decoding="async">
     <picture>
       ${hasMobileVariant ? `<source media="(max-width: 640px)" srcset="${esc(s.mobileImage)}">` : ""}
       <img src="${esc(s.image)}" alt="${esc(s.alt || "")}" loading="${i === 0 ? "eager" : "lazy"}">
