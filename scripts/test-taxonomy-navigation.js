@@ -89,6 +89,23 @@ async function main() {
     assert.equal(t.VIBE_CATEGORY_GROUPS.flatMap((g) => g.categories).length, 7);
   });
 
+  await test("una categoría literal «Accesorios» (productos demo) conserva su grupo", () => {
+    const demo = product({ id: 900, category: "Accesorios", categoryGroup: "Accesorios" });
+    assert.deepEqual(ids(t.filterProducts([demo, UNCURATED_OTRO], { group: "Accesorios" })), [900]);
+  });
+
+  console.log("Encabezado de Ofertas (Fase 47)");
+  await test("con promociones activas, copy creativo de precios especiales", () => {
+    const c = t.ofertasHeadingCopy(true);
+    assert.equal(c.eyebrow, "SOLO EN OFERTAS VIBE");
+    assert.equal(`${c.title} ${c.accent}`, "Pequeños precios. Grandes VIBES.");
+    assert.equal(c.lead, "Tus favoritos de belleza, con precios especiales.");
+  });
+  await test("sin promociones, copy neutro que no sugiere descuentos", () => {
+    const c = t.ofertasHeadingCopy(false);
+    assert.doesNotMatch(Object.values(c).join(" "), /precio|descuento|especial|Pequeños/i);
+  });
+
   console.log("Tarjetas de «Descubre tu VIBE» (destinos)");
   await test("Skincare por grupo → 1 producto (antes, con categoría POS «Skincare», 0)", () => {
     assert.deepEqual(ids(t.filterProducts(CATALOG, { group: "Skincare", category: "Todos" })), [99]);

@@ -46,11 +46,13 @@ header.scrolled .nav{height:68px}
    su estado máximo. Reducido ~18% (170px→140px) manteniendo la misma
    proporción de reducción al hacer scroll (~17%, 138px→114px) — más
    aire alrededor sin tocar el asset ni la altura del Header. */
-.logo-image{display:block;width:140px;aspect-ratio:504/207;overflow:hidden;transition:width .25s ease}
-header.scrolled .logo-image{width:114px}
+/* Fase 47 — pedido explícito: más presencia del logo y del header.
+   140px → 164px (scroll: 114px → 128px), misma proporción del asset. */
+.logo-image{display:block;width:164px;aspect-ratio:504/207;overflow:hidden;transition:width .25s ease}
+header.scrolled .logo-image{width:128px}
 .logo-image img{width:100%;height:100%;object-fit:contain;display:block}
 .logo small{font-size:6px;letter-spacing:.31em;color:#fff;white-space:nowrap}
-.nav-links{display:flex;gap:30px;color:#b7b7b7;font-size:13px;font-weight:700;letter-spacing:.02em}
+.nav-links{display:flex;gap:34px;color:#c4c4c4;font-size:14px;font-weight:700;letter-spacing:.02em}
 /* Fase 36 — antes solo cambiaba de color en hover; un subrayado que
    crece desde el centro (en vez de un salto de color plano) es el
    mismo tipo de microinteracción "premium = control + suavidad" ya
@@ -73,7 +75,7 @@ header.scrolled .logo-image{width:114px}
 .cart-btn{border:1px solid #fff;background:transparent;color:#fff;border-radius:999px;padding:9px 13px 9px 16px}
 .cart-btn b{display:inline-grid;place-items:center;min-width:22px;height:22px;margin-left:7px;border-radius:50%;background:var(--pink);color:#fff;font-size:12px}
 
-.menu-btn{display:none;flex-direction:column;justify-content:center;align-items:center;gap:5px;width:38px;height:38px;border:1px solid #333;border-radius:12px;background:transparent;padding:0}
+.menu-btn{display:none;flex-direction:column;justify-content:center;align-items:center;gap:5px;width:44px;height:44px;border:1px solid #333;border-radius:12px;background:transparent;padding:0}
 .menu-btn span{display:block;width:16px;height:1.5px;background:#fff;transition:transform .2s ease,opacity .2s ease}
 .menu-btn[aria-expanded="true"] span:nth-child(1){transform:translateY(6.5px) rotate(45deg)}
 .menu-btn[aria-expanded="true"] span:nth-child(2){opacity:0}
@@ -84,11 +86,22 @@ header.scrolled .logo-image{width:114px}
    220px (el alto de 4 filas) ya no alcanza para las 9 filas actuales —
    con overflow:hidden, el exceso simplemente quedaba invisible. */
 .mobile-nav.open{max-height:520px}
-.mobile-nav a{padding:16px 20px;border-bottom:1px solid var(--line);font-size:14px;font-weight:700;letter-spacing:.02em;color:#ddd;transition:color .2s ease,background .2s ease}
-.mobile-nav a:active{color:#fff;background:#111}
-.mobile-nav a.nav-active{color:var(--pink);border-left:3px solid var(--pink);padding-left:17px}
+/* Fase 47 — menú mobile más editorial: tipografía grande y firme, flecha
+   rosa como afordancia, separadores más suaves, "Buscar" como acción
+   secundaria tipo cápsula al final. Filas ≥56px (táctil cómodo). */
+.mobile-nav.open{padding:6px 0 16px}
+.mobile-nav a{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:56px;margin:0 20px;padding:0 4px;border-bottom:1px solid #1d1d1d;font-size:19px;font-weight:800;letter-spacing:-.01em;color:#f2f2f2;transition:color .2s ease,padding .2s ease}
+.mobile-nav a::after{content:"→";font-size:16px;font-weight:700;color:var(--pink);opacity:.55;transition:opacity .2s ease,transform .2s ease}
+.mobile-nav a:hover,.mobile-nav a:active{color:#fff}
+.mobile-nav a:hover::after,.mobile-nav a:active::after{opacity:1;transform:translateX(3px)}
+.mobile-nav a:focus{outline:none}
+.mobile-nav a:focus-visible{outline:2px solid var(--pink);outline-offset:2px;border-radius:8px}
+.mobile-nav a.nav-active{color:var(--pink)}
+.mobile-nav a.nav-active::after{opacity:1}
+.mobile-nav a#mobileSearchLink{justify-content:center;gap:10px;min-height:48px;margin-top:14px;border:1px solid #333;border-radius:999px;font-size:14px;font-weight:700;letter-spacing:.04em;color:#ddd}
+.mobile-nav a#mobileSearchLink::after{content:none}
 @media(prefers-reduced-motion:reduce){.mobile-nav a{transition:none}}
-.mobile-nav a:last-child{border-bottom:0}
+.mobile-nav a:last-child{border-bottom:1px solid #333}
 
 .hero{padding:56px 0 72px;overflow:hidden;background:radial-gradient(circle at 80% 45%,#430020 0,#050505 46%)}
 /* Fase 35.3 — bug/pedido reportado: la pieza ya se mostraba completa
@@ -374,7 +387,11 @@ header.scrolled .logo-image{width:114px}
 .drawer h2,.dialog-head h2{margin:0;font-size:28px}
 .x{border:0;background:transparent;color:inherit;font-size:28px;line-height:1;padding:2px 6px}
 .cart-items{flex:1;overflow:auto;padding:20px 25px}
-.cart-item{display:grid;grid-template-columns:64px 1fr auto;gap:13px;padding-bottom:18px;margin-bottom:18px;border-bottom:1px solid #292929}
+/* Fase 47 — .cart-item es el contenedor (recorta la acción revelada
+   por el gesto); el contenido real vive en .cart-item-inner, opaco, que
+   es lo que se desplaza. */
+.cart-item{position:relative;overflow:hidden;margin-bottom:18px;border-bottom:1px solid #292929;touch-action:pan-y}
+.cart-item-inner{position:relative;z-index:1;display:grid;grid-template-columns:64px 1fr auto;gap:13px;padding-bottom:18px;background:#0b0b0b;transition:transform .2s ease}
 .thumb{width:64px;aspect-ratio:1;border-radius:12px;background:#171717;display:grid;place-items:center;font-size:9px;color:var(--pink);overflow:hidden}
 .thumb img{width:100%;height:100%;object-fit:cover;display:block}
 .cart-item h3{font-size:14px;margin:0 0 4px}
@@ -400,8 +417,11 @@ dialog::backdrop{background:#000d}
    nativo: sin tap-highlight y sin outline en :focus, pero con un
    :focus-visible propio para teclado (blanco + halo rosa, visible sobre
    cualquier fondo). */
-.dialog-x{position:sticky;top:12px;z-index:5;display:grid;place-items:center;width:44px;height:44px;margin:12px 12px -56px auto;padding:0;border-radius:50%;border:1px solid #ffffff40;background:#0b0b0bd9;color:#fff;box-shadow:0 6px 18px #00000066;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);-webkit-tap-highlight-color:transparent;touch-action:manipulation;transition:background .2s ease}
-.dialog-x:hover{background:#000}
+/* Fase 47 — más sutil: trazo fino (1.6), fondo translúcido sin borde
+   marcado ni sombra pesada. 50% negro conserva el contraste de la X
+   blanca sobre fotos claras (≈3.9:1) y sobre fondos oscuros. */
+.dialog-x{position:sticky;top:12px;z-index:5;display:grid;place-items:center;width:44px;height:44px;margin:12px 12px -56px auto;padding:0;border-radius:50%;border:0;background:#00000080;color:#fff;box-shadow:0 0 0 1px #ffffff1f,0 2px 8px #0000002e;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);-webkit-tap-highlight-color:transparent;touch-action:manipulation;transition:background .2s ease}
+.dialog-x:hover{background:#000000b3}
 .dialog-x:focus{outline:none}
 .dialog-x:focus-visible{outline:2px solid #fff;outline-offset:2px;box-shadow:0 0 0 5px var(--pink)}
 @media(prefers-reduced-motion:reduce){.dialog-x{transition:none}}
@@ -653,8 +673,8 @@ footer .wrap.footer-grid{display:grid;grid-template-columns:1.1fr 1fr 1.3fr;gap:
      Fase 42.6 — misma reducción ~18% que en escritorio (152px→125px,
      scrolled 112px→92px, mismo ratio de achique ~26% al hacer scroll). */
   header.scrolled .nav{height:58px}
-  .logo-image{width:125px}
-  header.scrolled .logo-image{width:92px}
+  .logo-image{width:142px}
+  header.scrolled .logo-image{width:108px}
   .logo small{font-size:5px}
   .nav-links{display:none}
   .menu-btn{display:flex}
@@ -825,3 +845,72 @@ footer .wrap.footer-grid{display:grid;grid-template-columns:1.1fr 1fr 1.3fr;gap:
   .empty-state{padding:36px 18px}
   .empty-actions .button{width:100%}
 }
+
+/* Fase 47 — franja editorial animada (Hero → Descubre tu VIBE). Rosa
+   claro con texto negro y destellos rosa VIBE; desplazamiento continuo
+   con CSS (la segunda lista es copia aria-hidden), overflow:hidden para
+   no generar scroll horizontal. Sin movimiento si el usuario lo pide. */
+.vibe-ticker{position:relative;overflow:hidden;height:44px;display:flex;align-items:center;background:#FFB8D0;color:#111;border-top:1px solid #ff9cc0;border-bottom:1px solid #ff9cc0}
+.vibe-ticker-track{display:flex;width:max-content;animation:vibe-ticker 34s linear infinite}
+.vibe-ticker:hover .vibe-ticker-track{animation-play-state:paused}
+.vibe-ticker-group{display:flex;flex-shrink:0;margin:0;padding:0;list-style:none}
+.vibe-ticker-group li{display:flex;align-items:center;white-space:nowrap;font-size:13px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
+.vibe-ticker-group li::after{content:"✦";margin:0 26px;color:var(--pink);font-size:12px}
+@keyframes vibe-ticker{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@media(prefers-reduced-motion:reduce){
+  .vibe-ticker-track{animation:none}
+  .vibe-ticker{justify-content:center}
+  .vibe-ticker-group[aria-hidden="true"]{display:none}
+}
+
+/* Fase 47 — "Descubre tu VIBE" con menos aire para que las categorías
+   aparezcan tras un desplazamiento corto (las tarjetas no cambian). */
+.discover-vibe-visual{padding:40px 0 48px}
+.discover-vibe-visual .heading{margin-bottom:24px}
+
+/* Fase 47 — encabezado de Ofertas: titular editorial en dos tiempos
+   (negro + rosa), complemento legible con filete rosa. El punto rosa del
+   sistema de títulos no se añade: el titular ya termina en punto. */
+.heading-ofertas h2{font-size:clamp(34px,4.2vw,54px);line-height:1;max-width:14ch}
+.heading-ofertas h2::after{content:none}
+.heading-ofertas>p{max-width:30ch;color:#222;font-size:16px;font-weight:600;line-height:1.45;border-left-width:3px}
+
+/* Fase 47 — encabezado del Catálogo tipo masthead: bloque negro con
+   título en mayúsculas de gran peso, etiqueta rosa y frase en alto
+   contraste. Misma familia que Ofertas (etiqueta + titular + filete
+   rosa), personalidad propia; compacto para que los productos aparezcan
+   pronto en mobile. */
+.heading-catalog{align-items:center;padding:28px 32px;border-radius:var(--radius);background:#0b0b0b;color:#fff}
+.heading-catalog .eyebrow{color:var(--pink);margin-bottom:10px}
+.heading-catalog h2{color:#fff;font-size:clamp(40px,5.4vw,68px);text-transform:uppercase;letter-spacing:-.035em;line-height:.92}
+.heading-catalog>p{color:#e8e8e8;font-size:15px;font-weight:500;max-width:32ch}
+
+/* Fase 47 — botón Eliminar visible (papelera + etiqueta) en la columna
+   del precio; contraste y foco claros sin dominar la fila. Solo el del
+   carrito: el "Quitar" del checkout conserva su estilo. */
+.cart-item-side{display:flex;flex-direction:column;align-items:flex-end;justify-content:space-between;gap:10px}
+.cart-item .remove{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:0 12px;border:1px solid #3a3a3a;border-radius:999px;background:transparent;color:#e6e6e6;font-size:12px;font-weight:700;transition:color .2s ease,border-color .2s ease,background .2s ease}
+.cart-item .remove:hover{color:#fff;border-color:var(--pink);background:#ff007a1f}
+.cart-item .remove:focus{outline:none}
+.cart-item .remove:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
+.cart-item .remove svg{flex-shrink:0}
+/* Acción que revela el gesto de deslizar (detrás de la fila). */
+.cart-swipe-action{position:absolute;top:0;right:0;bottom:18px;width:96px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border:0;border-radius:12px;background:var(--pink);color:#fff;font-size:12px;font-weight:800}
+.cart-swipe-action:focus-visible{outline:2px solid #fff;outline-offset:-4px}
+@media(prefers-reduced-motion:reduce){.cart-item-inner,.cart-item .remove{transition:none}}
+
+@media(max-width:640px){
+  .vibe-ticker{height:40px}
+  .vibe-ticker-group li{font-size:12px}
+  .vibe-ticker-group li::after{margin:0 18px}
+  .discover-vibe-visual{padding:28px 0 32px}
+  .discover-vibe-visual .heading{margin-bottom:18px}
+  .heading-ofertas>p{font-size:15px}
+  .heading-catalog{padding:22px 20px;gap:10px}
+  .heading-catalog>p{font-size:14px}
+  /* En mobile el gesto es el atajo principal: el botón queda como icono
+     compacto (sigue visible y accesible por su aria-label). */
+  .cart-item .remove{padding:0 10px}
+  .cart-item .remove span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+}
+@media(max-width:900px){.heading-catalog{align-items:flex-start;padding:22px 24px;gap:10px}}

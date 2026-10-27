@@ -40,11 +40,15 @@ const POS_CATCH_ALL_GROUP = "Accesorios";
 //    "Todos" y en la búsqueda) hasta que se le asigne una categoría de
 //    Accesorios en Admin. Esto era la causa de que la tarjeta Accesorios
 //    filtrara por la categoría POS "Otro" en vez de por la editorial.
+//    Fase 47 — una categoría que se llama literalmente "Accesorios" (los
+//    productos demo, ver js/products.js) sí es una señal explícita, no
+//    una suposición: conserva su grupo.
 function groupOf(p) {
   const editorialGroup = EDITORIAL_GROUP_BY_CATEGORY[p.editorialCategory];
   if (editorialGroup) return editorialGroup;
   const posGroup = p.categoryGroup || p.category || null;
-  return posGroup === POS_CATCH_ALL_GROUP ? null : posGroup;
+  const isCatchAll = posGroup === POS_CATCH_ALL_GROUP && p.category !== POS_CATCH_ALL_GROUP;
+  return isCatchAll ? null : posGroup;
 }
 
 // Fase 46 — "Novedades" se activa con el badge editorial "Nuevo" desde
@@ -158,6 +162,15 @@ export function selectNew(products) {
 // resuelto server-side (incluye la ventana de fechas, ver
 // api/catalog/_lib/merge.js) — esta función nunca vuelve a evaluar
 // fechas ni ningún otro campo.
+// Fase 47 — encabezado de la página Ofertas según la situación REAL: el
+// mensaje creativo de precios especiales solo cuando hay promociones
+// activas; sin ninguna, un texto neutro que no sugiere descuentos.
+export function ofertasHeadingCopy(hasPromotions) {
+  return hasPromotions
+    ? { eyebrow: "SOLO EN OFERTAS VIBE", title: "Pequeños precios.", accent: "Grandes VIBES.", lead: "Tus favoritos de belleza, con precios especiales." }
+    : { eyebrow: "OFERTAS VIBE", title: "Ofertas", accent: "VIBE", lead: "Cuando haya promociones activas, las verás aquí." };
+}
+
 export function selectPromotions(products) {
   return products.filter((p) => p.promoActive === true && isAvailable(p)).sort(byEditorialOrderThenName);
 }
@@ -180,6 +193,8 @@ export function breadcrumbLabel(p) {
 // actual, no de un producto individual). Misma prioridad que en
 // breadcrumbLabel: categoría editorial antes que categoría POS, y nunca
 // se inventa un nombre — solo refleja lo que el propio estado ya trae.
+// Fase 47 — ya no se muestra en el encabezado del catálogo (no era
+// navegable y repetía título y chips); se conserva por compatibilidad.
 export function breadcrumbForState({ group, category, subcategory } = {}) {
   const parts = ["Inicio"];
   if (group && group !== "Todos") parts.push(group);
@@ -241,7 +256,13 @@ export function emptyStateContent(state = {}) {
   if (label) {
     return { title: "Estamos preparando esta selección", message: `Pronto encontrarás productos de ${label} en VIBE. Mientras tanto, explora otras categorías.` };
   }
-  return { title: "Estamos preparando algo especial", message: "Muy pronto encontrarás aquí nuestros productos." };
+  return { title: "Estamos preparando algo especial", message: "Estamos preparando algo especial para ti." };
+}
+
+// Fase 27 — copy de estado vacío en una sola línea (compatibilidad).
+// Fase 46/47 — deriva del mismo emptyStateContent que usa el catálogo.
+export function emptyStateCopy(state = {}) {
+  return emptyStateContent(state).message;
 }
 
 // Fase 46 — evita combinaciones contradictorias (p. ej. Accesorios + la

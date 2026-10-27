@@ -5,8 +5,8 @@ import {
   getCategoriesInGroup,
   getSubcategories,
   filterProducts,
-  breadcrumbForState,
   selectPromotions,
+  ofertasHeadingCopy,
   sortProducts,
   emptyStateContent,
   normalizeSelection,
@@ -25,6 +25,7 @@ import {
 } from "./taxonomy.js";
 import { readStateFromSearch, buildUrl } from "./url-state.js";
 import { computeOrderSummary, validateCheckoutForm } from "./checkout.js";
+import { bindCartSwipe } from "./cart-swipe.js";
 
 // Fase 27: se agregan los filtros/orden de la PLP. Todos arrancan
 // "apagados" — ningún filtro activo por defecto, igual que antes.
@@ -180,10 +181,6 @@ function renderCatalogHeading() {
   $("#catalogSubtitle").textContent = isAll ? "Esenciales de belleza seleccionados para elevar tu ritual." : "";
 }
 
-function renderBreadcrumbUI() {
-  $("#catalogBreadcrumb").textContent = breadcrumbForState(state).join(" / ");
-}
-
 function renderActiveFilters() {
   const chips = activeFilterChips(state);
   const el = $("#activeFilters");
@@ -254,7 +251,6 @@ function renderProducts() {
 
   renderActiveFilters();
   renderCatalogHeading();
-  renderBreadcrumbUI();
 }
 
 // Único punto de entrada para "algo del estado de filtros/orden cambió":
@@ -315,6 +311,10 @@ function renderOfertasHome() {
 function renderOfertasPage() {
   const list = selectPromotions(state.products);
   const hasPromotions = list.length > 0;
+  const copy = ofertasHeadingCopy(hasPromotions);
+  $("#ofertasEyebrow").textContent = copy.eyebrow;
+  $("#ofertasTitle").innerHTML = `${esc(copy.title)} <span class="title-accent">${esc(copy.accent)}</span>`;
+  $("#ofertasLead").textContent = copy.lead;
   $("#ofertasGrid").classList.toggle("hidden", !hasPromotions);
   $("#ofertasEmpty").classList.toggle("hidden", hasPromotions);
   if (hasPromotions) $("#ofertasGrid").innerHTML = list.map(productCard).join("");
@@ -410,9 +410,19 @@ function renderDiscoverVibe() {
 // con una promoción real, ver openProduct/addToCart), cantidad,
 // subtotal de la línea y eliminar. Nunca stock ni costos: cart.js nunca
 // los tuvo en primer lugar.
+// Fase 47 — icono de papelera (trazo, hereda currentColor).
+const TRASH_ICON = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6.5 7l.8 12a1.5 1.5 0 0 0 1.5 1.4h6.4a1.5 1.5 0 0 0 1.5-1.4l.8-12M10 11v6M14 11v6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+// Fase 47 — cada fila tiene su botón visible "Eliminar" (papelera +
+// etiqueta) y, detrás, la acción que revela el gesto de deslizar en
+// mobile (js/cart-swipe.js). Ambos usan data-a="del": la eliminación
+// siempre pasa por el mismo handler de #cartItems.
 function cartItemHtml(i) {
   const showPromo = i.originalPrice != null && i.originalPrice > i.price;
-  return `<div class="cart-item">
+  const ids = `data-p="${i.productId}" data-v="${i.variantId}"`;
+  return `<div class="cart-item" data-swipe>
+    <button type="button" class="cart-swipe-action" data-a="del" ${ids} tabindex="-1" aria-hidden="true">${TRASH_ICON}<span>Eliminar</span></button>
+    <div class="cart-item-inner">
     <div class="thumb">${i.image ? `<img src="${i.image}" alt="${esc(i.name)}">` : "VIBE"}</div>
     <div>
       ${i.brand ? `<p class="cart-item-brand">${esc(i.brand)}</p>` : ""}
@@ -427,9 +437,12 @@ function cartItemHtml(i) {
         <span>${i.quantity}</span>
         <button data-a="inc" data-p="${i.productId}" data-v="${i.variantId}">+</button>
       </div>
-      <button class="remove" data-a="del" data-p="${i.productId}" data-v="${i.variantId}">Eliminar</button>
     </div>
-    <div class="cart-price">${money(i.price * i.quantity)}</div>
+    <div class="cart-item-side">
+      <div class="cart-price">${money(i.price * i.quantity)}</div>
+      <button type="button" class="remove" data-a="del" ${ids} aria-label="Eliminar ${esc(i.name)} del carrito">${TRASH_ICON}<span>Eliminar</span></button>
+    </div>
+    </div>
   </div>`;
 }
 
@@ -980,6 +993,8 @@ $("#checkoutButton").onclick = () => {
 };
 $("#closeCheckout").onclick = () => $("#checkoutDialog").close();
 
+bindCartSwipe($("#cartItems"));
+
 $("#cartItems").addEventListener("click", e => {
   if (e.target.id === "cartEmptyCta") {
     e.preventDefault();
@@ -1392,6 +1407,15 @@ function renderCheckoutConfirmation(order) {
 $("#menuToggle").addEventListener("click", () => {
   const open = $("#mobileNav").classList.toggle("open");
   $("#menuToggle").setAttribute("aria-expanded", open ? "true" : "false");
+  $("#menuToggle").setAttribute("aria-label", open ? "Cerrar menú" : "Abrir menú");
+});
+// Fase 47 — Escape cierra el menú mobile y devuelve el foco al botón.
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape" || !$("#mobileNav").classList.contains("open")) return;
+  $("#mobileNav").classList.remove("open");
+  $("#menuToggle").setAttribute("aria-expanded", "false");
+  $("#menuToggle").setAttribute("aria-label", "Abrir menú");
+  $("#menuToggle").focus();
 });
 // Fase 46 — el menú mobile vive dentro del header sticky, en el flujo: si
 // se cierra DESPUÉS de navegar (y con su transición de max-height), la
@@ -1407,6 +1431,7 @@ $("#mobileNav").addEventListener("click", e => {
   void nav.offsetHeight;
   requestAnimationFrame(() => { nav.style.transition = ""; });
   $("#menuToggle").setAttribute("aria-expanded", "false");
+  $("#menuToggle").setAttribute("aria-label", "Abrir menú");
 }, true);
 $("#mobileSearchLink").addEventListener("click", () => {
   setTimeout(() => $("#searchInput").focus(), 450);
