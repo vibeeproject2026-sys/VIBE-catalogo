@@ -20,10 +20,47 @@ const { parseDetails, serializeDetails } = require("../_lib/editorialDetails");
 const { requireAdmin } = require("./_lib/auth");
 const { sendJson, sendError, methodNotAllowed } = require("../catalog/_lib/http");
 const { resolveCategoryGroup } = require("../catalog/_lib/categoryGroups");
+const { isListedSubcategory, validateSubcategory } = require("../_lib/subcategories");
 
 const PRODUCT_COLUMNS = "id,name,price,stock,category";
 const METADATA_COLUMNS =
   "product_id,image,images,short_description,description,benefits,ingredients,usage,presentation,category,subcategory,brand,badge,search_keywords,featured,editorial_order,published,additional_info";
+
+// Fase 53 — subcategoría controlada (ver api/_lib/subcategories.js).
+// Solo se valida cuando el guardado envía subcategory; la fila guardada
+// se lee únicamente si hace falta (valor fuera de la lista), para
+// permitir conservar un valor histórico sin cambios. Devuelve un mensaje
+// de error o null; normaliza fields en el lugar.
+async function checkSubcategory(fields, productId, env) {
+  if (!("subcategory" in fields)) return null;
+  const sub = typeof fields.subcategory === "string" ? fields.subcategory.trim() : "";
+  fields.subcategory = sub || null;
+  const sentInfo = "additional_info" in fields && fields.additional_info && typeof fields.additional_info === "object";
+  const clearReason = () => {
+    if (sentInfo) fields.additional_info = { ...fields.additional_info, subcategoryOtherReason: null };
+  };
+  if (!sub) {
+    clearReason();
+    return null;
+  }
+  if ("category" in fields && isListedSubcategory(fields.category, sub)) {
+    clearReason();
+    return null;
+  }
+  const rows = await pgrestSelect({
+    table: "catalog_metadata",
+    columns: "category,subcategory,additional_info",
+    filters: [["product_id", `eq.${productId}`]],
+    env,
+  });
+  const stored = rows[0] || {};
+  const category = "category" in fields ? fields.category : stored.category;
+  const reason = sentInfo ? fields.additional_info.subcategoryOtherReason : parseDetails(stored.additional_info).subcategoryOtherReason;
+  const result = validateSubcategory({ category, subcategory: sub, storedSubcategory: stored.subcategory, reason });
+  if (!result.ok) return result.error;
+  if (!result.other) clearReason();
+  return null;
+}
 
 module.exports = async function handler(req, res) {
   if (req.method !== "GET" && req.method !== "PATCH") {
@@ -78,6 +115,13 @@ module.exports = async function handler(req, res) {
     return sendError(res, 400, "product_id inválido o ausente.");
   }
   const fields = pickEditorialFields(body);
+  try {
+    const subError = await checkSubcategory(fields, productId, env);
+    if (subError) return sendError(res, 400, subError);
+  } catch (e) {
+    console.error("[admin/catalog-metadata] " + (e && e.message ? e.message : e));
+    return sendError(res, 502, "No se pudo validar la subcategoría. No se guardó nada.");
+  }
   // Fase 34 — el Admin envía additional_info como un objeto (no un
   // string ya serializado): se serializa aquí, en el único lugar que
   // sabe qué claves son válidas y descarta cualquier otra cosa. Un

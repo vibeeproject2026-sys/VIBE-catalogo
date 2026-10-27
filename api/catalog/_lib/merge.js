@@ -8,7 +8,7 @@
 // Embedding can be adopted later as an optimization once the schema is
 // live and confirmed.
 
-const { parseDetails } = require("../../_lib/editorialDetails");
+const { publicDetails } = require("../../_lib/editorialDetails");
 
 // Fase 43 — INNER JOIN sobre published = true (reemplaza el LEFT JOIN de
 // Fase 31, que exponía públicamente todo producto del POS aunque el
@@ -59,7 +59,8 @@ function shapeProduct(product, metadata, resolveCategoryGroup) {
   // esta fase (texto libre no-JSON) se degrada a "todo vacío", nunca
   // rompe la respuesta ni filtra nada fuera de la whitelist. Se aplanan
   // como campos de primer nivel, igual que shortDescription/ingredients.
-  const details = parseDetails(m.additional_info);
+  // Fase 53 — sin los campos internos del Admin (INTERNAL_FIELDS).
+  const details = publicDetails(m.additional_info);
   return {
     id: product.id,
     name: product.name,

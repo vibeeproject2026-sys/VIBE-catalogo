@@ -11,7 +11,8 @@ const { resolveCategoryGroup } = require("../api/catalog/_lib/categoryGroups");
 const { pgrestSelect } = require("../api/catalog/_lib/supabaseRead");
 const { getEnv } = require("../api/catalog/_lib/env");
 const { applyCors, DEFAULT_DEV_ORIGINS } = require("../api/catalog/_lib/cors");
-const { ALL_FIELDS: EDITORIAL_DETAIL_FIELDS } = require("../api/_lib/editorialDetails");
+// Fase 53 — solo los campos públicos (sin INTERNAL_FIELDS: notas internas del Admin).
+const { PUBLIC_FIELDS: EDITORIAL_DETAIL_FIELDS } = require("../api/_lib/editorialDetails");
 
 let passed = 0;
 let failed = 0;

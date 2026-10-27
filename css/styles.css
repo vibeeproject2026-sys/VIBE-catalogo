@@ -742,29 +742,32 @@ footer .wrap.footer-grid{display:grid;grid-template-columns:1.1fr 1fr 1.3fr;gap:
      sin bandas desenfocadas visibles). El fondo desenfocado se conserva
      solo como respaldo: si una pieza tuviera otra proporción (o mientras
      se mide la primera), rellena sus bandas en vez de dejar negro. */
-  .hero-carousel{min-height:0;aspect-ratio:auto;padding-bottom:36px}
+  /* Fase 53 — la franja crece a 52px: flechas (círculo de 36px) e
+     indicadores quedan enteros dentro de ella, sin invadir la pieza, y el
+     bloque del Hero gana presencia sin recortar ni deformar la imagen. */
+  .hero-carousel{min-height:0;aspect-ratio:auto;padding-bottom:52px}
   .hero-slides{height:auto;aspect-ratio:var(--hero-mobile-ratio, 4/5)}
   .hero-slide .hero-slide-backdrop{display:block;position:absolute;inset:-24px;width:calc(100% + 48px);height:calc(100% + 48px);object-fit:cover;filter:blur(22px) brightness(.42) saturate(1.15);transform:scale(1.08)}
   .hero-slide picture{position:relative;z-index:1}
   /* Indicadores centrados en la franja de controles. Fase 50 — su
      contenedor ocupa todo el ancho, donde también están las flechas:
      solo los botones de los indicadores reciben toques. */
-  .hero-dots{bottom:7px;pointer-events:none}
+  .hero-dots{bottom:15px;pointer-events:none}
   .hero-dot{pointer-events:auto}
   .hero-slide-copy{padding:20px 18px 26px}
   .hero-slide-subtitle{display:none}
   /* Fase 50/51 — flechas en la franja de controles, a los lados de los
      indicadores y alineadas con ellos: el botón es un área táctil
-     transparente de 44×44 (sobresale 8px hacia la pieza, sin taparla) y
-     el círculo visible de 30px queda entero en la franja. */
-  .hero-arrow{top:auto;bottom:0;transform:none;width:44px;height:44px;border:0;border-radius:0;background:transparent;-webkit-backdrop-filter:none;backdrop-filter:none;place-items:end center;padding:0 0 10px;font-size:15px}
-  .hero-arrow::before{content:"";position:absolute;left:7px;bottom:3px;z-index:-1;width:30px;height:30px;box-sizing:border-box;border-radius:50%;border:1px solid #ffffff33;background:#00000055;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+     transparente de 44×44 y, desde la Fase 53, tanto el área táctil como
+     el círculo visible de 36px quedan enteros en la franja de 52px. */
+  .hero-arrow{top:auto;bottom:4px;transform:none;width:44px;height:44px;border:0;border-radius:0;background:transparent;-webkit-backdrop-filter:none;backdrop-filter:none;place-items:end center;padding:0 0 13px;font-size:17px}
+  .hero-arrow::before{content:"";position:absolute;left:4px;bottom:4px;z-index:-1;width:36px;height:36px;box-sizing:border-box;border-radius:50%;border:1px solid #ffffff33;background:#00000055;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
   .hero-arrow:hover{background:transparent}
   .hero-arrow:hover::before{background:#00000088}
   .hero-arrow:focus-visible{outline:none}
   .hero-arrow:focus-visible::before{outline:2px solid #fff;outline-offset:2px}
-  .hero-arrow-prev{left:4px}
-  .hero-arrow-next{right:4px}
+  .hero-arrow-prev{left:8px}
+  .hero-arrow-next{right:8px}
   /* Fase 42.7 — mobile: tile angosta lo suficiente para que la
      siguiente se asome (~85px visibles de la tile #2 dentro del ancho
      de .wrap en 390px) — esa asomada es la señal de "hay más
@@ -772,7 +775,10 @@ footer .wrap.footer-grid{display:grid;grid-template-columns:1.1fr 1fr 1.3fr;gap:
      visible. Sigue siendo scroll horizontal nativo, nunca grid. */
   .discover-vibe-visual{padding:40px 0}
   .discover-tile-grid{gap:12px}
-  .discover-tile{width:265px;height:350px}
+  /* Fase 53 — tarjetas algo más contenidas (antes 265×350, más grandes
+     que la propia pieza del Hero): mismas imágenes y encuadres, la
+     siguiente sigue asomando. */
+  .discover-tile{width:248px;height:310px}
   .discover-tile-label{font-size:21px}
   /* Fase 42.8 — pedido explícito: flechas discretas en mobile, sin
      estorbar el swipe nativo (que sigue siendo la interacción
@@ -993,4 +999,15 @@ footer .wrap.footer-grid{display:grid;grid-template-columns:1.1fr 1fr 1.3fr;gap:
    encabezado del Catálogo en fila (apiladas quedaba demasiado alto). */
 @media(min-width:641px) and (max-width:900px){
   .heading-catalog{flex-direction:row;align-items:flex-end;justify-content:space-between}
+}
+
+/* Fase 53 — escritorio: el carrusel pasa a ocupar 2/3 del ancho del Hero
+   (antes 3/5; ~811→904px a 1440, proporción real intacta, sin estirar) y
+   el bloque de bienvenida se compacta para cederle protagonismo. Menos
+   aire vertical alrededor para que la transición a «Descubre tu VIBE»
+   siga visible en el primer pantallazo. Tablet (641–900) no cambia. */
+@media(min-width:901px){
+  .hero{padding:40px 0 52px}
+  .hero-grid{grid-template-columns:1fr 2fr;gap:44px}
+  .hero h1{font-size:clamp(58px,6vw,84px)}
 }

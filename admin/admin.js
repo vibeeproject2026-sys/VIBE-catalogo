@@ -16,7 +16,7 @@
 // sent anywhere except as the Authorization header on /api/admin/*
 // requests.
 
-import { getCategoriesInGroup, getSubcategories, VIBE_CATEGORY_GROUPS, SUBCATEGORIES_BY_CATEGORY, subcategorySuggestions, publicPlacement } from "../js/taxonomy.js";
+import { getCategoriesInGroup, getSubcategories, VIBE_CATEGORY_GROUPS, SUBCATEGORIES_BY_CATEGORY, publicPlacement, isListedSubcategory, needsClassificationReview } from "../js/taxonomy.js";
 import { SECTION_DESTINATIONS, describeSlideDestination } from "../js/hero-links.js";
 
 const TOKEN_KEY = "vibe_admin_token";
@@ -131,12 +131,25 @@ async function deleteSecondaryImage(productId, url, statusEl) {
 // nunca se asignan automáticamente. "Sin categoría" siempre disponible;
 // la administradora puede dejarlo vacío si no lo sabe.
 
-// Subcategorías propuestas en la Fase 20 — sugerencias en un <datalist>,
-// nunca forzadas: el campo sigue siendo texto libre. Fase 51: se filtran
-// según la Categoría VIBE elegida (SUBCATEGORIES_BY_CATEGORY en
-// js/taxonomy.js) en vez de ofrecer las 25 mezcladas.
-function subcategoryOptionsHtml(category) {
-  return subcategorySuggestions(category).map((s) => `<option value="${esc(s)}">`).join("");
+// Fase 53 — subcategoría CONTROLADA: un <select> con la lista de la
+// Categoría VIBE elegida (SUBCATEGORIES_BY_CATEGORY en js/taxonomy.js),
+// más dos casos explícitos, ambos marcados como revisión pendiente:
+// - SUB_HISTORICAL: el valor ya guardado que no está en la lista; se
+//   conserva tal cual mientras no elijas otra cosa (nunca se reasigna);
+// - SUB_OTHER: «Otra», con nombre y justificación obligatoria (nota
+//   interna, nunca pública). El servidor vuelve a validar todo esto.
+const SUB_HISTORICAL = "__historical__";
+const SUB_OTHER = "__other__";
+const MIN_OTHER_REASON = 10;
+function subcategoryOptionsHtml(category, { selected = "", historical = "" } = {}) {
+  const list = SUBCATEGORIES_BY_CATEGORY[category] || [];
+  const opt = (value, label) => `<option value="${esc(value)}" ${selected === value ? "selected" : ""}>${esc(label)}</option>`;
+  return [
+    opt("", category ? "Sin subcategoría" : "Sin subcategoría (elige primero una categoría VIBE)"),
+    ...list.map((sub) => opt(sub, sub)),
+    historical ? opt(SUB_HISTORICAL, `${historical} — valor guardado, revisión pendiente`) : "",
+    opt(SUB_OTHER, "Otra… (requiere justificación)"),
+  ].join("");
 }
 
 // Fase 51 — "dónde se verá" en el catálogo público, con la misma lógica
@@ -270,6 +283,7 @@ function filteredProducts() {
     if (state.status === "unavailable" && p.available) return false;
     if (state.status === "with_ficha" && !p.hasMetadata) return false;
     if (state.status === "unclassified" && p.editorialCategory) return false;
+    if (state.status === "review" && !needsClassificationReview(p)) return false;
     if (state.status === "published_unclassified" && (!p.published || p.editorialCategory)) return false;
     const haystack = [String(p.id), p.name, p.category, p.editorialCategory, p.subcategory].filter(Boolean).join(" ").toLowerCase();
     if (q && !haystack.includes(q)) return false;
@@ -309,6 +323,7 @@ function stateChips(p) {
   if (!p.available) chips.push(`<span class="pill pill-warn">Agotado</span>`);
   if (p.featured) chips.push(`<span class="pill pill-pink">★ Más elegidos</span>`);
   if (p.badge) chips.push(`<span class="pill pill-outline">${esc(p.badge)}</span>`);
+  if (needsClassificationReview(p)) chips.push(`<span class="pill pill-review" title="Subcategoría fuera de la lista controlada">Revisión pendiente</span>`);
   return chips.join("");
 }
 
@@ -397,7 +412,7 @@ function renderTaxonomy() {
           .join("");
         const historical = [...new Set(inCat.map((p) => p.subcategory).filter((v) => v && !approved.includes(v)))];
         const histChips = historical
-          .map((v) => `<span class="sub-chip sub-hist" title="Valor guardado que no está en la lista aprobada; se conserva hasta que lo revises">${esc(v)}<b>${inCat.filter((p) => p.subcategory === v).length}</b></span>`)
+          .map((v) => `<span class="sub-chip sub-hist" title="Revisión pendiente: valor fuera de la lista controlada; se conserva hasta que lo revises">${esc(v)}<b>${inCat.filter((p) => p.subcategory === v).length}</b></span>`)
           .join("");
         const noSub = inCat.filter((p) => !p.subcategory).length;
         return `<div class="tax-cat">
@@ -410,7 +425,7 @@ function renderTaxonomy() {
     return `<section class="tax-group"><div class="tax-group-head"><h2>${esc(group)}</h2><span class="tax-count">${inGroup.length} con clasificación VIBE</span></div>${cats}</section>`;
   }).join("");
   const unclassifiedPublished = state.products.filter((p) => p.published && !p.editorialCategory);
-  const legend = `<p class="tax-legend"><span class="sub-chip sub-hist">Fuera de la lista<b>n</b></span> valor guardado que no coincide con las subcategorías aprobadas: se conserva hasta que decidas.</p>`;
+  const legend = `<p class="tax-legend"><span class="sub-chip sub-hist">Revisión pendiente<b>n</b></span> subcategoría fuera de la lista controlada (valor histórico o «Otra» con justificación): se conserva hasta que decidas.</p>`;
   const unclassified = unclassifiedPublished.length
     ? `<section class="tax-group tax-note"><div class="tax-group-head"><h2>Publicados sin categoría VIBE</h2><span class="tax-count">aparecen por su categoría POS</span></div><div class="tax-products">${unclassifiedPublished.map((p) => `${productLink(p)}<span class="tax-muted">${esc(placementText(p) || "Solo «Todos»")}</span>`).join("")}</div></section>`
     : "";
@@ -485,6 +500,15 @@ async function openEdit(productId) {
   // poblarse sin checks extra.
   const d = m.additional_info || {};
 
+  // Fase 53 — estado inicial del selector de subcategoría.
+  const storedSub = (m.subcategory || "").trim();
+  const subInitial = !storedSub
+    ? { selected: "", historical: "", otherName: "" }
+    : isListedSubcategory(m.category || "", storedSub)
+      ? { selected: storedSub, historical: "", otherName: "" }
+      : d.subcategoryOtherReason
+        ? { selected: SUB_OTHER, historical: "", otherName: storedSub }
+        : { selected: SUB_HISTORICAL, historical: storedSub, otherName: "" };
   $("#editContent").innerHTML = `
     <div class="edit-actionbar">
       <div class="edit-actionbar-title"><strong>${esc(product.name)}</strong><span class="prod-id">#${product.id}</span></div>
@@ -560,10 +584,13 @@ async function openEdit(productId) {
             <select name="category">${renderCategoryOptions(m.category || "")}</select>
           </label>
           <label>Subcategoría VIBE
-            <input name="subcategory" list="subcategorySuggestions" value="${esc(m.subcategory || "")}" placeholder="Elige una sugerencia o escribe la tuya">
+            <select name="subcategory_choice">${subcategoryOptionsHtml(m.category || "", subInitial)}</select>
           </label>
         </div>
-        <datalist id="subcategorySuggestions">${subcategoryOptionsHtml(m.category || "")}</datalist>
+        <div id="subcategoryOther" class="sub-other${subInitial.selected === SUB_OTHER ? "" : " hidden"}">
+          ${textField("subcategory_other", "Nombre de la subcategoría «Otra»", subInitial.otherName, "Ej. Fijadores de maquillaje")}
+          ${textareaField("subcategory_other_reason", "Justificación (obligatoria, nota interna)", `Por qué ninguna subcategoría de la lista sirve — mínimo ${MIN_OTHER_REASON} caracteres. No se muestra en el catálogo público.`, 2)}
+        </div>
         <p id="placementHint" class="placement-hint" role="status"></p>
         <p id="subcategoryHint" class="section-hint"></p>
         <div class="edit-row">
@@ -734,7 +761,7 @@ async function openEdit(productId) {
   // estén dentro de <form> (los <details> viven fuera de él a propósito,
   // para que cada acordeón se pueda abrir/cerrar sin afectar el formulario).
   const ALL_FIELD_NAMES = [
-    "image", "commercial_name", "brand", "line", "category", "subcategory", "product_type", "presentation",
+    "image", "commercial_name", "brand", "line", "category", "subcategory_choice", "subcategory_other", "subcategory_other_reason", "product_type", "presentation",
     "net_content", "sku", "tone", "tone_code", "color", "variant", "main_image_alt",
     "what_is", "short_description", "description", "characteristics",
     "benefits", "usage", "recommended_amount", "application_area", "recommended_tool", "application_order", "application_tips",
@@ -776,15 +803,29 @@ async function openEdit(productId) {
   $("textarea[name=certifications]").value = arrayFieldToText(d.certifications);
   $("textarea[name=manufacturer_info]").value = d.manufacturerInfo || "";
   $("textarea[name=search_keywords]").value = arrayFieldToText(m.search_keywords);
+  $("textarea[name=subcategory_other_reason]").value = d.subcategoryOtherReason || "";
+
+  // Fase 53 — subcategoría efectiva según el selector.
+  function currentSubcategory() {
+    const choice = $('[name="subcategory_choice"]').value;
+    if (choice === SUB_HISTORICAL) return subInitial.historical;
+    if (choice === SUB_OTHER) return $('[name="subcategory_other"]').value.trim();
+    return choice;
+  }
 
   $("#editForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     const fd = readAllFields();
+    const isOther = fd.subcategory_choice === SUB_OTHER;
+    if (isOther && (!fd.subcategory_other.trim() || fd.subcategory_other_reason.trim().length < MIN_OTHER_REASON)) {
+      setSaveStatus(`No se guardó: «Otra» necesita un nombre y una justificación de al menos ${MIN_OTHER_REASON} caracteres (pestaña Identificación).`, true);
+      return;
+    }
     const payload = {
       product_id: product.id,
       image: fd.image || null,
       category: fd.category || null,
-      subcategory: fd.subcategory || null,
+      subcategory: currentSubcategory() || null,
       brand: fd.brand || null,
       badge: fd.badge || null,
       presentation: fd.presentation || null,
@@ -841,6 +882,7 @@ async function openEdit(productId) {
         manufacturerInfo: fd.manufacturer_info || null,
         commercialAngle: fd.commercial_angle || null,
         usageOccasion: fd.usage_occasion || null,
+        subcategoryOtherReason: isOther ? fd.subcategory_other_reason.trim() : fd.subcategory_choice === SUB_HISTORICAL ? d.subcategoryOtherReason || null : null,
       },
     };
 
@@ -902,7 +944,9 @@ async function openEdit(productId) {
   const placementBase = { category: product.category, categoryGroup: product.categoryGroup };
   function refreshClassificationHints() {
     const category = $('[name="category"]').value || null;
-    const sub = $('[name="subcategory"]').value.trim();
+    const sub = currentSubcategory();
+    const choice = $('[name="subcategory_choice"]').value;
+    $("#subcategoryOther").classList.toggle("hidden", choice !== SUB_OTHER);
     const where = placementText({ ...placementBase, editorialCategory: category });
     $("#placementHint").textContent = where
       ? `Se verá en el catálogo público en: ${where}${category ? "" : " (por categoría POS)"}.`
@@ -910,9 +954,13 @@ async function openEdit(productId) {
     $("#placementHint").classList.toggle("placement-warn", !category);
     $("#summaryPlacement").textContent = $("#placementHint").textContent;
     $("#summaryClassification").textContent = category ? category + (sub ? " › " + sub : "") : "sin categoría VIBE";
-    const suggestions = subcategorySuggestions(category);
     $("#subcategoryHint").textContent =
-      category && sub && !suggestions.includes(sub) ? `«${sub}» no está entre las sugeridas para ${category}; se guardará tal cual.` : "";
+      choice === SUB_HISTORICAL
+        ? `Revisión pendiente: «${sub}» no está en la lista${category ? " de " + category : ""}. Se conserva tal cual hasta que elijas otra opción.`
+        : choice === SUB_OTHER
+          ? "Revisión pendiente: «Otra» se guarda con su justificación (interna) y queda marcada para revisar."
+          : "";
+    $("#subcategoryHint").classList.toggle("review-hint", choice === SUB_HISTORICAL || choice === SUB_OTHER);
     const published = $('[name="published"]').checked;
     const chip = $("#editStatusChip");
     chip.textContent = published ? "Publicado" : "No publicado";
@@ -926,10 +974,16 @@ async function openEdit(productId) {
     }
   }
   $('[name="category"]').addEventListener("change", () => {
-    $("#subcategorySuggestions").innerHTML = subcategoryOptionsHtml($('[name="category"]').value);
+    // Conserva la elección si sigue siendo válida en la nueva categoría;
+    // el valor histórico y «Otra» siempre siguen disponibles.
+    const category = $('[name="category"]').value;
+    const prev = $('[name="subcategory_choice"]').value;
+    const keep = prev === SUB_HISTORICAL || prev === SUB_OTHER || isListedSubcategory(category, prev) ? prev : isListedSubcategory(category, storedSub) ? storedSub : "";
+    $('[name="subcategory_choice"]').innerHTML = subcategoryOptionsHtml(category, { selected: keep, historical: subInitial.historical });
     refreshClassificationHints();
   });
-  $('[name="subcategory"]').addEventListener("input", refreshClassificationHints);
+  $('[name="subcategory_choice"]').addEventListener("change", refreshClassificationHints);
+  $('[name="subcategory_other"]').addEventListener("input", refreshClassificationHints);
   $('[name="published"]').addEventListener("change", refreshClassificationHints);
   refreshClassificationHints();
 
@@ -1677,10 +1731,12 @@ const ORDER_STATUS_LABELS = { received: "Recibido", confirmed: "Confirmado", can
 
 function renderOrdersTable() {
   const list = ordersState.orders;
+  $("#ordersCount").textContent = list.length === 1 ? "1 pedido" : `${list.length} pedidos`;
   $("#ordersRows").innerHTML = list.length
     ? list
         .map(
-          (o) => `<tr>
+          (o) => `<tr data-order-row="${esc(o.id)}">
+        <td><b>#${esc(o.id)}</b></td>
         <td>${esc(formatOrderDate(o.created_at))}</td>
         <td>${esc(o.customer_name)}</td>
         <td>${esc(o.customer_phone)}</td>
@@ -1689,11 +1745,80 @@ function renderOrdersTable() {
         <td>${money(Number(o.total))}</td>
         <td>${esc(ORDER_STATUS_LABELS[o.status] || o.status)}</td>
         <td>${o.email_sent ? "Sí" : "No"}</td>
+        <td><button type="button" class="order-delete" data-delete-order="${esc(o.id)}" aria-label="Eliminar pedido #${esc(o.id)}">Eliminar</button></td>
       </tr>`
         )
         .join("")
-    : `<tr><td colspan="8"><span class="section-hint">Todavía no hay ningún pedido registrado.</span></td></tr>`;
+    : `<tr><td colspan="10"><span class="section-hint">Todavía no hay ningún pedido registrado.</span></td></tr>`;
 }
+
+// ---- Fase 53 — eliminar un pedido (cualquier estado) ----
+// El botón solo abre la confirmación; la eliminación real la autoriza el
+// servidor (DELETE /api/admin/orders, protegido por el token de admin).
+// Cancelar o Esc cierran el diálogo sin ninguna llamada.
+let pendingOrderDelete = null;
+
+function showOrdersNotice(text, isError = false) {
+  const el = $("#ordersNotice");
+  el.textContent = text;
+  el.classList.toggle("is-error", isError);
+  el.classList.remove("hidden");
+}
+
+function openOrderDelete(id) {
+  const order = ordersState.orders.find((o) => String(o.id) === String(id));
+  if (!order) return;
+  pendingOrderDelete = order;
+  $("#orderDeleteNumber").textContent = `#${order.id}`;
+  $("#orderDeleteSummary").textContent = `${order.customer_name || "Sin nombre"} · ${formatOrderDate(order.created_at)} · ${money(Number(order.total))} · ${ORDER_STATUS_LABELS[order.status] || order.status}`;
+  $("#orderDeleteError").classList.add("hidden");
+  $("#orderDeleteConfirm").disabled = false;
+  $("#orderDeleteConfirm").textContent = "Eliminar pedido";
+  $("#orderDeleteDialog").showModal();
+}
+
+async function confirmOrderDelete() {
+  const order = pendingOrderDelete;
+  if (!order) return;
+  const btn = $("#orderDeleteConfirm");
+  btn.disabled = true;
+  btn.textContent = "Eliminando…";
+  let res;
+  try {
+    res = await adminFetch(`/api/admin/orders?id=${encodeURIComponent(order.id)}`, { method: "DELETE" });
+  } catch {
+    res = null;
+  }
+  if (res && res.status === 401) {
+    $("#orderDeleteDialog").close();
+    clearToken();
+    showLogin("Token incorrecto o vencido.");
+    return;
+  }
+  if (res && (res.ok || res.status === 404)) {
+    // 404: ya no existía (p. ej. eliminado en otra pestaña) — se quita igual.
+    ordersState.orders = ordersState.orders.filter((o) => String(o.id) !== String(order.id));
+    pendingOrderDelete = null;
+    $("#orderDeleteDialog").close();
+    renderOrdersTable();
+    renderHome();
+    showOrdersNotice(res.ok ? `Pedido #${order.id} eliminado.` : `El pedido #${order.id} ya no existía; se quitó del listado.`);
+    return;
+  }
+  btn.disabled = false;
+  btn.textContent = "Eliminar pedido";
+  $("#orderDeleteError").textContent = "No se pudo eliminar el pedido. No se modificó nada; intenta de nuevo.";
+  $("#orderDeleteError").classList.remove("hidden");
+}
+
+$("#ordersRows").addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-delete-order]");
+  if (btn) openOrderDelete(btn.dataset.deleteOrder);
+});
+$("#orderDeleteConfirm").addEventListener("click", confirmOrderDelete);
+$("#orderDeleteDialog").addEventListener("close", () => {
+  pendingOrderDelete = null;
+});
 
 // En mobile la barra lateral es navegación inferior (sin "Salir"): el
 // botón de Inicio reutiliza exactamente el mismo cierre de sesión.

@@ -573,6 +573,112 @@ async function main() {
     });
   });
 
+  console.log("\nDELETE /api/admin/orders (Fase 53)");
+
+  // Captura las llamadas a Supabase y console.error durante una prueba.
+  async function runDelete(req, supa) {
+    const calls = [];
+    const logs = [];
+    const originalFetch = global.fetch;
+    const originalError = console.error;
+    global.fetch = async (url, opts = {}) => {
+      calls.push({ url: String(url), method: opts.method || "GET", headers: opts.headers || {} });
+      return supa(url, opts);
+    };
+    console.error = (...args) => logs.push(args.join(" "));
+    const res = mockRes();
+    try {
+      await withEnv(BASE_ENV, () => adminOrdersHandler(req, res));
+    } finally {
+      global.fetch = originalFetch;
+      console.error = originalError;
+    }
+    return { res, calls, logs };
+  }
+  const ADMIN = { authorization: "Bearer admin-test-token" };
+  const okRows = (rows) => async () => ({ ok: true, status: 200, text: async () => JSON.stringify(rows) });
+
+  await test("sin token: 401 y Supabase nunca se llama", async () => {
+    const { res, calls } = await runDelete({ method: "DELETE", headers: {}, query: { id: "5" } }, okRows([{ id: 5 }]));
+    assert.equal(res.statusCode, 401);
+    assert.equal(calls.length, 0);
+  });
+
+  await test("token manipulado: 401 y Supabase nunca se llama", async () => {
+    const { res, calls } = await runDelete({ method: "DELETE", headers: { authorization: "Bearer admin-test-tokem" }, query: { id: "5" } }, okRows([{ id: 5 }]));
+    assert.equal(res.statusCode, 401);
+    assert.equal(calls.length, 0);
+  });
+
+  await test("ids inválidos o manipulados: 400 sin tocar Supabase", async () => {
+    for (const id of [undefined, "", "abc", "0", "-3", "1.5", "07", "5&status=eq.received", "5,6", "in.(1,2)", "12345678901234567"]) {
+      const { res, calls } = await runDelete({ method: "DELETE", headers: ADMIN, query: id === undefined ? {} : { id } }, okRows([{ id: 5 }]));
+      assert.equal(res.statusCode, 400, `id ${JSON.stringify(id)}`);
+      assert.equal(calls.length, 0, `id ${JSON.stringify(id)}`);
+    }
+  });
+
+  await test("eliminación confirmada: un único DELETE a orders filtrado por ese id", async () => {
+    const { res, calls } = await runDelete({ method: "DELETE", headers: ADMIN, query: { id: "42" } }, okRows([{ id: 42 }]));
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(res.body, { deleted: { id: 42 } });
+    assert.equal(res.headers["Cache-Control"], "no-store");
+    assert.equal(calls.length, 1);
+    const u = new URL(calls[0].url);
+    assert.equal(calls[0].method, "DELETE");
+    assert.equal(u.pathname, "/rest/v1/orders");
+    assert.equal(u.searchParams.get("id"), "eq.42");
+    assert.deepEqual([...u.searchParams.keys()].sort(), ["id", "select"]);
+    assert.equal(calls[0].headers.Prefer, "return=representation");
+  });
+
+  await test("integridad: nunca toca products, catalog_metadata ni ninguna otra tabla", async () => {
+    const { calls } = await runDelete({ method: "DELETE", headers: ADMIN, query: { id: "42" } }, okRows([{ id: 42 }]));
+    for (const c of calls) assert.equal(new URL(c.url).pathname, "/rest/v1/orders");
+    assert.ok(calls.every((c) => c.method === "DELETE"));
+  });
+
+  await test("disponible para cualquier estado: el filtro es solo el id (sin condición de estado)", async () => {
+    for (const status of ["received", "confirmed", "cancelled"]) {
+      const { res, calls } = await runDelete({ method: "DELETE", headers: ADMIN, query: { id: "9" } }, okRows([{ id: 9, status }]));
+      assert.equal(res.statusCode, 200, status);
+      assert.equal(new URL(calls[0].url).searchParams.get("status"), null);
+    }
+  });
+
+  await test("también acepta el id en el cuerpo JSON", async () => {
+    const { res, calls } = await runDelete({ method: "DELETE", headers: ADMIN, query: {}, body: JSON.stringify({ id: 7 }) }, okRows([{ id: 7 }]));
+    assert.equal(res.statusCode, 200);
+    assert.equal(new URL(calls[0].url).searchParams.get("id"), "eq.7");
+  });
+
+  await test("pedido inexistente: 404 (nada que borrar)", async () => {
+    const { res } = await runDelete({ method: "DELETE", headers: ADMIN, query: { id: "999" } }, okRows([]));
+    assert.equal(res.statusCode, 404);
+  });
+
+  await test("error de Supabase: 502 y el log no incluye datos del cliente ni la respuesta cruda", async () => {
+    const leak = { message: "fallo", details: "Ana Cliente 3001234567 ana@example.com" };
+    const { res, logs } = await runDelete({ method: "DELETE", headers: ADMIN, query: { id: "42" } }, async () => ({ ok: false, status: 500, text: async () => JSON.stringify(leak) }));
+    assert.equal(res.statusCode, 502);
+    assert.ok(logs.length > 0);
+    assert.ok(logs.every((l) => !/Ana|3001234567|example\.com|service-role/.test(l)), logs.join(" | "));
+  });
+
+  await test("fallo de red: 502 con mensaje claro", async () => {
+    const { res } = await runDelete({ method: "DELETE", headers: ADMIN, query: { id: "42" } }, async () => { throw new TypeError("fetch failed"); });
+    assert.equal(res.statusCode, 502);
+    assert.match(res.body.error, /No se pudo eliminar/);
+  });
+
+  await test("PUT/PATCH siguen sin permitirse (405) y Allow anuncia GET, DELETE", async () => {
+    for (const method of ["PUT", "PATCH"]) {
+      const { res } = await runDelete({ method, headers: ADMIN, query: { id: "1" } }, okRows([]));
+      assert.equal(res.statusCode, 405);
+      assert.equal(res.headers.Allow, "GET, DELETE");
+    }
+  });
+
   console.log(`\n${passed} passed, ${failed} failed`);
   if (failed > 0) process.exit(1);
 }

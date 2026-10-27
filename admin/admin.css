@@ -368,3 +368,34 @@ dialog#editDialog.editor-page::backdrop{background:#0b0b0b99}
 .view-head-row{display:flex;justify-content:space-between;align-items:center;gap:12px}
 .mobile-logout{display:none;border:1px solid var(--hair);background:var(--card);color:var(--ink-2);border-radius:999px;min-height:36px;padding:0 14px;font-weight:600;cursor:pointer}
 @media(max-width:720px){.mobile-logout{display:inline-flex;align-items:center}}
+
+/* Fase 53 — eliminar pedidos: acción por fila, confirmación y aviso. */
+.visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.order-delete{min-height:36px;padding:0 14px;border:1px solid #f0c2d6;border-radius:999px;background:#fff;color:#b0003a;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
+.order-delete:hover{background:#fff0f5;border-color:#b0003a}
+.order-delete:focus-visible{outline:2px solid #b0003a;outline-offset:2px}
+.button.danger{background:#b0003a;border-color:#b0003a;color:#fff}
+.button.danger:hover{background:#8f002f}
+.button:disabled{opacity:.55;cursor:not-allowed}
+dialog.confirm-dialog{width:min(460px,calc(100% - 32px))}
+.confirm-box{margin:0;padding:24px}
+.confirm-box h2{margin:0 0 10px;font-size:20px;line-height:1.25}
+.confirm-summary{margin:0 0 12px;color:var(--ink-2);font-weight:600}
+.confirm-warning{margin:0 0 18px;padding:10px 12px;border-left:3px solid #b0003a;background:#fff4f7;color:#5c1a30;font-size:13px;line-height:1.45}
+.confirm-actions{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap}
+.orders-notice{margin:0 0 14px;padding:10px 14px;border-radius:10px;background:#e6f8ee;color:#1a7f4c;font-weight:600}
+.orders-notice.is-error{background:#fff0f0;color:#b00020}
+
+/* Fase 53 — subcategoría controlada: «Otra» con justificación y marca
+   visible de revisión pendiente. */
+.pill-review{background:#fff1df;color:#8a4b00;border:1px solid #f3c98f}
+.sub-other{display:grid;gap:10px;margin:4px 0 6px;padding:12px 14px;border:1px dashed #f3c98f;border-radius:12px;background:#fffaf2}
+.review-hint{color:#8a4b00;font-weight:600}
+
+/* Fase 53 — corrección de la Fase 52: organizeEditorTabs mueve los campos
+   de .admin-accordion-body a .editor-section, y con eso perdían el estilo
+   de etiquetas y campos (quedaban en línea, sin borde). Mismas reglas. */
+.editor-section label{display:grid;gap:6px;font-size:12px;font-weight:700;color:#333}
+.editor-section input,.editor-section textarea,.editor-section select{border:1px solid #ddd;border-radius:8px;padding:9px 11px;font-size:13px;color:#111;background:#fff;font-weight:400}
+.editor-section textarea{min-height:60px;resize:vertical}
+.editor-section .checkbox-field,.edit-form .checkbox-field{display:flex;align-items:center;gap:8px;flex-direction:row}

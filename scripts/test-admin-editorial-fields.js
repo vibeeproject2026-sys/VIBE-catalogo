@@ -99,6 +99,11 @@ function mockFetchCapture() {
       calls.push(body);
       return { ok: true, status: 200, text: async () => JSON.stringify([{ product_id: body.product_id, ...body }]) };
     }
+    // Fase 53 — guardar solo la subcategoría lee la categoría ya guardada
+    // para validarla contra la lista controlada (lectura, nunca escritura).
+    if (url.includes("/rest/v1/catalog_metadata") && (opts.method || "GET") === "GET") {
+      return { ok: true, status: 200, text: async () => JSON.stringify([{ category: "Rostro", subcategory: null, additional_info: null }]) };
+    }
     throw new Error("URL inesperada en el mock: " + url);
   };
   return { fetchImpl, calls };

@@ -53,17 +53,33 @@ function groupOf(p) {
 
 // Fase 51 — subcategorías aprobadas por categoría editorial (Fase 20.2,
 // docs/fase20-curaduria-editorial-decisiones.md, con la fusión del punto
-// 6). Son SUGERENCIAS para el Admin: el campo sigue siendo texto libre y
-// nada se reclasifica automáticamente.
+// 6). Fase 53 — taxonomía v2: lista CONTROLADA en el Admin (se agregan
+// «Kits de rostro», «Sérums» y «Rizadores de pestañas»; «Pestañas» pasa a
+// «Máscara de pestañas» y «Pestañas (crecimiento)» a «Pestañas y cejas
+// (crecimiento)»). Nada se reclasifica automáticamente: un valor guardado
+// que no está en la lista se conserva tal cual (revisión pendiente) y
+// «Otra» exige justificación. Espejo del servidor:
+// api/_lib/subcategories.js (deben coincidir).
 export const SUBCATEGORIES_BY_CATEGORY = {
-  Rostro: ["Base y corrector", "Polvo y fijador", "Iluminador", "Rubor"],
-  Ojos: ["Sombras", "Delineado", "Pestañas", "Cejas", "Kits de ojos"],
+  Rostro: ["Base y corrector", "Polvo y fijador", "Iluminador", "Rubor", "Kits de rostro"],
+  Ojos: ["Sombras", "Delineado", "Máscara de pestañas", "Cejas", "Kits de ojos"],
   Labios: ["Labiales", "Gloss y oils", "Kits de labios"],
   Limpieza: ["Limpiadores", "Tónicos"],
-  Tratamiento: ["Cremas faciales", "Contorno de ojos", "Cuello y escote", "Pestañas (crecimiento)", "Papel matificante", "Mascarillas", "Kits"],
-  "Herramientas de aplicación": ["Brochas", "Esponjas"],
+  Tratamiento: ["Cremas faciales", "Sérums", "Contorno de ojos", "Cuello y escote", "Pestañas y cejas (crecimiento)", "Papel matificante", "Mascarillas", "Kits"],
+  "Herramientas de aplicación": ["Brochas", "Esponjas", "Rizadores de pestañas"],
   "Complementos de belleza": ["Accesorios para el cabello", "Cuidado personal"],
 };
+
+// Fase 53 — ¿la subcategoría está en la lista controlada de su categoría?
+export function isListedSubcategory(category, subcategory) {
+  return Boolean(SUBCATEGORIES_BY_CATEGORY[category] && SUBCATEGORIES_BY_CATEGORY[category].includes(subcategory));
+}
+
+// Fase 53 — una subcategoría fuera de la lista (valor histórico o «Otra»)
+// queda en revisión pendiente hasta que la administradora decida.
+export function needsClassificationReview(p) {
+  return Boolean(p && p.subcategory && !isListedSubcategory(p.editorialCategory, p.subcategory));
+}
 
 // Sugerencias de subcategoría para una categoría editorial; sin
 // categoría (o con una desconocida), todas.

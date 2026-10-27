@@ -89,6 +89,7 @@
         <button type="button" class="chip" data-status="unpublished">No publicados</button>
         <button type="button" class="chip" data-status="with_ficha">Con ficha</button>
         <button type="button" class="chip" data-status="unclassified">Sin categoría VIBE</button>
+        <button type="button" class="chip" data-status="review">Revisión pendiente</button>
         <button type="button" class="chip" data-status="unavailable">Agotados</button>
       </div>
       <p class="result-line"><span id="resultCount" class="result-count"></span></p>
@@ -138,21 +139,25 @@
       </div>
     </main>
 
-    <!-- Fase 39 — solo lectura: los pedidos entrantes, sin acciones ni
-         edición de estado. VIBE contacta manualmente por WhatsApp. -->
+    <!-- Fase 39 — pedidos entrantes, sin edición de estado: VIBE contacta
+         manualmente por WhatsApp. Fase 53 — cada pedido se puede eliminar
+         (cualquier estado), siempre tras confirmar. -->
     <main id="ordersApp" class="admin-main view-panel hidden" data-view-panel="orders">
       <header class="view-head">
         <p class="eyebrow">Pedidos</p>
         <h1>Pedidos recibidos</h1>
-        <p class="view-sub">Más reciente primero. Sin edición de estado: VIBE contacta manualmente por WhatsApp Business usando el número del cliente.</p>
+        <p class="view-sub">Más reciente primero. Sin edición de estado: VIBE contacta manualmente por WhatsApp Business usando el número del cliente. Eliminar un pedido no modifica productos, inventario ni fichas.</p>
       </header>
 
+      <p class="result-line"><span id="ordersCount" class="result-count"></span></p>
+      <p id="ordersNotice" class="orders-notice hidden" role="status" aria-live="polite"></p>
       <p id="ordersLoadError" class="login-error hidden"></p>
 
       <div class="table-wrap">
         <table class="admin-table">
           <thead>
             <tr>
+              <th>Nº</th>
               <th>Fecha</th>
               <th>Cliente</th>
               <th>WhatsApp</th>
@@ -161,6 +166,7 @@
               <th>Total</th>
               <th>Estado</th>
               <th>Email enviado</th>
+              <th><span class="visually-hidden">Acciones</span></th>
             </tr>
           </thead>
           <tbody id="ordersRows"></tbody>
@@ -174,6 +180,21 @@
 <dialog id="editDialog" class="editor-page" aria-label="Editor de producto">
   <button id="closeEdit" type="button" class="editor-back" aria-label="Volver a Productos">← Productos</button>
   <div id="editContent"></div>
+</dialog>
+
+<!-- Fase 53 — confirmación de eliminación de un pedido. Cancelar (o Esc)
+     cierra sin tocar ningún dato. -->
+<dialog id="orderDeleteDialog" class="confirm-dialog" aria-labelledby="orderDeleteTitle">
+  <form method="dialog" class="confirm-box">
+    <h2 id="orderDeleteTitle">¿Eliminar el pedido <span id="orderDeleteNumber"></span>?</h2>
+    <p id="orderDeleteSummary" class="confirm-summary"></p>
+    <p class="confirm-warning">Esta acción es permanente: el pedido se borra de la base de datos y no se puede recuperar. No modifica productos, inventario ni fichas.</p>
+    <p id="orderDeleteError" class="login-error hidden" role="alert"></p>
+    <div class="confirm-actions">
+      <button type="submit" value="cancel" id="orderDeleteCancel" class="button">Cancelar</button>
+      <button type="button" id="orderDeleteConfirm" class="button danger">Eliminar pedido</button>
+    </div>
+  </form>
 </dialog>
 
 <dialog id="heroEditDialog">

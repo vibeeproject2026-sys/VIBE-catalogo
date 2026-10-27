@@ -66,6 +66,9 @@ const STRING_FIELDS = [
   "usageOccasion",
   // Imágenes
   "mainImageAlt",
+  // Fase 53 — clasificación: justificación de una subcategoría «Otra»
+  // (fuera de la lista controlada). Nota interna, nunca pública.
+  "subcategoryOtherReason",
 ];
 
 // Multivalor — sección 8: "uno por línea" en Admin, arreglo en el dato
@@ -73,6 +76,13 @@ const STRING_FIELDS = [
 const ARRAY_FIELDS = ["highlightedIngredients", "claims", "certifications"];
 
 const ALL_FIELDS = [...STRING_FIELDS, ...ARRAY_FIELDS];
+
+// Fase 53 — campos de uso interno del Admin: se guardan y el Admin los
+// lee, pero la API pública nunca los expone (publicDetails). Los dos de
+// merchandising ya se presentaban en el Admin como «nota interna — no se
+// muestra en el catálogo público»; ahora tampoco viajan en el JSON.
+const INTERNAL_FIELDS = ["commercialAngle", "usageOccasion", "subcategoryOtherReason"];
+const PUBLIC_FIELDS = ALL_FIELDS.filter((k) => !INTERNAL_FIELDS.includes(k));
 
 function emptyDetails() {
   const out = {};
@@ -123,10 +133,21 @@ function serializeDetails(input) {
   return hasContent ? JSON.stringify(sanitized) : null;
 }
 
+// Solo los campos públicos, para la API del catálogo.
+function publicDetails(raw) {
+  const all = parseDetails(raw);
+  const out = {};
+  for (const k of PUBLIC_FIELDS) out[k] = all[k];
+  return out;
+}
+
 module.exports = {
   STRING_FIELDS,
   ARRAY_FIELDS,
   ALL_FIELDS,
+  INTERNAL_FIELDS,
+  PUBLIC_FIELDS,
+  publicDetails,
   emptyDetails,
   sanitizeDetails,
   parseDetails,
