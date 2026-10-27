@@ -330,26 +330,27 @@ function goToFilter(overrides) {
 // producto VIBE para estas categorías, reemplaza automáticamente a la
 // editorial (misma lógica de "primero lo real" que ya rige Rostro/
 // Labios). Nunca repite el wordmark "VIBE" encima de cada tile.
-const DISCOVER_EDITORIAL_FALLBACK = {
-  Ojos: "assets/discover/ojos.jpg",
-  Skincare: "assets/discover/skincare.jpg",
-  Accesorios: "assets/discover/accesorios.jpg",
-};
+//
+// Fase 44 — reemplaza todo lo anterior sobre la FOTO: cada tarjeta usa
+// una imagen editorial propia de VIBE, fija y asignada explícitamente
+// a su categoría (assets/discover/vibe-category-*.webp, ver
+// assets/discover/CREDITS.md). Ya no depende de productos, fotos de
+// producto, publicación ni inventario, así que nunca cambia cuando
+// cambia el catálogo. Dos anchos (640w / 1122w original) vía srcset.
+// Destinos (group/category) sin cambios.
 const DISCOVER_VIBE_TILES = [
-  { label: "Rostro", group: "Maquillaje", category: "Rostro" },
-  { label: "Labios", group: "Maquillaje", category: "Labios" },
-  { label: "Ojos", group: "Maquillaje", category: "Ojos" },
-  { label: "Skincare", group: "Skincare", category: "Skincare" },
-  { label: "Accesorios", group: "Accesorios", category: "Otro" },
+  { label: "Rostro", group: "Maquillaje", category: "Rostro", image: "vibe-category-rostro" },
+  { label: "Labios", group: "Maquillaje", category: "Labios", image: "vibe-category-labios" },
+  { label: "Ojos", group: "Maquillaje", category: "Ojos", image: "vibe-category-ojos" },
+  { label: "Skincare", group: "Skincare", category: "Skincare", image: "vibe-category-skincare" },
+  { label: "Accesorios", group: "Accesorios", category: "Otro", image: "vibe-category-accesorios" },
 ];
 
 function renderDiscoverVibe() {
-  $("#discoverVibeGrid").innerHTML = DISCOVER_VIBE_TILES.map(({ label, group, category }) => {
-    const inCategory = state.products.filter((p) => (p.editorialCategory || p.category) === category);
-    const withPhoto = inCategory.find((p) => p.image);
+  $("#discoverVibeGrid").innerHTML = DISCOVER_VIBE_TILES.map(({ label, group, category, image }) => {
     const slugClass = `discover-tile-${label.toLowerCase()}`;
-    const src = withPhoto ? withPhoto.image : DISCOVER_EDITORIAL_FALLBACK[label];
-    const imageHtml = src ? `<img class="discover-tile-photo" src="${esc(src)}" alt="${esc(label)}" loading="lazy">` : "";
+    const base = `assets/discover/${image}`;
+    const imageHtml = `<img class="discover-tile-photo" src="${base}.webp" srcset="${base}-640.webp 640w, ${base}.webp 1122w" sizes="(max-width: 900px) 265px, 25vw" width="1122" height="1402" alt="${esc(label)}" loading="lazy" decoding="async">`;
     return `<button class="discover-tile ${slugClass}" data-group="${esc(group)}" data-category="${esc(category)}">
       ${imageHtml}
       <span class="discover-tile-scrim"></span>

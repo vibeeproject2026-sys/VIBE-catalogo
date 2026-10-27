@@ -226,6 +226,16 @@ header.scrolled .logo-image{width:114px}
 @media(prefers-reduced-motion:reduce){.discover-tile{transition:none}.discover-tile:hover{transform:none}}
 .discover-tile-photo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;transition:transform .35s ease}
 .discover-tile:hover .discover-tile-photo{transform:scale(1.04)}
+/* Fase 44 — encuadre de las imágenes editoriales fijas (4:5). Las
+   tarjetas son más angostas (~2:3 desktop, ~3:4 mobile), así que solo
+   se recortan los costados (siempre ≥83% del ancho visible, alto
+   completo): se desplaza el recorte hacia donde está el sujeto para
+   no cortar rostro, mano ni herramientas. */
+.discover-tile-rostro .discover-tile-photo{object-position:70% 50%}
+.discover-tile-labios .discover-tile-photo{object-position:62% 50%}
+.discover-tile-ojos .discover-tile-photo{object-position:60% 50%}
+.discover-tile-skincare .discover-tile-photo{object-position:65% 50%}
+.discover-tile-accesorios .discover-tile-photo{object-position:62% 50%}
 @media(prefers-reduced-motion:reduce){.discover-tile-photo{transition:none}.discover-tile:hover .discover-tile-photo{transform:none}}
 .discover-tile-scrim{position:absolute;inset:0;background:linear-gradient(0deg,#000000d9 0%,#00000000 55%)}
 .discover-tile-body{position:absolute;left:0;right:0;bottom:0;padding:20px 22px;color:#fff}

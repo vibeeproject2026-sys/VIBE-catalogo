@@ -1,26 +1,29 @@
-# Fotografías editoriales — sección "Descubre tu VIBE"
+# Imágenes editoriales — sección "Descubre tu VIBE"
 
-Usadas en las tiles de categoría que no tienen foto real de producto
-VIBE (Ojos, Skincare, Accesorios — Rostro y Labios usan foto real de
-producto, ver `js/app.js#renderDiscoverVibe`). Ninguna representa un
-producto VIBE ni de ninguna otra marca — son fotografía editorial
-genérica de belleza, elegida solo para ilustrar la categoría.
+Fase 44 — imágenes editoriales definitivas de VIBE para las cinco
+tarjetas de categoría, entregadas por VIBE como assets propios de la
+marca. Son fijas: cada una está asignada explícitamente a su categoría
+en `js/app.js` (`DISCOVER_VIBE_TILES`) y no depende de productos,
+fotos de producto, publicación ni inventario.
 
-Las tres son de [Unsplash](https://unsplash.com), bajo la
-[Unsplash License](https://unsplash.com/license): uso comercial y no
-comercial permitido, sin necesidad de atribución. Se documenta la
-atribución de todas formas, como buena práctica.
+| Archivo | Categoría | Destino de la tarjeta |
+|---|---|---|
+| `vibe-category-rostro.webp` | Rostro | Maquillaje → Rostro |
+| `vibe-category-labios.webp` | Labios | Maquillaje → Labios |
+| `vibe-category-ojos.webp` | Ojos | Maquillaje → Ojos |
+| `vibe-category-skincare.webp` | Skincare | Skincare |
+| `vibe-category-accesorios.webp` | Accesorios | Accesorios (categoría POS "Otro") |
 
-| Archivo | Categoría | Fotógrafo/a | Fuente | Licencia |
-|---|---|---|---|---|
-| `ojos.jpg` | Ojos | Linh Ha ([@lintin9095](https://unsplash.com/@lintin9095)) | [unsplash.com/photos/nt6KRD9im7A](https://unsplash.com/photos/a-close-up-of-a-womans-eye-with-makeup-nt6KRD9im7A) | Unsplash License |
-| `skincare.jpg` | Skincare | ibnu ihza ([@mahendra_10](https://unsplash.com/@mahendra_10)) | [unsplash.com/photos/g6q3lFAe3kA](https://unsplash.com/photos/skincare-products-with-leaves-on-a-light-background-g6q3lFAe3kA) | Unsplash License |
-| `accesorios.jpg` | Accesorios | freestocks ([@freestocks](https://unsplash.com/@freestocks)) | [unsplash.com/photos/JfJjQgXpXeM](https://unsplash.com/photos/assorted-makeup-brushes-JfJjQgXpXeM) | Unsplash License |
+Formato: WebP (calidad 82) generado desde los PNG originales de
+1122×1402 (4:5), en dos anchos servidos vía `srcset`:
 
-Descargadas directamente a `assets/discover/` (nunca hotlinked) a
-1200px de ancho, formato JPEG, calidad 80 — tamaño razonable para uso
-web sin perder nitidez en las tiles de la sección.
+- `vibe-category-<categoría>.webp` — 1122×1402, ancho original sin
+  ampliar (pantallas 2×/3×).
+- `vibe-category-<categoría>-640.webp` — 640×800 (pantallas 1×).
 
-Si en el futuro VIBE cuenta con fotografía real propia para estas
-categorías, estas imágenes deben reemplazarse por esa fotografía real
-siguiendo el mismo criterio ya aplicado a Rostro/Labios.
+El encuadre dentro de la tarjeta se ajusta por categoría con
+`object-position` en `css/styles.css` (`.discover-tile-<categoría>`).
+
+Reemplazan a las tres fotografías genéricas de Unsplash usadas en
+Fase 42.8 (`ojos.jpg`, `skincare.jpg`, `accesorios.jpg`), que se
+retiraron del proyecto.
