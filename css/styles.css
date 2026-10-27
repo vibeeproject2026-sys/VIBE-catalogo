@@ -89,11 +89,6 @@ header.scrolled .logo-image{width:114px}
 .mobile-nav a.nav-active{color:var(--pink);border-left:3px solid var(--pink);padding-left:17px}
 @media(prefers-reduced-motion:reduce){.mobile-nav a{transition:none}}
 .mobile-nav a:last-child{border-bottom:0}
-/* Fase 41 — submenú Maquillaje → Rostro/Ojos/Labios: mismo link de
-   mobile-nav, con indentación + tipografía más chica para leerse como
-   subcategoría anidada, no como un mundo de nivel 1. */
-.mobile-nav a.mobile-nav-sub{padding-left:36px;font-size:13px;font-weight:600;color:#aaa}
-.mobile-nav a.mobile-nav-sub.nav-active{padding-left:33px}
 
 .hero{padding:56px 0 72px;overflow:hidden;background:radial-gradient(circle at 80% 45%,#430020 0,#050505 46%)}
 /* Fase 35.3 — bug/pedido reportado: la pieza ya se mostraba completa
@@ -789,7 +784,7 @@ footer .wrap.footer-grid{display:grid;grid-template-columns:1.1fr 1fr 1.3fr;gap:
 .faq{background:#fff;color:#111;padding:80px 0}
 /* El header es sticky: al llegar por ancla (#ayuda desde el footer,
    #contacto desde la FAQ) el inicio de la sección no queda debajo. */
-#ayuda,#contacto{scroll-margin-top:80px}
+#ayuda,#contacto,#discoverVibe,#ofertas{scroll-margin-top:80px}
 .faq .eyebrow{color:var(--pink)}
 .faq-list{max-width:860px;border-top:1px solid #e6e6e6}
 .faq-item{border-bottom:1px solid #e6e6e6}
@@ -816,4 +811,17 @@ footer .wrap.footer-grid{display:grid;grid-template-columns:1.1fr 1fr 1.3fr;gap:
   .faq{padding:56px 0}
   .faq-q{font-size:15px}
   footer .wrap.footer-grid{grid-template-columns:1fr;gap:24px}
+}
+
+/* Fase 46 — estado vacío del catálogo (categoría sin productos
+   publicados, Novedades/Más elegidos sin selección, filtros sin
+   coincidencias): mensaje breve + salidas claras, nunca un error. */
+.empty-state{max-width:520px;margin:8px auto 0;padding:48px 24px;border:1px dashed #e2e2e2;border-radius:var(--radius);background:#fafafa}
+.empty-state .empty-title{margin:0 0 8px;color:#111;font-size:22px;font-weight:800;letter-spacing:-.02em}
+.empty-state .empty-message{margin:0 auto 22px;max-width:40ch;color:#666;font-size:14px;line-height:1.55}
+.empty-actions{display:flex;justify-content:center;gap:10px;flex-wrap:wrap}
+.empty-actions .button{min-height:46px}
+@media(max-width:640px){
+  .empty-state{padding:36px 18px}
+  .empty-actions .button{width:100%}
 }

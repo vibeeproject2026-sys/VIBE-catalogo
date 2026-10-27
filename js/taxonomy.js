@@ -9,8 +9,49 @@
 
 const collator = (a, b) => a.localeCompare(b, "es");
 
+// Taxonomía editorial VIBE aprobada en Fase 20.2 (docs/fase20-curaduria-
+// editorial-decisiones.md): 3 grupos, 7 categorías. Fase 46 — antes vivía
+// solo en admin/admin.js (opciones del selector de categoría); ahora es
+// la única fuente para Admin y catálogo público, así ambos clasifican
+// igual. Admin la importa desde aquí.
+export const VIBE_CATEGORY_GROUPS = [
+  { group: "Maquillaje", categories: ["Rostro", "Ojos", "Labios"] },
+  { group: "Skincare", categories: ["Limpieza", "Tratamiento"] },
+  { group: "Accesorios", categories: ["Herramientas de aplicación", "Complementos de belleza"] },
+];
+const EDITORIAL_GROUP_BY_CATEGORY = Object.fromEntries(
+  VIBE_CATEGORY_GROUPS.flatMap(({ group, categories }) => categories.map((c) => [c, group]))
+);
+export const EDITORIAL_GROUPS = VIBE_CATEGORY_GROUPS.map((g) => g.group);
+
+// Grupo que el servidor asigna a la categoría POS "Otro" y a cualquier
+// categoría POS sin mapear (api/catalog/_lib/categoryGroups.js,
+// DEFAULT_GROUP). Es un cajón de sastre, no una clasificación real.
+const POS_CATCH_ALL_GROUP = "Accesorios";
+
+// Fase 46 — grupo editorial de un producto:
+// 1. Si tiene categoría editorial de la taxonomía VIBE (asignada en
+//    Admin), su grupo manda — igual que categoryOf() ya prioriza la
+//    categoría editorial sobre la del POS.
+// 2. Si no, se usa el grupo derivado del POS (Labios/Rostro/Ojos/Uñas →
+//    Maquillaje, Skincare → Skincare)...
+// 3. ...salvo el cajón de sastre "Otro"/sin mapear: un producto así NO
+//    entra a Accesorios por suposición; queda sin grupo (sigue visible en
+//    "Todos" y en la búsqueda) hasta que se le asigne una categoría de
+//    Accesorios en Admin. Esto era la causa de que la tarjeta Accesorios
+//    filtrara por la categoría POS "Otro" en vez de por la editorial.
 function groupOf(p) {
-  return p.categoryGroup || p.category;
+  const editorialGroup = EDITORIAL_GROUP_BY_CATEGORY[p.editorialCategory];
+  if (editorialGroup) return editorialGroup;
+  const posGroup = p.categoryGroup || p.category || null;
+  return posGroup === POS_CATCH_ALL_GROUP ? null : posGroup;
+}
+
+// Fase 46 — "Novedades" se activa con el badge editorial "Nuevo" desde
+// Admin. El campo es texto libre (la ayuda de Admin sugería "NUEVO"), así
+// que se compara sin distinguir mayúsculas ni espacios.
+export function isNewBadge(p) {
+  return String(p.badge ?? "").trim().toLowerCase() === "nuevo";
 }
 
 // Nivel 2 de la taxonomía (Fase 20/22B): prefiere la categoría editorial
@@ -25,7 +66,7 @@ function categoryOf(p) {
 }
 
 export function getGroups(products) {
-  return [...new Set(products.map(groupOf))].sort(collator);
+  return [...new Set(products.map(groupOf).filter(Boolean))].sort(collator);
 }
 
 export function getCategoriesInGroup(products, group) {
@@ -54,7 +95,7 @@ export function filterProducts(products, { group, category, subcategory, search,
     if (available === true && p.available === false) return false;
     if (promo === true && p.promoActive !== true) return false;
     if (featuredOnly === true && p.featured !== true) return false;
-    if (newOnly === true && p.badge !== "Nuevo") return false;
+    if (newOnly === true && !isNewBadge(p)) return false;
     if (brand && p.brand !== brand) return false;
     if (q) {
       // Fase 36 — brand ya estaba en el shape del producto pero nunca se
@@ -110,7 +151,7 @@ export function selectFeatured(products) {
 // ningún producto con ese badge, la lista queda vacía — nunca se inventa
 // una novedad.
 export function selectNew(products) {
-  return products.filter((p) => p.badge === "Nuevo" && isAvailable(p)).sort(byEditorialOrderThenName);
+  return products.filter((p) => isNewBadge(p) && isAvailable(p)).sort(byEditorialOrderThenName);
 }
 
 // Fase 26 — "Promociones": único criterio, promoActive === true, ya
@@ -169,8 +210,8 @@ export function sortProducts(products, sortKey) {
       return list.sort((a, b) => effectivePrice(b) - effectivePrice(a));
     case "new":
       return list.sort((a, b) => {
-        const an = a.badge === "Nuevo";
-        const bn = b.badge === "Nuevo";
+        const an = isNewBadge(a);
+        const bn = isNewBadge(b);
         if (an !== bn) return an ? -1 : 1;
         return byEditorialOrderThenName(a, b);
       });
@@ -181,15 +222,42 @@ export function sortProducts(products, sortKey) {
   }
 }
 
-// Fase 27 — copy de estado vacío, distinto según la causa real (nunca un
-// único mensaje genérico para todo): búsqueda sin resultados, filtros sin
-// resultados, o simplemente una categoría todavía sin curar.
-export function emptyStateCopy(state = {}) {
-  if (state.search) return `No encontramos productos para "${state.search}". Intenta con otra palabra.`;
-  if (state.available || state.promo || state.featuredOnly || state.newOnly || state.brand) {
-    return "No hay productos que coincidan con estos filtros. Prueba ajustándolos.";
+// Fase 46 — estado vacío diseñado (título + mensaje); app.js agrega las
+// acciones "Ver todo el catálogo" / "Ver categorías". Nunca suena a error
+// técnico ni promete fechas: solo dice que la selección se está
+// preparando.
+export function emptyStateContent(state = {}) {
+  if (state.search) {
+    return { title: "Sin resultados", message: `No encontramos productos para "${state.search}". Intenta con otra palabra.` };
   }
-  return "Estamos preparando algo especial para ti.";
+  const onlyNew = state.newOnly && !state.featuredOnly && !state.available && !state.promo && !state.brand;
+  const onlyFeatured = state.featuredOnly && !state.newOnly && !state.available && !state.promo && !state.brand;
+  if (onlyNew) return { title: "Muy pronto, novedades", message: "Estamos preparando las próximas novedades VIBE. Mientras tanto, descubre el catálogo." };
+  if (onlyFeatured) return { title: "Muy pronto, los más elegidos", message: "Estamos seleccionando los favoritos de VIBE. Mientras tanto, descubre el catálogo." };
+  if (state.newOnly || state.featuredOnly || state.available || state.promo || state.brand) {
+    return { title: "Sin coincidencias", message: "No hay productos que coincidan con estos filtros. Prueba ajustándolos." };
+  }
+  const label = [state.subcategory, state.category, state.group].find((v) => v && v !== "Todos");
+  if (label) {
+    return { title: "Estamos preparando esta selección", message: `Pronto encontrarás productos de ${label} en VIBE. Mientras tanto, explora otras categorías.` };
+  }
+  return { title: "Estamos preparando algo especial", message: "Muy pronto encontrarás aquí nuestros productos." };
+}
+
+// Fase 46 — evita combinaciones contradictorias (p. ej. Accesorios + la
+// categoría POS "Otro", o un enlace viejo/compartido con una categoría que
+// ya no existe en ese grupo). Cada nivel inválido vuelve a "Todos":
+// - grupo: debe ser un grupo editorial VIBE o uno presente en el catálogo
+//   (un grupo editorial sin productos se conserva, para mostrar su estado
+//   vacío en vez de saltar en silencio al catálogo completo);
+// - categoría: debe existir en ese grupo;
+// - subcategoría: debe existir en ese grupo/categoría.
+export function normalizeSelection(products, { group = "Todos", category = "Todos", subcategory = "Todos" } = {}) {
+  const groups = getGroups(products);
+  const g = group === "Todos" || EDITORIAL_GROUPS.includes(group) || groups.includes(group) ? group : "Todos";
+  const c = category === "Todos" || getCategoriesInGroup(products, g).includes(category) ? category : "Todos";
+  const s = subcategory === "Todos" || getSubcategories(products, g, c).includes(subcategory) ? subcategory : "Todos";
+  return { group: g, category: c, subcategory: s };
 }
 
 // Fase 27 — chips de filtros activos, para que el estado sea siempre
@@ -202,7 +270,7 @@ export function activeFilterChips(state = {}) {
   if (state.subcategory && state.subcategory !== "Todos") chips.push({ key: "subcategory", label: state.subcategory });
   if (state.available) chips.push({ key: "available", label: "Disponibles" });
   if (state.promo) chips.push({ key: "promo", label: "Promoción" });
-  if (state.featuredOnly) chips.push({ key: "featuredOnly", label: "Destacados" });
+  if (state.featuredOnly) chips.push({ key: "featuredOnly", label: "Más elegidos" });
   if (state.newOnly) chips.push({ key: "newOnly", label: "Novedades" });
   if (state.brand) chips.push({ key: "brand", label: state.brand });
   if (state.search) chips.push({ key: "search", label: `"${state.search}"` });

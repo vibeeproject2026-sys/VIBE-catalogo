@@ -16,7 +16,7 @@
 // sent anywhere except as the Authorization header on /api/admin/*
 // requests.
 
-import { getCategoriesInGroup, getSubcategories } from "../js/taxonomy.js";
+import { getCategoriesInGroup, getSubcategories, VIBE_CATEGORY_GROUPS } from "../js/taxonomy.js";
 import { SECTION_DESTINATIONS, describeSlideDestination } from "../js/hero-links.js";
 
 const TOKEN_KEY = "vibe_admin_token";
@@ -125,15 +125,11 @@ async function deleteSecondaryImage(productId, url, statusEl) {
   return payload;
 }
 
-// Taxonomía VIBE aprobada en Fase 20.2 (docs/fase20-curaduria-editorial-decisiones.md):
-// 3 grupos, 7 categorías. Se ofrecen aquí como opciones de selección
-// manual — nunca se asignan automáticamente. "Sin categoría" siempre
-// disponible; la administradora puede dejarlo vacío si no lo sabe.
-const VIBE_CATEGORY_GROUPS = [
-  { group: "Maquillaje", categories: ["Rostro", "Ojos", "Labios"] },
-  { group: "Skincare", categories: ["Limpieza", "Tratamiento"] },
-  { group: "Accesorios", categories: ["Herramientas de aplicación", "Complementos de belleza"] },
-];
+// Taxonomía VIBE aprobada en Fase 20.2 (VIBE_CATEGORY_GROUPS, importada de
+// js/taxonomy.js desde Fase 46 — la misma que usa el catálogo público
+// para agrupar). Se ofrecen aquí como opciones de selección manual —
+// nunca se asignan automáticamente. "Sin categoría" siempre disponible;
+// la administradora puede dejarlo vacío si no lo sabe.
 
 // Subcategorías propuestas en la Fase 20 — ofrecidas como sugerencias en
 // un <datalist>, nunca forzadas: el campo sigue siendo texto libre, así
@@ -540,10 +536,10 @@ async function openEdit(productId) {
       <summary>11. Merchandising VIBE</summary>
       <div class="admin-accordion-body">
         <div class="edit-row">
-          ${textField("badge", "Badge", m.badge, "Ej. NUEVO, VIBE PICK... déjalo vacío si no aplica.")}
+          ${textField("badge", "Badge", m.badge, "Escribe «Nuevo» para que aparezca en Novedades. Otros textos (ej. VIBE PICK) solo se muestran como etiqueta. Déjalo vacío si no aplica.")}
           <label>Orden editorial<input type="number" name="editorial_order" value="${m.editorial_order ?? ""}" placeholder="Déjalo vacío si no aplica."></label>
         </div>
-        <label class="checkbox-field"><input type="checkbox" name="featured" ${m.featured ? "checked" : ""}> Producto destacado</label>
+        <label class="checkbox-field"><input type="checkbox" name="featured" ${m.featured ? "checked" : ""}> Producto destacado (aparece en «Más elegidos»)</label>
         ${textareaField("search_keywords", "Palabras clave (una por línea)", "Una palabra o frase clave por línea.", 3)}
         ${textField("commercial_angle", "Ángulo comercial VIBE", d.commercialAngle, "Nota interna de merchandising — no se muestra en el catálogo público.")}
         ${textField("usage_occasion", "Momento / ocasión de uso", d.usageOccasion, "Nota interna de merchandising — no se muestra en el catálogo público.")}

@@ -8,7 +8,8 @@ import {
   breadcrumbForState,
   selectPromotions,
   sortProducts,
-  emptyStateCopy,
+  emptyStateContent,
+  normalizeSelection,
   activeFilterChips,
   findProduct,
   pdpPriceInfo,
@@ -67,21 +68,24 @@ function tabButton(label, active, dataAttr) {
 // efectivamente seleccionada (mundo/Novedades/Promociones) queda con
 // una marca persistente (.nav-active, ver CSS) mientras siga aplicada,
 // sin depender de que el mouse esté encima.
+// Fase 46 — el menú superior ya no repite las categorías de "Descubre tu
+// VIBE": Novedades y Más elegidos son vistas filtradas del catálogo y
+// quedan marcadas mientras su filtro siga aplicado.
 function updateHeaderNavActive() {
-  // Fase 41 — el submenú mobile de Maquillaje (Rostro/Ojos/Labios,
-  // mismo data-group="Maquillaje" + un data-category propio) no debe
-  // marcarse activo solo por group — necesita que category también
-  // coincida, para no iluminar "Rostro" cuando en realidad se filtró
-  // por Maquillaje sin subcategoría (o por otra subcategoría).
-  document.querySelectorAll(".nav-links a[data-group], #mobileNav a[data-group]").forEach((a) => {
-    const matchesGroup = state.group !== "Todos" && a.dataset.group === state.group;
-    const matchesCategory = !a.dataset.category || a.dataset.category === state.category;
-    a.classList.toggle("nav-active", matchesGroup && matchesCategory);
-  });
   document.querySelectorAll("#navNovedades, #mobileNavNovedades").forEach((a) => a.classList.toggle("nav-active", state.newOnly === true));
+  document.querySelectorAll("#navElegidos, #mobileNavElegidos").forEach((a) => a.classList.toggle("nav-active", state.featuredOnly === true));
 }
 
 function renderNav() {
+  // Fase 46 — nunca renderizar una combinación contradictoria de
+  // grupo/categoría/subcategoría (ver normalizeSelection en taxonomy.js).
+  if (state.products.length) {
+    const normalized = normalizeSelection(state.products, state);
+    if (normalized.group !== state.group || normalized.category !== state.category || normalized.subcategory !== state.subcategory) {
+      Object.assign(state, normalized);
+      syncUrl();
+    }
+  }
   const groups = ["Todos", ...getGroups(state.products)];
   $("#groupTabs").innerHTML = groups.map(g => tabButton(g, state.group === g, "group")).join("");
   updateHeaderNavActive();
@@ -147,8 +151,28 @@ function productCard(p) {
   </article>`;
 }
 
+// Fase 46 — Novedades y Más elegidos (menú superior) son vistas del
+// catálogo con título propio, para que se lean como destinos distintos.
+const CURATED_HEADINGS = {
+  newOnly: { title: "Novedades", subtitle: "Lo nuevo en VIBE, seleccionado por nuestro equipo." },
+  featuredOnly: { title: "Más elegidos", subtitle: "Los favoritos que VIBE recomienda." },
+};
+
+function curatedViewKey() {
+  if (state.group !== "Todos" || state.search) return null;
+  if (state.newOnly && !state.featuredOnly) return "newOnly";
+  if (state.featuredOnly && !state.newOnly) return "featuredOnly";
+  return null;
+}
+
 function renderCatalogHeading() {
   const isAll = state.group === "Todos";
+  const curated = curatedViewKey();
+  if (curated) {
+    $("#catalogTitle").textContent = CURATED_HEADINGS[curated].title;
+    $("#catalogSubtitle").textContent = CURATED_HEADINGS[curated].subtitle;
+    return;
+  }
   $("#catalogTitle").textContent = isAll ? "Catálogo" : state.group;
   // Sin descripción editorial por categoría en el modelo de datos actual
   // (ver docs/fase27-plp.md) — se muestra la intro general solo en "Todos"
@@ -210,7 +234,15 @@ function renderProducts() {
 
   const isEmpty = list.length === 0;
   $("#emptyState").classList.toggle("hidden", !isEmpty);
-  if (isEmpty) $("#emptyState").textContent = emptyStateCopy(state);
+  if (isEmpty) {
+    const { title, message } = emptyStateContent(state);
+    $("#emptyState").innerHTML = `<p class="empty-title">${esc(title)}</p>
+      <p class="empty-message">${esc(message)}</p>
+      <div class="empty-actions">
+        <button type="button" class="button dark" data-empty-action="all">Ver todo el catálogo</button>
+        <a class="button outline" href="#discoverVibe">Ver categorías</a>
+      </div>`;
+  }
 
   // Estado E (sección 17): la lista tiene resultados pero ninguno está
   // disponible — se avisa sin ocultar el grid (siguen siendo productos
@@ -342,8 +374,12 @@ const DISCOVER_VIBE_TILES = [
   { label: "Rostro", group: "Maquillaje", category: "Rostro", image: "vibe-category-rostro" },
   { label: "Labios", group: "Maquillaje", category: "Labios", image: "vibe-category-labios" },
   { label: "Ojos", group: "Maquillaje", category: "Ojos", image: "vibe-category-ojos" },
-  { label: "Skincare", group: "Skincare", category: "Skincare", image: "vibe-category-skincare" },
-  { label: "Accesorios", group: "Accesorios", category: "Otro", image: "vibe-category-accesorios" },
+  // Fase 46 — Skincare y Accesorios son grupos editoriales completos: se
+  // filtra solo por grupo. Antes forzaban la categoría POS ("Skincare" /
+  // "Otro"), que nunca coincide con la categoría editorial asignada en
+  // Admin (Limpieza, Herramientas de aplicación...) → 0 productos.
+  { label: "Skincare", group: "Skincare", image: "vibe-category-skincare" },
+  { label: "Accesorios", group: "Accesorios", image: "vibe-category-accesorios" },
 ];
 
 function renderDiscoverVibe() {
@@ -351,7 +387,8 @@ function renderDiscoverVibe() {
     const slugClass = `discover-tile-${label.toLowerCase()}`;
     const base = `assets/discover/${image}`;
     const imageHtml = `<img class="discover-tile-photo" src="${base}.webp" srcset="${base}-640.webp 640w, ${base}.webp 1122w" sizes="(max-width: 900px) 265px, 25vw" width="1122" height="1402" alt="${esc(label)}" loading="lazy" decoding="async">`;
-    return `<button class="discover-tile ${slugClass}" data-group="${esc(group)}" data-category="${esc(category)}">
+    const categoryAttr = category ? ` data-category="${esc(category)}"` : "";
+    return `<button class="discover-tile ${slugClass}" data-group="${esc(group)}"${categoryAttr}>
       ${imageHtml}
       <span class="discover-tile-scrim"></span>
       <span class="discover-tile-body">
@@ -796,11 +833,9 @@ $("#subcategoryTabs").addEventListener("click", e => {
   applyFiltersAndRender();
 });
 
-// Fase 41 — el submenú mobile de Maquillaje (Rostro/Ojos/Labios) pasa
-// también un data-category, además del data-group ya existente —
-// goToFilter ya soporta category como filtro independiente (misma
-// lógica que ya usa el panel Filter&Sort), así que esto reusa 100% de
-// lo existente, solo agrega el segundo atributo al click handler.
+// Navegación por grupo/categoría desde las tarjetas de "Descubre tu VIBE"
+// (data-group + data-category opcional). Fase 46 — el menú superior ya no
+// tiene enlaces por categoría, así que solo se enlaza esa sección.
 function bindWorldNav(selector) {
   const el = document.querySelector(selector);
   if (!el) return;
@@ -811,8 +846,6 @@ function bindWorldNav(selector) {
     goToFilter({ group: b.dataset.group, category: b.dataset.category || "Todos" });
   });
 }
-bindWorldNav(".nav-links");
-bindWorldNav("#mobileNav");
 bindWorldNav("#discoverVibeGrid");
 
 // Fase 42.8 — flechas de "Descubre tu VIBE": desplazan la fila por un
@@ -867,6 +900,24 @@ document.querySelectorAll("#navNovedades, #mobileNavNovedades").forEach((el) => 
     e.preventDefault();
     goToFilter({ newOnly: true });
   });
+});
+// Fase 46 — "Más elegidos": selección editorial = productos marcados
+// "Producto destacado" en Admin (featured; mismo filtro que "Solo más
+// elegidos VIBE" del panel Filtrar + Ordenar). No son "más vendidos": no
+// hay datos de ventas detrás.
+document.querySelectorAll("#navElegidos, #mobileNavElegidos").forEach((el) => {
+  el.addEventListener("click", (e) => {
+    e.preventDefault();
+    goToFilter({ featuredOnly: true });
+  });
+});
+
+// Fase 46 — acción "Ver todo el catálogo" del estado vacío ("Ver
+// categorías" es un enlace normal a #discoverVibe).
+$("#emptyState").addEventListener("click", (e) => {
+  if (!e.target.closest('[data-empty-action="all"]')) return;
+  e.preventDefault();
+  goToFilter({});
 });
 
 $("#searchInput").addEventListener("input", e => {
@@ -1342,12 +1393,21 @@ $("#menuToggle").addEventListener("click", () => {
   const open = $("#mobileNav").classList.toggle("open");
   $("#menuToggle").setAttribute("aria-expanded", open ? "true" : "false");
 });
+// Fase 46 — el menú mobile vive dentro del header sticky, en el flujo: si
+// se cierra DESPUÉS de navegar (y con su transición de max-height), la
+// página se desplaza hacia arriba lo que medía el menú y el destino
+// (#ofertas, #discoverVibe, #catalogo) queda fuera de vista. Por eso se
+// cierra en fase de captura —antes del handler del propio enlace— y sin
+// animación, para que el layout ya sea el definitivo al hacer scroll.
 $("#mobileNav").addEventListener("click", e => {
-  if (e.target.closest("a")) {
-    $("#mobileNav").classList.remove("open");
-    $("#menuToggle").setAttribute("aria-expanded", "false");
-  }
-});
+  if (!e.target.closest("a")) return;
+  const nav = $("#mobileNav");
+  nav.style.transition = "none";
+  nav.classList.remove("open");
+  void nav.offsetHeight;
+  requestAnimationFrame(() => { nav.style.transition = ""; });
+  $("#menuToggle").setAttribute("aria-expanded", "false");
+}, true);
 $("#mobileSearchLink").addEventListener("click", () => {
   setTimeout(() => $("#searchInput").focus(), 450);
 });

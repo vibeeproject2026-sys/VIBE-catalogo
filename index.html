@@ -33,12 +33,16 @@
          #ofertas (que sí maneja su propio estado vacío elegante, ver
          renderOfertasPage() en app.js), en vez de ocultarse cuando no
          hay promoción activa. -->
-    <nav class="nav-links">
-      <a href="#catalogo" id="navNovedades">Novedades</a>
-      <a href="#catalogo" data-group="Maquillaje">Maquillaje</a>
-      <a href="#catalogo" data-group="Skincare">Skincare</a>
-      <a href="#catalogo" data-group="Accesorios">Accesorios</a>
+    <!-- Fase 46 — el menú ya no repite las categorías de "Descubre tu
+         VIBE" (siguen ahí y en las pills del catálogo). Cada enlace es un
+         destino distinto: Novedades (badge "Nuevo" en Admin), Más elegidos
+         (productos destacados en Admin), Ofertas (promociones activas) y
+         Descubre tu VIBE (sección de categorías). -->
+    <nav class="nav-links" aria-label="Principal">
+      <a href="?new=true#catalogo" id="navNovedades">Novedades</a>
+      <a href="?featured=true#catalogo" id="navElegidos">Más elegidos</a>
       <a href="#ofertas" id="navOfertas">Ofertas</a>
+      <a href="#discoverVibe" id="navDescubre">Descubre tu VIBE</a>
     </nav>
     <div class="nav-actions">
       <button id="cartButton" class="cart-btn">Carrito <b id="cartCount">0</b></button>
@@ -48,14 +52,10 @@
     </div>
   </div>
   <nav id="mobileNav" class="mobile-nav" aria-label="Menú móvil">
-    <a href="#catalogo" id="mobileNavNovedades">Novedades</a>
-    <a href="#catalogo" data-group="Maquillaje">Maquillaje</a>
-    <a href="#catalogo" class="mobile-nav-sub" data-group="Maquillaje" data-category="Rostro">Rostro</a>
-    <a href="#catalogo" class="mobile-nav-sub" data-group="Maquillaje" data-category="Ojos">Ojos</a>
-    <a href="#catalogo" class="mobile-nav-sub" data-group="Maquillaje" data-category="Labios">Labios</a>
-    <a href="#catalogo" data-group="Skincare">Skincare</a>
-    <a href="#catalogo" data-group="Accesorios">Accesorios</a>
+    <a href="?new=true#catalogo" id="mobileNavNovedades">Novedades</a>
+    <a href="?featured=true#catalogo" id="mobileNavElegidos">Más elegidos</a>
     <a href="#ofertas" id="mobileNavOfertas">Ofertas</a>
+    <a href="#discoverVibe" id="mobileNavDescubre">Descubre tu VIBE</a>
     <a href="#catalogo" id="mobileSearchLink">Buscar</a>
   </nav>
 </header>
@@ -125,7 +125,7 @@
     <div id="activeFilters" class="active-filters hidden"></div>
     <p id="allSoldOutNotice" class="notice hidden">Todos los productos de esta selección están agotados por ahora.</p>
     <div id="productGrid" class="grid"></div>
-    <p id="emptyState" class="empty hidden">Estamos preparando algo especial para ti.</p>
+    <div id="emptyState" class="empty empty-state hidden" role="status"></div>
   </div>
 </section>
 
@@ -278,7 +278,7 @@
     </label>
     <label class="checkbox-field"><input type="checkbox" id="filterAvailable"> Solo disponibles</label>
     <label class="checkbox-field"><input type="checkbox" id="filterPromo"> Solo en promoción</label>
-    <label class="checkbox-field"><input type="checkbox" id="filterFeatured"> Solo destacados VIBE</label>
+    <label class="checkbox-field"><input type="checkbox" id="filterFeatured"> Solo más elegidos VIBE</label>
     <div id="filterBrandGroup" class="hidden">
       <label>Marca
         <select id="filterBrandSelect"><option value="">Todas</option></select>
