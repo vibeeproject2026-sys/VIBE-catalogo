@@ -95,5 +95,33 @@ test("pdpGalleryImages pone siempre la imagen principal primero (p.image antes q
   assert.ok(/\[p\.image, \.\.\.\(Array\.isArray\(p\.images\) \? p\.images : \[\]\)\]/.test(taxonomySrc));
 });
 
+console.log("\nPDP — cerrar una ficha y abrir otra al instante (estabilización)");
+
+test("un 'close' tardío de la apertura anterior no cierra ni limpia la ficha nueva", () => {
+  const handler = appSrc.slice(appSrc.indexOf('$("#productDialog").addEventListener("close"'));
+  assert.ok(/^\$\("#productDialog"\)\.addEventListener\("close", \(\) => \{[\s\S]*?if \(\$\("#productDialog"\)\.open\) return;\s*state\.product = null;/.test(handler));
+});
+
+test("con el back() del cierre aún en curso, la entrada de la ficha nueva se difiere hasta su popstate", () => {
+  assert.ok(/if \(ownHistoryBackPending\) deferredProductPush = String\(p\.id\);/.test(appSrc));
+  assert.ok(/ownHistoryBackPending = true;\s*\/\/[^\n]*\n[\s\S]{0,200}window\.history\.back\(\);|ownHistoryBackPending = true;[\s\S]{0,400}window\.history\.back\(\);/.test(appSrc));
+  const pop = appSrc.slice(appSrc.indexOf('window.addEventListener("popstate"'));
+  assert.ok(/if \(ownHistoryBackPending\) \{\s*ownHistoryBackPending = false;\s*if \(deferredProductPush\) \{[\s\S]*?pushProductHistory\(id\);\s*return;/.test(pop));
+});
+
+test("si se cierra antes de que termine el back(), no se lanza otro (no sale del sitio)", () => {
+  assert.ok(/if \(ownHistoryBackPending\) \{\s*deferredProductPush = null;\s*return;\s*\}/.test(appSrc));
+});
+
+test("abrir con la entrada de la ficha cerrada aún arriba la reemplaza (Atrás no vuelve a ella)", () => {
+  assert.ok(/pushProductHistory\(p\.id, \{ replace: !\$\("#productDialog"\)\.open && Boolean\(window\.history\.state && window\.history\.state\.vibeProduct\) \}\)/.test(appSrc));
+  assert.ok(/window\.history\[replace \? "replaceState" : "pushState"\]/.test(appSrc));
+});
+
+test("sin retrasos artificiales en la apertura/cierre de fichas", () => {
+  const region = appSrc.slice(appSrc.indexOf("function openProduct"), appSrc.indexOf("function selected()"));
+  assert.ok(!/setTimeout|requestAnimationFrame/.test(region));
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

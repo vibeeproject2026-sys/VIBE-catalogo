@@ -876,13 +876,26 @@ function openProduct(id, { pushHistory = true } = {}) {
   state.presentationId = autoPresentationId(p);
   renderProductDetail(p);
   if (pushHistory) {
-    try {
-      window.history.pushState({ vibeProduct: String(p.id) }, "", buildUrl(window.location.pathname, { ...state, product: p.id }));
-    } catch {
-      // history/URL APIs unavailable — no bloquea la apertura del producto.
-    }
+    // Fase final — si el cierre anterior aún está volviendo atrás en el
+    // historial (history.back() es asíncrono), empujar ahora haría que ese
+    // back() pendiente aterrice sobre la entrada equivocada y su popstate
+    // reabra la ficha anterior. La entrada de esta ficha se empuja cuando
+    // ese back() termine (ver popstate); la ficha se muestra ya.
+    // Y si la ficha anterior se acaba de cerrar pero su evento 'close'
+    // (asíncrono) aún no corrió, su entrada sigue arriba: se reemplaza en
+    // vez de apilar otra, para que Atrás no vuelva a la ficha cerrada.
+    if (ownHistoryBackPending) deferredProductPush = String(p.id);
+    else pushProductHistory(p.id, { replace: !$("#productDialog").open && Boolean(window.history.state && window.history.state.vibeProduct) });
   }
   if (!$("#productDialog").open) $("#productDialog").showModal();
+}
+
+function pushProductHistory(id, { replace = false } = {}) {
+  try {
+    window.history[replace ? "replaceState" : "pushState"]({ vibeProduct: String(id) }, "", buildUrl(window.location.pathname, { ...state, product: id }));
+  } catch {
+    // history/URL APIs unavailable — no bloquea la apertura del producto.
+  }
 }
 
 function selected() {
@@ -921,6 +934,10 @@ function moveGalleryBy(delta) {
 // Safari no enfoca botones al tocarlos/clickearlos.
 let productTrigger = null;
 let pendingTriggerFocus = null;
+// Fase final — history.back() propio en curso (lanzado al cerrar la ficha)
+// y, si mientras tanto se abrió otra, el id cuya entrada falta empujar.
+let ownHistoryBackPending = false;
+let deferredProductPush = null;
 
 function restoreProductTriggerFocus(trigger) {
   if (!trigger || $("#productDialog").open || $("#cartDrawer").classList.contains("open")) return;
@@ -1366,6 +1383,11 @@ $("#productDialog").addEventListener(
 // por este único evento nativo 'close' del <dialog>.
 let suppressHistoryOnClose = false;
 $("#productDialog").addEventListener("close", () => {
+  // Fase final — el evento 'close' llega en una tarea posterior: si para
+  // entonces la ficha ya se volvió a abrir (con otro producto), este
+  // evento pertenece a la apertura anterior y no debe cerrar ni limpiar
+  // la nueva.
+  if ($("#productDialog").open) return;
   state.product = null;
   setCanonical(null);
   const trigger = productTrigger;
@@ -1375,8 +1397,16 @@ $("#productDialog").addEventListener("close", () => {
     suppressHistoryOnClose = false;
     return;
   }
+  // Se cerró una ficha abierta mientras el back() anterior seguía en curso:
+  // su entrada nunca se empujó, así que basta con descartarla (otro back()
+  // saldría del sitio).
+  if (ownHistoryBackPending) {
+    deferredProductPush = null;
+    return;
+  }
   try {
     if (window.history.state && window.history.state.vibeProduct) {
+      ownHistoryBackPending = true;
       // popstate re-renderiza las tarjetas: el foco se restaura de nuevo ahí.
       pendingTriggerFocus = trigger;
       window.history.back();
@@ -1800,6 +1830,19 @@ function applyUrlToFilterState(urlState) {
 // dispara este evento nativo. Se reconstruye todo el estado (filtros +
 // producto) desde la URL de destino, nunca se asume qué había antes.
 window.addEventListener("popstate", () => {
+  // Fase final — llegó el back() lanzado al cerrar una ficha. Si entretanto
+  // se abrió otra, ahora sí se empuja su entrada y no se reconcilia nada
+  // (la URL de destino es el catálogo y la ficha nueva debe seguir abierta).
+  if (ownHistoryBackPending) {
+    ownHistoryBackPending = false;
+    if (deferredProductPush) {
+      const id = deferredProductPush;
+      deferredProductPush = null;
+      pendingTriggerFocus = null; // el foco está en la ficha nueva
+      pushProductHistory(id);
+      return;
+    }
+  }
   if (!state.products.length) return; // el catálogo aún no cargó — nada que reconciliar todavía
   const urlState = readStateFromSearch(window.location.search);
   applyUrlToFilterState(urlState);

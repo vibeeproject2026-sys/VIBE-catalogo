@@ -696,6 +696,120 @@ No se creó ni publicó ninguna ficha (ED-01).
   - columna «Legal» presente y **oculta** (sin datos).
 - **Caché:** tras publicar el manifiesto, la API de productos puede tardar hasta 5 minutos en reflejarlo (`s-maxage=300` del CDN). El Hero lo reflejó al instante.
 
+## 15. Estabilización (2026-10-28)
+
+### 15.1 Ficha que se cerraba sola (PDP-RACE)
+
+| ID | Instrucción | Estado |
+|---|---|---|
+| PDP-RACE | Cerrar una ficha y abrir otra al instante no debe cerrar ni reemplazar la nueva, sin depender de pausas | **CORREGIDO Y VERIFICADO** (ver detalle) |
+
+**Detalle de PDP-RACE:**
+- **Causa real:** dos eventos asíncronos de la ficha anterior llegaban después de abrir la nueva.
+  1. **El evento `close` del `<dialog>`:** se dispara en una tarea posterior. Si la ficha B ya estaba abierta, ese `close` tardío limpiaba `state.product` y lanzaba `history.back()`.
+  2. **El `history.back()` del cierre:** también es asíncrono. Si B empujaba su entrada antes de que terminara, el back() aterrizaba en la entrada de A y su `popstate` reabría A.
+- **Reproducción determinista:** se cerraba A y se abría B en el mismo tick, y se veía «Producto 1» con `?product=1` en vez de B.
+- **Corrección** (`js/app.js`, sin retrasos):
+  - un `close` que llega con la ficha ya reabierta se ignora;
+  - si al abrir B la entrada de A sigue arriba, se **reemplaza** (`replaceState`), así que «Atrás» no vuelve a A;
+  - con el back() propio en curso, la entrada de B se empuja cuando ese back() termina;
+  - si B se cierra antes, no se lanza un segundo back() que sacaría a la clienta del sitio.
+  - Carrito, variantes, galería y checkout sin cambios.
+- **Pruebas:**
+  - **en el repo, prueba de navegador:** `scripts/browser/pdp-reopen-race.cjs`. Cubre cerrar y abrir al instante con el botón × y con `dialog.close`, abrir con el back() en curso, cerrar-abrir-cerrar sin salir del sitio, el flujo normal y «Atrás». Fallaba antes de la corrección (2 casos) y después pasa en 4 de 4 corridas;
+  - **en el repo, comprobaciones de código:** `test-pdp-gallery-nav.js`, +5, total 17/17;
+  - **en navegador, sin pausa:** `store57.js` original, 5 de 5 (antes fallaba de forma intermitente); `store56b.js`, 25/25;
+  - **en Node:** galería e imágenes (`imgfinal.js`) siguen bien. El único cambio es que hay 6 productos publicados y no 7 (ver #106).
+
+### 15.2 Decisiones pendientes de la propietaria (lista única)
+
+Reemplaza como lista de trabajo a las de §11, §12 y §14. Esas secciones se conservan como historia.
+
+| # | Decisión o acción | Opciones / detalle |
+|---|---|---|
+| 1 | **#56 Makeup Brush Set:** su foto es la de #110 (sha256 idéntico) | La propietaria la retirará desde el Admin › ficha #56 › «Quitar imagen», **sin** marcar el borrado del archivo. La ficha no está publicada |
+| 2 | **#59 Suprliner** | Ojos › Delineado **o** Labios. Sin cambios hasta confirmar |
+| 3 | **#103 VIBE Love-Blend Kit** | Definir grupo y categoría. Sin ficha; nada asignado |
+| 4 | **#119 Polvo Ácido Hialurónico** | ¿Rostro › Polvo y fijador? Sin ficha; se conserva la clasificación actual del POS («Labios») |
+| 5 | **#106 Set Perfect Lips** | Ver «Detalle del punto 5» debajo de esta tabla |
+| 6 | **Imagen para compartir** | Aprobar la propuesta A. Ver «Detalle del punto 6» debajo de esta tabla |
+| 7 | **Migraciones 0004 y 0005** | Autorizar y aplicar (15.3) |
+| 8 | **Variables de notificación** | 15.4 |
+| 9 | **Información legal y comercial** | Lista de §14.4 y §11, punto 6: identificación del negocio, datos personales, envíos, pagos, cambios, devoluciones, retracto y garantía |
+| 10 | **Tonos y presentaciones reales** | Desde el Admin (guía en §14.2) |
+
+**Detalle del punto 5 (#106 Set Perfect Lips):**
+- **Qué cambió:** se despublicó y se quitaron sus 3 fotos de la ficha (`published=false`, `image=null`, `images=[]`). Los archivos siguen en Storage.
+- **Cuándo:** entre el 2026-10-28 a las 13:00:03 UTC (08:00 hora de Colombia), cuando las pruebas de esta sesión aún lo veían publicado con sus fotos, y las 13:09:57 UTC (08:09), cuando ya no aparecía.
+- **Cómo:** no se puede determinar con la información disponible.
+  - `updated_at` no cambió (2026-09-30), porque ni el Admin ni la base lo actualizan (no hay trigger). Eso no distingue el Admin del editor SQL.
+  - La tabla no lleva historial de cambios.
+  - Los registros de Supabase requieren un token de gestión, y el local no es válido.
+- **Esta sesión no lo hizo:** en esa ventana solo publicó código que no escribe productos, y su única escritura en la base, la de #56, fue bloqueada y no se ejecutó.
+- **Pendiente:** confirmar si fue intencional. No se restauró nada.
+
+**Detalle del punto 6 (imagen para compartir):**
+- **Archivo listo, sin publicar:** `C:\Users\jdvm1\Desktop\Catalogo VIBE\entregables-fase58\imagen-compartir\vibe-og-1200x630-final.png`.
+- **Características:** PNG de 1200×630 y 33 KB, copia exacta de la propuesta A (mismo sha256).
+- **Legibilidad comprobada:** el logo, el lema y el dominio se leen en la vista horizontal de 400 px y en el recorte cuadrado de 160 px; el dominio queda pequeño, pero la vista previa ya lo muestra como texto.
+- **Qué pasa al aprobarla:**
+  - el archivo se copia al sitio, en `assets/brand/`;
+  - `og:image` y `twitter:image` pasan a apuntar a él, con `og:image:width=1200` y `og:image:height=630`;
+  - `twitter:card` pasa a `summary_large_image`.
+
+### 15.3 Migraciones 0004 y 0005: instrucciones (NO aplicadas)
+
+**Estado:** siguen **pendientes de autorización**. Ni esta sesión ni el código las aplicaron. Están en `supabase/manual/`, fuera de `supabase/migrations/`, así que ningún push las ejecuta.
+
+**Qué hace cada una:**
+
+| Archivo | Qué hace |
+|---|---|
+| `0004_orders_internal_notification.sql` | Agrega a `orders` las columnas `internal_notification_status` (`accepted`/`failed`/`not_configured`), `internal_notification_at` e `internal_notification_error` (máx. 80 caracteres) |
+| `0005_orders_idempotency_key.sql` | Agrega `idempotency_key` (16–64 caracteres) y un índice único parcial (solo valores no nulos) |
+
+Las dos admiten vacío, usan `if not exists` (se pueden repetir sin error) y terminan con `notify pgrst, 'reload schema'`. No cambian ni borran datos y no dependen una de otra.
+
+**Procedimiento** (Supabase › proyecto VIBE › SQL Editor):
+1. «New query», pegar el contenido completo de `supabase/manual/0004_orders_internal_notification.sql` y ejecutar con «Run». Debe responder «Success. No rows returned».
+2. Repetir con `supabase/manual/0005_orders_idempotency_key.sql`.
+3. Comprobar en una consulta nueva:
+   ```sql
+   select column_name from information_schema.columns
+   where table_name = 'orders'
+     and column_name in ('internal_notification_status','internal_notification_at','internal_notification_error','idempotency_key');
+   ```
+   Deben salir 4 filas.
+4. No hace falta desplegar. El código detecta las columnas y empieza a usarlas en el siguiente pedido.
+
+**Riesgo de mantenerlas pendientes:**
+- **Sin 0005:**
+  - **Cuándo se duplica un pedido:** solo si el pedido se guarda pero la respuesta no llega a la clienta (corte de red) y ella vuelve a enviarlo. En ese caso se crea un segundo pedido y se repiten los avisos.
+  - **Qué protege hoy:** el botón se bloquea mientras se envía, y hay un límite de 3 pedidos por teléfono en 10 minutos.
+  - **Probabilidad:** baja con el volumen actual (1 pedido registrado), pero real.
+- **Sin 0004:**
+  - **Qué se pierde:** si el aviso interno a VIBE falla, el Admin no lo muestra y no se puede reintentar.
+  - **Qué no se afecta:** el pedido y el correo a la clienta.
+
+### 15.4 Variables de entorno para notificaciones
+
+**Dónde se configuran:** Vercel › proyecto `vibe-catalog` › Settings › Environment Variables › entorno **Production**. Después hay que volver a desplegar el último despliegue para que tomen efecto. Aquí no se registra ningún valor secreto.
+
+| Variable | Uso | Estado conocido |
+|---|---|---|
+| `RESEND_API_KEY` | Envío de correos (Resend) | **Configurada** (indicio: el único pedido tiene `email_sent=true`) |
+| `EMAIL_FROM_ADDRESS` | Remitente de los correos (dominio verificado en Resend) | **Configurada** (mismo indicio) |
+| `ORDERS_NOTIFICATION_EMAIL` | Correo interno de VIBE que recibe cada pedido | **Desconocido** (no verificable sin 0004 ni acceso a Vercel) |
+| `WHATSAPP_BUSINESS_TOKEN` | Token de la API de WhatsApp Cloud (Meta) | **Falta o falla** (`whatsapp_notified=false`) |
+| `WHATSAPP_PHONE_NUMBER_ID` | Id del número emisor en Meta | Igual |
+| `VIBE_WHATSAPP_NOTIFICATION_NUMBER` | Número de VIBE que recibe el aviso (formato internacional, sin «+») | Igual |
+| `WHATSAPP_MESSAGE_MODE` | `text` (por defecto) o `template` | Ver «Detalle del modo de WhatsApp» debajo de esta tabla |
+
+**Detalle del modo de WhatsApp:**
+- **Con `text`:** Meta solo entrega si el número receptor escribió al número emisor en las últimas 24 h.
+- **Para avisos fiables:** usar `template`, con una plantilla aprobada llamada exactamente **`nuevo_pedido_vibe`** (idioma `es_CO`, sin parámetros; el aviso no incluye el detalle del pedido).
+- **Estado:** no se afirma que WhatsApp funcione. Requiere configuración y una verificación real autorizada.
+
 ## Historial
 
 - **2026-10-28 (Fase 57):**
@@ -729,3 +843,9 @@ No se creó ni publicó ninguna ficha (ED-01).
   - **Hallazgos:** #56 tiene la foto de #110; #106 fue despublicado por otra persona durante la fase.
   - **Pendientes de la propietaria:** recomendación de la imagen para compartir y de las migraciones.
   - **Commit:** `8f10f79`.
+- **2026-10-28 (estabilización):**
+  - **PDP-RACE:** corregido (`close` tardío y `history.back()` asíncrono), con prueba de navegador en el repo.
+  - **Pendientes:** lista única de decisiones (§15.2) e investigación de #106 (ventana horaria; sin atribuir autoría).
+  - **Imagen para compartir:** propuesta A preparada como archivo final, sin publicar.
+  - **Migraciones:** procedimiento de 0004 y 0005 documentado, sin aplicarlas.
+  - **Notificaciones:** variables de correo y WhatsApp documentadas.
