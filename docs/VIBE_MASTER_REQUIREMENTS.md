@@ -2,9 +2,17 @@
 
 **Qué es:** el registro permanente de lo que pidió la propietaria, en qué estado está **comprobado** y con qué evidencia. Cada solicitud nueva se agrega aquí. Una decisión anterior solo se reemplaza si la propietaria lo ordena expresamente; si ocurre, la entrada vieja queda tachada con la fecha.
 
-**Última actualización:** 2026-10-28 (Fase 58, cierre). Base: rama `main`, commit `c60bef6`, con cambios locales **sin commit ni despliegue**.
+**Última actualización:** 2026-10-28 (último bloque de cierre). Base: rama `main`, commit `c610ef6`, **publicado** en www.vibebeautycol.com (Vercel Production: «Deployment has completed»).
 
-> **Importante para leer los estados:** «VERIFICADO» significa comprobado **en este repositorio local**, con pruebas automáticas y capturas de un navegador real sobre APIs simuladas. **Nada de las Fases 55–58 está en producción**: el sitio público sigue en `c60bef6`, que coincide con `origin/main` y con el último despliegue de Production de `vercel[bot]`. Hasta que se despliegue, la propietaria verá en www.vibebeautycol.com el comportamiento anterior. La clasificación final de Fase 58, con las cinco categorías pedidas, está en la §12.
+> **Estado del proyecto:** el catálogo está publicado y estable. Todo lo de las Fases 55–58, la fase final integral (§14) y la estabilización (§15) está en producción y verificado en el sitio publicado (§13.4, §14.8 y §16.1).
+>
+> **Lo que sigue pendiente depende de la propietaria:** decisiones editoriales, aprobación de la imagen para compartir, autorización de las migraciones 0004 y 0005, configuración de notificaciones, información legal y comercial, y variantes reales. Lista única en la §16.0.
+>
+> **Cómo leer los estados:** cada entrada indica dónde se comprobó.
+> - **«VERIFICADO (local)»:** pruebas automáticas o navegador real sobre APIs simuladas.
+> - **«EN PRODUCCIÓN»:** comprobado en www.vibebeautycol.com.
+>
+> Las secciones §11 a §15 se conservan como historia; cuando una entrada fue superada, lo indica.
 
 **Estados:**
 - PENDIENTE
@@ -810,6 +818,82 @@ Las dos admiten vacío, usan `if not exists` (se pueden repetir sin error) y ter
 - **Para avisos fiables:** usar `template`, con una plantilla aprobada llamada exactamente **`nuevo_pedido_vibe`** (idioma `es_CO`, sin parámetros; el aviso no incluye el detalle del pedido).
 - **Estado:** no se afirma que WhatsApp funcione. Requiere configuración y una verificación real autorizada.
 
+## 16. Último bloque de cierre: lista final para la propietaria (2026-10-28)
+
+En este bloque no se cambiaron productos, datos de producción, Storage, el POS ni la configuración de Vercel, y no se ejecutó SQL.
+
+### 16.0 Pendientes (lista final)
+
+Ninguno se ha realizado. Todos esperan a la propietaria.
+
+| # | Pendiente | Tipo | Detalle |
+|---|---|---|---|
+| 1 | #56: quitar la foto incorrecta (es la de #110) desde Admin › «Quitar imagen», sin borrar el archivo | Acción | §15.2 |
+| 2 | #59 Suprliner: Ojos › Delineado o Labios | Decisión | §15.2 |
+| 3 | #103 VIBE Love-Blend Kit: grupo y categoría | Decisión | §15.2 |
+| 4 | #119 Polvo Ácido Hialurónico: ¿Rostro › Polvo y fijador? | Decisión | §15.2 |
+| 5 | #106: ¿despublicación intencional? | Decisión | §15.2 |
+| 6 | Imagen para compartir (propuesta A): aprobar o rechazar | Decisión | §15.2 |
+| 7 | Migraciones 0004 y 0005 | Autorización | §15.3 |
+| 8 | Variables de correo interno y WhatsApp | Configuración | §16.3 |
+| 9 | Información legal y comercial | Datos | §16.2 |
+| 10 | Tonos y presentaciones reales | Configuración en el Admin | §14.2 y §16.4 |
+
+### 16.1 Estado publicado tras `c610ef6`
+
+- **Publicación:** `c610ef6` (corrección PDP-RACE y §15) está desplegado en Production («Deployment has completed»). El `app.js` servido contiene la corrección.
+- **Pruebas en el sitio publicado:** `scripts/browser/pdp-reopen-race.cjs` dio todo OK, con la API de catálogo simulada en el navegador y los pedidos abortados.
+- **Rutas internas:** `/scripts/…` redirige (307) a la portada.
+- **Catálogo público:** 6 productos publicados (#106 despublicado; ver §15.2, punto 5).
+- **Migraciones:** 0004 y 0005 siguen **sin aplicar**, con los archivos intactos en `supabase/manual/`.
+- **Imagen para compartir:** **no publicada**.
+- **Columna «Legal»:** oculta, porque todos los campos de `js/legal.js` están en `null`.
+
+### 16.2 Datos legales y comerciales que faltan (para completar `js/legal.js`)
+
+1. **Titular:** razón social o nombre completo, tipo y número de identificación (NIT o C.C.), ciudad y dirección.
+2. **Tratamiento de datos personales (Ley 1581 de 2012):** el texto de la política. Debe indicar:
+   - el responsable;
+   - las finalidades (gestionar el pedido y contactar por WhatsApp o correo);
+   - los derechos del titular;
+   - el canal para ejercerlos.
+3. **Envíos:** zonas o ciudades cubiertas, tarifas o cómo se calculan, y plazos.
+4. **Medios de pago aceptados.**
+5. **Cambios, devoluciones, retracto y garantía (Ley 1480 de 2011):** condiciones, plazos y procedimiento.
+6. **Contacto y canales oficiales.**
+   - **Ya publicados y confirmados:** WhatsApp/teléfono 314 349 0825, correo `vibeeproject2026@gmail.com` e Instagram `@beautyvibe.col`.
+   - **Por confirmar:** si son los definitivos, y si se agregan horario de atención o un correo específico para datos personales.
+
+Mientras falte un dato, no se muestra nada de él. Al recibir los textos, se completan los campos de `js/legal.js` y se despliega.
+
+### 16.3 Notificaciones: pasos pendientes (en Vercel › `vibe-catalog` › Settings › Environment Variables › Production)
+
+1. **Correo interno:** comprobar que exista `ORDERS_NOTIFICATION_EMAIL` con el correo de VIBE que debe recibir cada pedido. `RESEND_API_KEY` y `EMAIL_FROM_ADDRESS` ya están configuradas: el único pedido registrado tiene `email_sent=true`.
+2. **WhatsApp:** revisar o crear `WHATSAPP_BUSINESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID` y `VIBE_WHATSAPP_NOTIFICATION_NUMBER` (formato internacional, sin «+»; por ejemplo `57…`).
+3. **Modo plantilla:** si se usa la integración de WhatsApp Cloud, aprobar en Meta (WhatsApp Manager › Plantillas) una plantilla llamada exactamente `nuevo_pedido_vibe`, idioma `es_CO`, sin parámetros. Luego definir `WHATSAPP_MESSAGE_MODE=template`.
+4. **Activación:** después de guardar las variables, volver a desplegar el último despliegue de Production desde Vercel (Deployments › … › Redeploy).
+5. **Verificación real autorizada:** un pedido real o de prueba que la propietaria decida. Después se comprueba en Admin › Pedidos (con la migración 0004 aplicada, se ve el estado del aviso interno). Hasta entonces, **no se considera que WhatsApp funcione**.
+
+Ningún valor secreto se escribe en este registro ni en el repositorio.
+
+### 16.4 Variantes: comprobar que se ven bien (complementa la guía de §14.2)
+
+1. **En el Admin,** con la sesión iniciada:
+   - abrir la ficha del producto;
+   - cargar sus tonos (nombre y color) o sus presentaciones (etiqueta real);
+   - guardar.
+2. **En la tienda,** en una ventana privada o tras unos minutos (la API de catálogo puede tardar hasta 5 minutos por la caché):
+   - **tarjeta:** muestra los puntos de color de los tonos;
+   - **ficha, con varias opciones activas:** el botón dice «Elige un tono» o «Elige una presentación» y no deja agregar hasta elegir;
+   - **ficha, con una sola opción:** se muestra sin selector y se aplica sola;
+   - **opción inactiva:** se ve tachada y no se puede elegir.
+3. **En el carrito:**
+   - agregar dos combinaciones distintas produce dos líneas, cada una con su «Tono:» o «Presentación:»;
+   - repetir la misma combinación suma la cantidad en la misma línea.
+4. **En el checkout,** abrir el formulario sin enviarlo: el resumen muestra cada línea con su opción.
+
+Precio y stock siguen siendo los del POS.
+
 ## Historial
 
 - **2026-10-28 (Fase 57):**
@@ -849,3 +933,7 @@ Las dos admiten vacío, usan `if not exists` (se pueden repetir sin error) y ter
   - **Imagen para compartir:** propuesta A preparada como archivo final, sin publicar.
   - **Migraciones:** procedimiento de 0004 y 0005 documentado, sin aplicarlas.
   - **Notificaciones:** variables de correo y WhatsApp documentadas.
+- **2026-10-28 (último bloque de cierre):**
+  - **Encabezado:** el registro decía que nada estaba en producción; se corrigió, dejando el texto anterior tachado.
+  - **§16:** estado publicado tras `c610ef6`, datos legales y comerciales faltantes, pasos de notificaciones y comprobación de variantes en la tienda y el carrito.
+  - **Sin cambios:** productos, datos, Storage, configuración y migraciones.
