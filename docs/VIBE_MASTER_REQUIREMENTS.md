@@ -491,6 +491,61 @@ Son **66 rutas**: los 38 archivos modificados más los 28 sin seguimiento (27 qu
 | DEP-05 | Mitigado con el traslado; ninguna migración ejecutada |
 | Migraciones 0004 y 0005 | **Siguen PENDIENTES DE AUTORIZACIÓN.** Cuando se autoricen, se ejecutan a mano desde `supabase/manual/` |
 
+### 13.4 Resultado de la publicación (verificado en el sitio publicado)
+
+**Datos del despliegue:**
+- **Commit:** `b6ce13d`, con 66 archivos (38 modificados y 28 nuevos).
+- **Push:** `c60bef6..b6ce13d` → `main`.
+- **Vercel:** la API de GitHub Deployments registra el despliegue `7380114234` de **Production**, creado para `b6ce13d`. El estado del commit es «Vercel = success: Deployment has completed».
+- **Versión publicada:** la hoja de estilos servida contiene la regla de Fase 58 (`.catalog-lead-intro{display:none}`).
+
+| ID | Verificación en www.vibebeautycol.com | Estado |
+|---|---|---|
+| DEP-03 | Desplegado | **COMPLETADO Y VERIFICADO** |
+| DEP-04 | Portada, frase, tarjetas, imágenes, ficha, carrito y checkout, con Chromium real sin simulaciones | **COMPLETADO Y VERIFICADO** (ver detalle) |
+| CAT-01 y CAT-01b | La frase de «Descubre tu VIBE» se ve en todos los anchos; la de «Catálogo» se ve solo a 820 y 1440, y en todos se conservan «Catálogo», «Beauty for your VIBE.» y «Esenciales…» | **COMPLETADO Y VERIFICADO EN PRODUCCIÓN** |
+| CAT-02 | 7 tarjetas, dispersión de **0 px** en todas las filas a 360, 390, 820 y 1440, sin desborde horizontal | **COMPLETADO Y VERIFICADO EN PRODUCCIÓN** |
+| SEC-03 | `/docs/…`, `/scripts/…`, `/supabase/migrations/…` y `/supabase/manual/…` → **307 a `/`**; `/README.md` → 404 | **COMPLETADO Y VERIFICADO EN PRODUCCIÓN** |
+| SEO-02 | Ver «Detalle de SEO-02» debajo de esta tabla | **COMPLETADO Y VERIFICADO EN PRODUCCIÓN** |
+| SEO-01 | `canonical`, `og:image` (logo existente) y `/sitemap.xml` presentes | **COMPLETADO Y VERIFICADO EN PRODUCCIÓN**; la vista previa en redes queda sujeta a SEO-03 |
+| IMG-04 | La API pública entrega los originales (sin manifiesto) y todas las imágenes cargan | **COMPLETADO Y VERIFICADO EN PRODUCCIÓN** |
+
+**Detalle de DEP-04:**
+- **Portada:** 200, sin errores de consola ni respuestas 4xx/5xx.
+- **Imágenes:** 13 imágenes de tarjetas y Hero por ancho, 0 rotas.
+- **Ficha:**
+  - el agotado (#99) muestra «Agotado» deshabilitado;
+  - el disponible (#102) permite «Agregar al carrito».
+- **Carrito:** 1 línea, subtotal $15.000.
+- **Checkout:** el formulario aparece con 8 campos y **no se envió**.
+- **Pedidos:** las llamadas a `/api/orders/**` se abortaban en el navegador, y hubo 0 intentos.
+
+**Detalle de SEO-02:**
+- `robots.txt` y `sitemap.xml` → 200.
+- `X-Robots-Tag: noindex, nofollow` en `/admin/` y en los dominios `*.vercel.app`.
+- Cabeceras activas: `X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options` y `Permissions-Policy`.
+
+**Observación medida, sin bloqueo:**
+- **Qué se ve:** en mobile, la foto de la ficha tarda unos 3 s en empezar y unos 8 s en completarse, porque los originales PNG pesan alrededor de 1,5 MB.
+- **Qué lo resuelve:** IMG-09, subir las versiones WebP, que sigue **PENDIENTE DE AUTORIZACIÓN**.
+
+**Confirmaciones:**
+- No se ejecutó ninguna migración.
+- No hubo escrituras en Supabase, Storage ni el POS.
+- No se creó ningún pedido ni se envió ninguna notificación.
+- La imagen para compartir y las imágenes optimizadas no se publicaron.
+
+**Pendientes que siguen abiertos**, todos los de la §12 menos DEP-03 y DEP-04:
+- migraciones 0004 y 0005;
+- IMG-09;
+- SEO-03;
+- VAR-11;
+- ED-03;
+- información legal y comercial;
+- NOT-03 y NOT-04;
+- IMG-06;
+- SEC-02.
+
 ### 13.2 Bloqueos para publicar con seguridad
 
 1. **Confirmación expresa del commit y del push a `main`.** Es el único bloqueo técnico.
@@ -525,3 +580,7 @@ Son **66 rutas**: los 38 archivos modificados más los 28 sin seguimiento (27 qu
   - **DEP-05:** las migraciones quedan fuera del commit propuesto.
   - **Pruebas:** 953 aprobadas y 0 fallidas.
   - **Commit y push:** pendientes de confirmación expresa.
+- **2026-10-28 (publicación):**
+  - **Commit y despliegue:** `b6ce13d`, con push a `main` y despliegue de Production en Vercel completado.
+  - **Migraciones:** 0002, 0004 y 0005 trasladadas a `supabase/manual/`, sin ejecutar.
+  - **Verificación en producción:** catálogo, seguridad y SEO (§13.4).
