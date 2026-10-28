@@ -52,8 +52,11 @@ test("la sección se titula Contacto y está enlazada con aria-labelledby", () =
   assert.match(contact, /aria-labelledby="footerContactTitle"/);
   assert.match(contact, /id="footerContactTitle">Contacto</);
 });
-test("no inventa horarios ni direcciones físicas", () => {
-  assert.doesNotMatch(footer, /horario|lunes|sábado|calle |carrera |dirección:/i);
+test("horario y ubicación comercial confirmados por la propietaria; sin dirección física", () => {
+  // Cierre — horario y ciudad confirmados; la dirección particular es reservada.
+  assert.match(contact, /<span class="footer-contact-label">Horario<\/span><span class="footer-contact-value">Lunes a domingo, 8:00 a\. m\. a 10:00 p\. m\.<\/span>/);
+  assert.match(contact, /<span class="footer-contact-label">Ubicación<\/span><span class="footer-contact-value">Chía, Cundinamarca, Colombia<\/span>/);
+  assert.doesNotMatch(footer, /calle |carrera |dirección:|\b(cra|cl)\.?\s*\d/i);
 });
 test("conserva los enlaces existentes y agrega Preguntas frecuentes", () => {
   for (const href of ['href="#catalogo"', 'href="#ofertas"', 'href="https://www.instagram.com/beautyvibe.col/"', 'href="#ayuda"']) {
@@ -110,11 +113,15 @@ test("no presenta el envío del formulario como compra confirmada", () => {
   assert.match(faqText, /Todavía no/);
   assert.match(faqText, /queda registrado en VIBE/);
 });
-test("no inventa costos, tiempos, medios de pago, devoluciones ni garantías", () => {
-  assert.doesNotMatch(faqText, /\$\s?\d|gratis|\d+\s*(días|horas|hábiles)|tarjeta|nequi|daviplata|pse|contraentrega|devoluci|garant|reembols/i);
+test("no inventa costos, tiempos, devoluciones, garantías ni medios de pago no confirmados", () => {
+  assert.doesNotMatch(faqText, /\$\s?\d|gratis|\d+\s*(días|horas|hábiles)|daviplata|contraentrega|contra entrega|efectivo|débito|devoluci|garant|reembols/i);
 });
-test("remite envío y pago a VIBE por WhatsApp (como dice el checkout)", () => {
-  assert.match(faqText, /se acuerdan directamente con VIBE por WhatsApp/);
+test("envío y pago: cobertura Colombia, costo según destino confirmado por WhatsApp y medios confirmados", () => {
+  // Cierre — datos confirmados por la propietaria (antes: «se acuerdan por WhatsApp»).
+  assert.match(faqText, /Realizamos envíos dentro de Colombia\./);
+  assert.match(faqText, /dependen del destino y te los confirmamos por WhatsApp antes de cerrar tu pedido/);
+  assert.match(faqText, /transferencia bancaria, Nequi, PSE, Bre-B o tarjeta de crédito/);
+  assert.match(faq, /<a href="legal\.html#envios">Información legal<\/a>/);
 });
 
 console.log("PDP — botón de cierre");

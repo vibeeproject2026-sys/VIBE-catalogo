@@ -60,7 +60,7 @@ export function validateCheckoutForm({ name, phone, email, city, address, contac
   else if (!isValidEmail(email)) errors.email = "Ingresa un correo electrónico válido.";
   if (!String(city || "").trim()) errors.city = "Ingresa tu ciudad.";
   if (!String(address || "").trim()) errors.address = "Ingresa tu dirección de entrega.";
-  if (contactConsent !== true) errors.contactConsent = "Autoriza el contacto para poder enviar tu pedido.";
+  if (contactConsent !== true) errors.contactConsent = "Autoriza el tratamiento de tus datos y el contacto para poder enviar tu pedido.";
   return { valid: Object.keys(errors).length === 0, errors };
 }
 

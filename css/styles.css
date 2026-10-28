@@ -648,16 +648,31 @@ footer .wrap.footer-grid{display:grid;grid-template-columns:1.1fr 1fr 1.3fr;gap:
 .footer-contact-label{font-size:10px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--pink)}
 .footer-contact-value{color:#e6e6e6;font-size:14px;overflow-wrap:anywhere}
 .footer-contact a:hover .footer-contact-value{color:#fff}
-/* Fase final — columna «Legal» (js/legal.js). Solo existe cuando hay
-   datos reales; entonces el pie pasa a 4 columnas en escritorio. */
+/* Fase final — columna «Legal» (js/legal.js): enlaces a cada política de
+   legal.html. Con ella, el pie pasa a 4 columnas en escritorio. */
 @media(min-width:901px){footer .wrap.footer-grid:has(#legal:not([hidden])){grid-template-columns:1.1fr 1fr 1.3fr 1.3fr}}
-.footer-legal-business{color:#aaa;font-size:13px;line-height:1.6;padding:6px 0}
-.footer-legal-policy summary{display:flex;align-items:center;min-height:44px;color:#aaa;font-size:13px;cursor:pointer}
-.footer-legal-policy summary:hover,.footer-legal-policy[open] summary{color:#fff}
-.footer-legal-policy summary:focus{outline:none}
-.footer-legal-policy summary:focus-visible{outline:2px solid var(--pink);outline-offset:3px;border-radius:4px}
-.footer-legal-text{color:#b7b7b7;font-size:13px;line-height:1.6;padding:0 0 10px}
-.footer-legal-text p{margin:0 0 8px}
+.footer-contact-text{display:flex;flex-direction:column;justify-content:center;gap:2px;min-height:52px}
+/* Página legal.html — reutiliza el encabezado del sitio y la sección
+   clara de la FAQ; solo agrega tipografía de documento. */
+.legal-body{background:#fff}
+.legal-back{color:#d6d6d6;font-size:13px;font-weight:700;letter-spacing:.04em;padding:12px 0}
+.legal-back:hover{color:#fff}
+.legal-back:focus-visible,.legal-doc a:focus-visible{outline:2px solid var(--pink);outline-offset:3px;border-radius:4px}
+.legal-page .heading h1{font-size:clamp(38px,4.6vw,56px);line-height:.98;letter-spacing:-.045em;margin:0}
+.legal-page .heading h1::after{content:"";display:inline-block;width:.15em;height:.15em;margin-left:.07em;border-radius:50%;background:var(--pink)}
+.legal-doc{max-width:760px;color:#444;font-size:15px;line-height:1.7}
+.legal-index ul{list-style:none;margin:0 0 8px;padding:0;display:flex;flex-wrap:wrap;gap:8px}
+.legal-index a{display:inline-flex;align-items:center;min-height:40px;padding:0 16px;border:1px solid #e3e3e3;border-radius:999px;color:#111;font-size:13px;font-weight:700}
+.legal-index a:hover{border-color:var(--pink);color:var(--pink)}
+.legal-section{border-top:1px solid #e6e6e6;padding:36px 0 8px;scroll-margin-top:100px}
+.legal-section h2{margin:0 0 16px;color:#111;font-size:24px;letter-spacing:-.02em}
+.legal-section p{margin:0 0 14px}
+.legal-section strong{color:#111}
+.legal-section ul{margin:0 0 16px;padding-left:20px}
+.legal-section li{margin:0 0 6px}
+.legal-section a{color:var(--pink);font-weight:700;text-decoration:underline;text-underline-offset:2px}
+.legal-updated{border-top:1px solid #e6e6e6;margin:24px 0 0;padding-top:20px;color:#777;font-size:13px}
+.checkbox-field a{color:var(--pink);font-weight:700;text-decoration:underline;text-underline-offset:2px}
 @media(prefers-reduced-motion:reduce){.footer-links a{transition:none}}
 
 @media(max-width:900px){

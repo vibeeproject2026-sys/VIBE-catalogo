@@ -977,8 +977,89 @@ Reemplaza a la §16.0 como lista vigente; esa tabla se conserva como historia.
 1. #56: quitar la foto desde el Admin.
 2. Clasificar #59, #103 y #119 desde el Admin.
 3. Confirmar `ORDERS_NOTIFICATION_EMAIL` en Vercel.
-4. Información legal y comercial.
+4. Información legal y comercial. *(Implementada en parte el 2026-10-28; lo que falta está en §19.3.)*
 5. Aplazados: WhatsApp y tonos/presentaciones.
+
+## 19. Textos comerciales y legales (2026-10-28)
+
+**Fuente:** datos confirmados por la propietaria.
+- **Identidad:** VIBE · Vibrant Iconic Beauty Essentials.
+- **Ubicación comercial:** Chía, Cundinamarca, Colombia.
+- **Contacto:** WhatsApp 314 349 0825, `vibeeproject2026@gmail.com` e Instagram `@beautyvibe.col`.
+- **Horario:** lunes a domingo, de 8:00 a. m. a 10:00 p. m.
+- **Envíos:** a Colombia; costo y condiciones según destino, confirmados antes de cerrar el pedido.
+- **Pagos:** transferencia bancaria, Nequi, PSE, Bre-B y tarjeta de crédito.
+- **Garantía, retracto y reversión:** solo los derechos legales, sin política voluntaria de cambios.
+
+**Reservado por la propietaria:** su nombre legal, número de identificación y dirección particular. **No se publican** en la web, el SEO, los metadatos ni las páginas.
+
+### 19.1 Implementación
+
+| ID | Qué | Estado |
+|---|---|---|
+| LEG-01 | Fuente única de los textos: `js/legal.js` (identidad, contacto y 4 políticas) | IMPLEMENTADO Y VERIFICADO (local) |
+| LEG-02 | Página `legal.html` | IMPLEMENTADO Y VERIFICADO (local); ver «Detalle de LEG-02» |
+| LEG-03 | Pie de la portada: columna «Legal» con un enlace por política; Contacto con horario y ubicación | IMPLEMENTADO Y VERIFICADO (local) |
+| LEG-04 | FAQ «¿Hacen envíos y cómo puedo pagar?» con cobertura, costo según destino y medios confirmados. Antes: «¿Cuánto cuesta el envío, cuánto tarda y cómo pago?»; se quitó «cuánto tarda» porque no hay plazos confirmados | IMPLEMENTADO Y VERIFICADO (local) |
+| LEG-05 | Checkout: la casilla autoriza el **tratamiento de datos** y el contacto por WhatsApp, y enlaza la política (pestaña nueva) | IMPLEMENTADO Y VERIFICADO (local); ver «Detalle de LEG-05» |
+| LEG-06 | Publicación | Ver §19.2 |
+
+**Detalle de LEG-02 (`legal.html`):**
+- **Secciones:** envíos, medios de pago, garantía/retracto/reversión del pago, tratamiento de datos personales y contacto, con la fecha «Vigente desde el 28 de octubre de 2026».
+- **Contenido estático:** se genera con `scripts/build-legal.mjs`, así que se lee sin JavaScript.
+- **Diseño:** el mismo encabezado y la misma sección clara de la FAQ.
+- **Metadatos:** canonical `https://www.vibebeautycol.com/legal.html`.
+
+**Detalle de LEG-05 (casilla del checkout):**
+- **Mensaje de error:** «Autoriza el tratamiento de tus datos y el contacto para poder enviar tu pedido.»
+- **Pedidos anteriores al 2026-10-28:** se registraron con la casilla anterior, que solo autorizaba el contacto por WhatsApp.
+
+**Contenido de las políticas (sin políticas voluntarias ni plazos inventados):**
+- **Envíos y pagos:** solo los datos confirmados. No hay tarifas ni tiempos de entrega, porque no están confirmados.
+- **Garantía, retracto y reversión del pago:**
+  - garantía legal con sus excepciones del art. 16;
+  - retracto del art. 47 (5 días hábiles, devolución a cargo del consumidor, reintegro en 30 días). Menciona que **la ley prevé excepciones, entre ellas los bienes de uso personal**, sin afirmar que los cosméticos quedan excluidos;
+  - reversión del pago del art. 51;
+  - acudir a la SIC.
+  - Afirma expresamente que abrir un cosmético no elimina por sí solo la garantía legal frente a defectos.
+- **Datos personales:**
+  - responsable descrito como marca comercial;
+  - canal de contacto por correo y teléfono/WhatsApp;
+  - datos y finalidades del flujo real del sitio;
+  - autorización con la casilla;
+  - proveedores tecnológicos sin nombrarlos;
+  - derechos del art. 8 de la Ley 1581;
+  - plazos de **ley** para consultas (10 días hábiles) y reclamos (15).
+  - No se afirma cumplimiento integral.
+
+**Pruebas:**
+- `test-legal-structure.mjs` (13/13). Exige los datos confirmados, que no aparezcan nombre legal, NIT, C.C., razón social, tipo societario ni dirección física, que no se afirme cumplimiento integral ni plazos de conservación, y que `legal.html` esté sincronizada con `js/legal.js`.
+- `test-footer-faq-markup.js` (18/18). Ahora acepta solo los medios de pago confirmados y sigue bloqueando costos, tiempos, contraentrega, Daviplata y efectivo.
+- `test-checkout.mjs` (26/26) y `test-storefront-fase56.mjs` (22/22).
+- **Navegador local** (`legalcheck.js`, a 390 y 1440):
+  - página sin desborde y anclas correctas;
+  - columna «Legal» y horario/ubicación en el pie;
+  - enlace de la casilla y casilla funcional.
+- **Navegador local, checkout:** `store56b.js`, 25/25.
+
+### 19.2 Publicación
+
+Ver el historial y el informe de esta fase: commit, despliegue en Vercel y verificación en producción.
+
+### 19.3 Requisitos legales que dependen de datos reservados (PENDIENTE, sin ocultar)
+
+| Requisito | Qué exige | Qué falta | Alternativa que protege la privacidad |
+|---|---|---|---|
+| Ley 1480 de 2011, art. 50 (comercio electrónico): identificación del proveedor | Informar nombre o razón social, identificación (NIT), dirección de notificación judicial, teléfono y correo | Nombre o razón social, NIT y dirección de notificación (la propietaria no autoriza publicar los suyos) | Ver «Alternativas para el art. 50» debajo de esta tabla |
+| Ley 1581 de 2012 y su decreto reglamentario (Decreto 1377 de 2013, compilado en el Decreto 1074 de 2015): contenido de la política de tratamiento | Nombre o razón social, domicilio, dirección, correo y teléfono del responsable; fecha de vigencia de la política **y período de vigencia de la base de datos** | Nombre o razón social y dirección del responsable; período de vigencia de la base y plazos de conservación (no confirmados, no se inventaron) | La misma figura del art. 50 resuelve la identificación. La propietaria debe definir cuánto tiempo se conservan los datos de pedidos |
+
+**Alternativas para el art. 50:**
+1. **Constituir una sociedad (por ejemplo una S.A.S.):** tiene nombre y NIT propios y una dirección comercial distinta de la particular, así que separa por completo los datos personales.
+2. **Registrarse como persona natural comerciante con una dirección comercial de notificación** (oficina virtual o coworking) en lugar de la particular. En este caso el NIT de una persona natural es su cédula: no protege el número de identificación.
+
+**Recomendación:**
+- validar con un abogado o contador la figura y la redacción final antes de considerar completa esta sección;
+- mientras tanto, el sitio publica solo lo confirmado y no presenta VIBE como sociedad ni afirma cumplimiento integral.
 
 ## Historial
 
@@ -1031,3 +1112,7 @@ Reemplaza a la §16.0 como lista vigente; esa tabla se conserva como historia.
 - **2026-10-28 (migraciones):**
   - **Aplicación:** la propietaria aplicó a mano 0004 y 0005 en producción. La consulta de verificación devolvió las 4 columnas y se confirmó por lectura.
   - **§18:** registra lo que cambia y lo que todavía no se verificó de extremo a extremo.
+- **2026-10-28 (textos comerciales y legales):**
+  - **Publicado:** `legal.html` (envíos, pagos, garantía/retracto/reversión y datos personales), columna «Legal» y horario/ubicación en el pie, FAQ de envíos y pagos actualizada, y casilla del checkout con autorización de tratamiento de datos.
+  - **Privacidad:** los datos reservados de la propietaria no se publican.
+  - **Pendientes (§19.3):** requisitos de identificación (art. 50 de la Ley 1480 y Decreto 1377) y período de vigencia de la base.

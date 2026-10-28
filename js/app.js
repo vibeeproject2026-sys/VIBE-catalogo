@@ -1571,7 +1571,7 @@ function checkoutFormHtml() {
     <label>Observaciones (opcional)<textarea name="notes" rows="3"></textarea></label>
     <label class="checkbox-field">
       <input type="checkbox" name="contactConsent" aria-describedby="err-contactConsent">
-      Autorizo a VIBE a contactarme por WhatsApp al número registrado para gestionar y finalizar mi pedido.
+      Autorizo a VIBE a tratar mis datos para gestionar mi pedido y a contactarme por WhatsApp al número registrado para finalizarlo, según la <a href="legal.html#datos" target="_blank" rel="noopener noreferrer">Política de tratamiento de datos personales</a>.
     </label>
     <span class="field-error" id="err-contactConsent" role="alert"></span>
     <!-- Fase 56 — campo trampa antispam: oculto para personas y lectores de pantalla. -->
