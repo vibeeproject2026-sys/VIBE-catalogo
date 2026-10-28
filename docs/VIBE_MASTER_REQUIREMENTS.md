@@ -6,7 +6,7 @@
 
 > **Estado del proyecto:** el catálogo está publicado y estable. Todo lo de las Fases 55–58, la fase final integral (§14) y la estabilización (§15) está en producción y verificado en el sitio publicado (§13.4, §14.8 y §16.1).
 >
-> **Lo que sigue pendiente depende de la propietaria:** decisiones editoriales, aprobación de la imagen para compartir, autorización de las migraciones 0004 y 0005, configuración de notificaciones, información legal y comercial, y variantes reales. Lista única en la §16.0.
+> **Lo que sigue pendiente depende de la propietaria:** acciones editoriales en el Admin (#56 y las clasificaciones de #59, #103 y #119), configuración de notificaciones, información legal y comercial, y variantes reales. Lista vigente en la §17, actualizada en la §18. Las migraciones 0004 y 0005 **ya están aplicadas** en producción (§18).
 >
 > **Cómo leer los estados:** cada entrada indica dónde se comprobó.
 > - **«VERIFICADO (local)»:** pruebas automáticas o navegador real sobre APIs simuladas.
@@ -497,7 +497,7 @@ Son **66 rutas**: los 38 archivos modificados más los 28 sin seguimiento (27 qu
 |---|---|
 | DEP-03 | Commit y push realizados; ver el historial |
 | DEP-05 | Mitigado con el traslado; ninguna migración ejecutada |
-| Migraciones 0004 y 0005 | **Siguen PENDIENTES DE AUTORIZACIÓN.** Cuando se autoricen, se ejecutan a mano desde `supabase/manual/` |
+| Migraciones 0004 y 0005 | **Siguen PENDIENTES DE AUTORIZACIÓN.** Cuando se autoricen, se ejecutan a mano desde `supabase/manual/`. *(Aplicadas el 2026-10-28; ver §18.)* |
 
 ### 13.4 Resultado de la publicación (verificado en el sitio publicado)
 
@@ -741,7 +741,7 @@ Reemplaza como lista de trabajo a las de §11, §12 y §14. Esas secciones se co
 | 4 | **#119 Polvo Ácido Hialurónico** | ¿Rostro › Polvo y fijador? Sin ficha; se conserva la clasificación actual del POS («Labios») |
 | 5 | **#106 Set Perfect Lips** | Ver «Detalle del punto 5» debajo de esta tabla |
 | 6 | **Imagen para compartir** | Aprobar la propuesta A. Ver «Detalle del punto 6» debajo de esta tabla |
-| 7 | **Migraciones 0004 y 0005** | Autorizar y aplicar (15.3) |
+| 7 | **Migraciones 0004 y 0005** | Autorizar y aplicar (15.3). *(Aplicadas el 2026-10-28; ver §18.)* |
 | 8 | **Variables de notificación** | 15.4 |
 | 9 | **Información legal y comercial** | Lista de §14.4 y §11, punto 6: identificación del negocio, datos personales, envíos, pagos, cambios, devoluciones, retracto y garantía |
 | 10 | **Tonos y presentaciones reales** | Desde el Admin (guía en §14.2) |
@@ -765,7 +765,7 @@ Reemplaza como lista de trabajo a las de §11, §12 y §14. Esas secciones se co
   - `og:image` y `twitter:image` pasan a apuntar a él, con `og:image:width=1200` y `og:image:height=630`;
   - `twitter:card` pasa a `summary_large_image`.
 
-### 15.3 Migraciones 0004 y 0005: instrucciones (NO aplicadas)
+### 15.3 Migraciones 0004 y 0005: instrucciones (aplicadas el 2026-10-28; ver §18)
 
 **Estado:** siguen **pendientes de autorización**. Ni esta sesión ni el código las aplicaron. Están en `supabase/manual/`, fuera de `supabase/migrations/`, así que ningún push las ejecuta.
 
@@ -834,7 +834,7 @@ Ninguno se ha realizado. Todos esperan a la propietaria. *(El 2026-10-28 la prop
 | 4 | #119 Polvo Ácido Hialurónico: ¿Rostro › Polvo y fijador? | Decisión | §15.2 |
 | 5 | #106: ¿despublicación intencional? | Decisión | §15.2 |
 | 6 | Imagen para compartir (propuesta A): aprobar o rechazar | Decisión | §15.2 |
-| 7 | Migraciones 0004 y 0005 | Autorización | §15.3 |
+| 7 | Migraciones 0004 y 0005 | Autorización | §15.3. *(Aplicadas el 2026-10-28; ver §18.)* |
 | 8 | Variables de correo interno y WhatsApp | Configuración | §16.3 |
 | 9 | Información legal y comercial | Datos | §16.2 |
 | 10 | Tonos y presentaciones reales | Configuración en el Admin | §14.2 y §16.4 |
@@ -845,7 +845,7 @@ Ninguno se ha realizado. Todos esperan a la propietaria. *(El 2026-10-28 la prop
 - **Pruebas en el sitio publicado:** `scripts/browser/pdp-reopen-race.cjs` dio todo OK, con la API de catálogo simulada en el navegador y los pedidos abortados.
 - **Rutas internas:** `/scripts/…` redirige (307) a la portada.
 - **Catálogo público:** 6 productos publicados (#106 despublicado; ver §15.2, punto 5).
-- **Migraciones:** 0004 y 0005 siguen **sin aplicar**, con los archivos intactos en `supabase/manual/`.
+- **Migraciones:** 0004 y 0005 siguen **sin aplicar**, con los archivos intactos en `supabase/manual/`. *(Aplicadas el 2026-10-28; ver §18.)*
 - **Imagen para compartir:** **no publicada**.
 - **Columna «Legal»:** oculta, porque todos los campos de `js/legal.js` están en `null`.
 
@@ -906,7 +906,7 @@ Reemplaza a la §16.0 como lista vigente; esa tabla se conserva como historia.
 | 4 | #119 Polvo Ácido Hialurónico → Rostro › Polvo y fijador | **DECIDIDO; NO APLICADO (bloqueo)** | Igual que el 2 |
 | 5 | #106 Set Perfect Lips: despublicado intencionalmente | **CERRADO** | Sigue `published=false` (comprobado el 2026-10-28). No se restauró nada |
 | 6 | Imagen para compartir, propuesta A: aprobada | **PUBLICADA EN EL CÓDIGO** | Ver «Detalle del punto 6» debajo de esta tabla |
-| 7 | Migraciones 0004 y 0005: aplicación manual autorizada | **AUTORIZADAS; NO APLICADAS (bloqueo)** | Ver «Detalle del punto 7» debajo de esta tabla |
+| 7 | Migraciones 0004 y 0005: aplicación manual autorizada | ~~**AUTORIZADAS; NO APLICADAS (bloqueo)**~~ → **APLICADAS** (2026-10-28) | §18 |
 | 8 | Verificar `ORDERS_NOTIFICATION_EMAIL` en Vercel Production | **NO VERIFICABLE desde esta sesión** | Ver «Detalle del punto 8» debajo de esta tabla |
 | 9 | WhatsApp | **APLAZADO** por la propietaria (sin acceso a Meta Business) | Variables `WHATSAPP_*` sin cambios; pasos en §16.3. No se considera operativo |
 | 10 | Tonos y presentaciones | **APLAZADO**: la propietaria los cargará desde el Admin | Guía en §14.2 y §16.4 |
@@ -933,12 +933,52 @@ Reemplaza a la §16.0 como lista vigente; esa tabla se conserva como historia.
   - el token de gestión de Supabase responde 401;
   - no hay cadena de conexión a la base;
   - no hay `psql` ni CLI de Supabase.
-- **Qué falta:** aplicarlas a mano en el SQL Editor siguiendo la §15.3, en orden 0004 → 0005, con la consulta de verificación. Los riesgos de §15.3 siguen vigentes mientras no se apliquen.
+- **Qué falta:** aplicarlas a mano en el SQL Editor siguiendo la §15.3, en orden 0004 → 0005, con la consulta de verificación. Los riesgos de §15.3 siguen vigentes mientras no se apliquen. *(Aplicadas el 2026-10-28; ver §18.)*
 
 **Detalle del punto 8 (`ORDERS_NOTIFICATION_EMAIL`):**
 - **Por qué no se pudo verificar:** no hay CLI de Vercel ni token de su API para listar variables, y `.env.local` no la contiene.
 - **Qué falta:** la propietaria confirma en Vercel › `vibe-catalog` › Settings › Environment Variables › Production que exista.
 - No se cambió ningún destinatario.
+
+## 18. Migraciones 0004 y 0005 aplicadas (2026-10-28)
+
+| ID | Estado | Evidencia |
+|---|---|---|
+| MIG-0004 (`supabase/manual/0004_orders_internal_notification.sql`) | **APLICADA en producción** | Ver «Evidencia» debajo de esta tabla |
+| MIG-0005 (`supabase/manual/0005_orders_idempotency_key.sql`) | **APLICADA en producción** | Igual |
+
+**Evidencia:**
+- **Quién las aplicó:** la propietaria, a mano, en el proyecto Supabase de producción, el 2026-10-28.
+- **Consulta de verificación (§15.3)** sobre `information_schema.columns`: devolvió las 4 columnas esperadas en `public.orders`.
+
+  | Columna | Tipo |
+  |---|---|
+  | `idempotency_key` | `text` |
+  | `internal_notification_at` | `timestamp with time zone` |
+  | `internal_notification_error` | `text` |
+  | `internal_notification_status` | `text` |
+
+- **Comprobación de esta sesión (solo lectura):** `GET` con `limit=0` sobre esas 4 columnas en el mismo proyecto que usa el sitio publicado. Respondió **200** (antes, `42703`). No se leyeron filas.
+- **Archivos:** `supabase/manual/` sin cambios.
+
+**Qué cambia:**
+- **No hay que desplegar nada:** el código ya publicado detecta las columnas y las usa desde el siguiente pedido.
+- **Idempotencia de servidor (ORD-03):** la clave del intento se guarda y se consulta, y la base impide duplicados.
+- **Aviso interno (NOT-01):** se guarda el estado del aviso interno a VIBE (aceptado, fallido o no configurado). El Admin muestra el seguimiento y permite el reintento manual.
+- **Riesgos de §15.3:** ya no aplican.
+
+**Qué NO está verificado:**
+- **Sin pedidos de prueba:** no se ha creado ningún pedido real ni de prueba tras aplicar las migraciones.
+- **Flujos sin comprobar en producción:** la idempotencia y el estado del aviso interno no se han comprobado de extremo a extremo en producción. Solo están verificados en local (§7 y §8) y por el esquema.
+- **Entrega del aviso interno:** sigue dependiendo de `ORDERS_NOTIFICATION_EMAIL` (§17, punto 8, no verificada) y de Resend.
+- **Primer pedido real:** conviene revisar en Admin › Pedidos que muestre el estado del aviso interno.
+
+**Pendientes vigentes** (§17, sin el punto 7):
+1. #56: quitar la foto desde el Admin.
+2. Clasificar #59, #103 y #119 desde el Admin.
+3. Confirmar `ORDERS_NOTIFICATION_EMAIL` en Vercel.
+4. Información legal y comercial.
+5. Aplazados: WhatsApp y tonos/presentaciones.
 
 ## Historial
 
@@ -988,3 +1028,6 @@ Reemplaza a la §16.0 como lista vigente; esa tabla se conserva como historia.
   - **#106:** cerrado (despublicado intencionalmente).
   - **Bloqueados por credenciales:** clasificaciones de #59, #103 y #119 (Admin de producción: 401), migraciones 0004 y 0005 (sin mecanismo SQL) y verificación de `ORDERS_NOTIFICATION_EMAIL` (sin acceso a Vercel).
   - **Aplazados:** WhatsApp y variantes.
+- **2026-10-28 (migraciones):**
+  - **Aplicación:** la propietaria aplicó a mano 0004 y 0005 en producción. La consulta de verificación devolvió las 4 columnas y se confirmó por lectura.
+  - **§18:** registra lo que cambia y lo que todavía no se verificó de extremo a extremo.
