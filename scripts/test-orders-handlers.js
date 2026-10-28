@@ -33,6 +33,8 @@ function mockRes() {
 let passed = 0;
 let failed = 0;
 async function test(name, fn) {
+  // Fase 56 — el límite por IP (en memoria) se reinicia entre pruebas.
+  require("../api/orders/_lib/guard").resetIpLimiter();
   try {
     await fn();
     passed++;
@@ -564,9 +566,9 @@ async function main() {
     });
   });
 
-  await test("método no permitido -> 405", async () => {
+  await test("método no permitido -> 405 (Fase 55: POST ya es el reintento de aviso; PUT sigue sin permitirse)", async () => {
     await withEnv(BASE_ENV, async () => {
-      const req = { method: "POST", headers: {}, query: {} };
+      const req = { method: "PUT", headers: {}, query: {} };
       const res = mockRes();
       await adminOrdersHandler(req, res);
       assert.equal(res.statusCode, 405);
@@ -671,11 +673,11 @@ async function main() {
     assert.match(res.body.error, /No se pudo eliminar/);
   });
 
-  await test("PUT/PATCH siguen sin permitirse (405) y Allow anuncia GET, DELETE", async () => {
+  await test("PUT/PATCH siguen sin permitirse (405) y Allow anuncia GET, DELETE, POST", async () => {
     for (const method of ["PUT", "PATCH"]) {
       const { res } = await runDelete({ method, headers: ADMIN, query: { id: "1" } }, okRows([]));
       assert.equal(res.statusCode, 405);
-      assert.equal(res.headers.Allow, "GET, DELETE");
+      assert.equal(res.headers.Allow, "GET, DELETE, POST");
     }
   });
 

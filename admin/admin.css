@@ -399,3 +399,47 @@ dialog.confirm-dialog{width:min(460px,calc(100% - 32px))}
 .editor-section input,.editor-section textarea,.editor-section select{border:1px solid #ddd;border-radius:8px;padding:9px 11px;font-size:13px;color:#111;background:#fff;font-weight:400}
 .editor-section textarea{min-height:60px;resize:vertical}
 .editor-section .checkbox-field,.edit-form .checkbox-field{display:flex;align-items:center;gap:8px;flex-direction:row}
+
+/* Fase 55 — aviso interno a VIBE por pedido. */
+.notice-cell{min-width:120px}
+.order-retry{display:block;margin:4px 0 0;padding:2px 0;font-size:12px;white-space:nowrap}
+.order-retry:disabled{opacity:.5;cursor:default}
+.orders-review{margin:0 0 14px;padding:10px 14px;border-radius:10px;background:#f4f4f4;color:#555;font-weight:600}
+.orders-review.is-warn{background:#fff1df;color:#8a4b00}
+
+/* Fase 56 — quitar imágenes de una ficha. */
+.remove-image-btn{margin-left:8px;border-color:#f0c2d6;color:#b0003a}
+.image-remove-preview img{display:block;max-width:180px;max-height:180px;margin:0 0 12px;border-radius:10px;border:1px solid #eee;object-fit:contain;background:#fafafa}
+.image-remove-file{margin:0 0 16px;font-size:13px;color:#5c1a30}
+
+/* Fase 56 — taxonomía administrable. */
+.tax-actions{display:inline-flex;gap:6px;margin-left:auto;flex-wrap:wrap}
+.tax-act{border:1px solid var(--hair);background:#fff;color:var(--ink-2);border-radius:999px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer}
+.tax-act:hover{border-color:var(--blush-ink);color:var(--blush-ink)}
+.tax-act.tax-danger{color:#b0003a;border-color:#f0c2d6}
+.tax-act.tax-add{border-style:dashed;color:var(--blush-ink)}
+.tax-group-head .tax-add{margin-left:auto}
+button.sub-chip{cursor:pointer;font:inherit}
+button.sub-chip.sub-edit:hover{outline:2px solid var(--blush-ink);outline-offset:1px}
+.tax-dialog label{display:grid;gap:6px;margin:0 0 12px;font-size:12px;font-weight:700;color:#333}
+.tax-dialog input,.tax-dialog select{border:1px solid #ddd;border-radius:8px;padding:9px 11px;font-size:13px;font-weight:400}
+.tax-dialog .checkbox-field{display:flex;align-items:center;gap:8px;margin:0 0 6px;font-weight:600}
+.tax-choice{border:0;margin:0 0 10px;padding:0}
+.tax-choice legend{font-size:12px;font-weight:800;margin-bottom:6px}
+.tax-impact{margin:0 0 6px;font-weight:700;font-size:13px}
+.tax-impact-list{margin:0 0 12px;padding-left:18px;font-size:13px;color:var(--ink-2);max-height:140px;overflow:auto}
+.tax-note-text{margin:0 0 12px;font-size:12.5px;color:var(--soft)}
+
+/* Fase 56 — editor de tonos. */
+.shade-rows{display:grid;gap:10px}
+.shade-row{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding:10px 12px;border:1px solid var(--hair);border-radius:12px;background:#fff}
+.shade-dot{width:28px;height:28px;border-radius:50%;background:var(--shade);box-shadow:0 0 0 1px #00000026;flex-shrink:0}
+.shade-dot-empty{background:repeating-linear-gradient(45deg,#f2f2f2 0 4px,#fff 4px 8px)}
+.editor-section .shade-color input[type=color]{width:44px;height:34px;padding:2px}
+.shade-name{flex:1 1 180px}
+.shade-tools{display:inline-flex;gap:6px;margin-left:auto}
+.shade-tools button:disabled{opacity:.4;cursor:default}
+/* Fase 57 — tonos y presentaciones como dos bloques del mismo panel. */
+.option-block-title{margin:18px 0 4px;font-size:13px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-2)}
+.option-block-title:first-of-type{margin-top:8px}
+#addShadeBtn,#addPresentationBtn{margin-top:10px}

@@ -94,6 +94,11 @@ const FIELD_SAMPLES = {
 function mockFetchCapture() {
   const calls = [];
   const fetchImpl = async (url, opts = {}) => {
+    // Fase 56 — la validación lee la taxonomía editable (config/taxonomy.json
+    // en Storage); en estos tests no existe → taxonomía por defecto.
+    if (String(url).includes("/storage/v1/object/") && String(url).includes("config/taxonomy.json")) {
+      return { ok: false, status: 404, text: async () => "" };
+    }
     if (url.includes("/rest/v1/catalog_metadata") && (opts.method || "GET") === "POST") {
       const body = JSON.parse(opts.body);
       calls.push(body);

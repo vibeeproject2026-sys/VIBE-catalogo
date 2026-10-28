@@ -25,11 +25,11 @@ const BRAND = {
   black: "#050505",
 };
 
-// Fase 40.1 — beautyvibecol.com / vibebeautycol.com no tiene todavía una
-// página funcional detrás (el dominio está verificado en Resend
-// únicamente como remitente de correo, no como sitio web) — el enlace
-// de marca del email debe apuntar al catálogo real y en producción.
-const CATALOG_URL = "https://vibe-catalogo.vercel.app";
+// Fase 40.1 — el enlace de marca del email apunta al catálogo real en
+// producción. Fase 56 — el catálogo ya vive en el dominio oficial
+// (vibebeautycol.com redirige a www): los emails usan ese dominio en vez de
+// vibe-catalogo.vercel.app.
+const CATALOG_URL = "https://www.vibebeautycol.com";
 
 // Fase 40.1 — logo oficial real de VIBE (el mismo assets/vibe-logo.svg
 // que ya usa el header/footer del sitio en producción — nunca
@@ -358,7 +358,9 @@ function buildInternalOrderEmail(order) {
 
 // Nunca lanza: el llamador siempre recibe {sent, reason?} y decide qué
 // mostrarle al cliente (nunca afirmar un envío que no ocurrió).
-async function sendEmail({ to, subject, html, text }, fetchImpl = fetch) {
+// Fase 56 — idempotencyKey (opcional): Resend no reenvía un email con la
+// misma clave (protege contra avisos duplicados por reintentos).
+async function sendEmail({ to, subject, html, text, idempotencyKey }, fetchImpl = fetch) {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.EMAIL_FROM_ADDRESS;
 
@@ -373,44 +375,64 @@ async function sendEmail({ to, subject, html, text }, fetchImpl = fetch) {
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
+        ...(idempotencyKey ? { "Idempotency-Key": String(idempotencyKey).slice(0, 256) } : {}),
       },
       body: JSON.stringify({ from, to, subject, html, text }),
     });
     if (!res.ok) {
-      // Diagnóstico Fase 39.1 — Resend siempre devuelve un JSON
-      // {name, message} explicando la causa exacta del rechazo (dominio
-      // no verificado, remitente no permitido, etc.) — nunca contiene la
-      // API key ni ningún secreto, así que es seguro loguearlo completo
-      // para poder diagnosticar sin adivinar. Nunca se expone en la
-      // respuesta al cliente, solo en los logs del servidor.
+      // Fase 55 — antes (Fase 39.1) se logueaba el cuerpo completo de la
+      // respuesta de Resend, pero su `message` puede incluir direcciones
+      // de correo (p. ej. "only send testing emails to owner@…"). Ahora
+      // solo se registra el código HTTP y el `name` del error de Resend
+      // (validation_error, missing_api_key, …), que basta para
+      // diagnosticar sin exponer datos personales.
       const body = typeof res.text === "function" ? await res.text().catch(() => "") : "";
-      console.error("[orders/email] Resend respondió " + res.status + " al intentar enviar la confirmación: " + body.slice(0, 500));
-      return { sent: false, reason: "EMAIL_SEND_FAILED" };
+      const errorCode = `HTTP_${res.status}:${resendErrorName(body)}`;
+      console.error("[orders/email] Resend rechazó el envío (" + errorCode + ").");
+      return { sent: false, reason: "EMAIL_SEND_FAILED", errorCode };
     }
+    // `sent: true` significa ACEPTADO por Resend, no entregado: la entrega
+    // real solo se ve en el panel de Resend (Emails).
     return { sent: true };
   } catch (e) {
-    console.error("[orders/email] Error de red al intentar enviar la confirmación: " + (e && e.message ? e.message : e));
-    return { sent: false, reason: "EMAIL_SEND_FAILED" };
+    const errorCode = "NETWORK:" + sanitizeCode(e && e.name);
+    console.error("[orders/email] Error de red al intentar enviar el email (" + errorCode + ").");
+    return { sent: false, reason: "EMAIL_SEND_FAILED", errorCode };
   }
 }
 
-async function sendOrderConfirmationEmail(order, fetchImpl = fetch) {
+// Solo identificadores cortos [a-z0-9_]: nunca texto libre que pueda
+// contener datos personales.
+function sanitizeCode(value) {
+  const v = String(value || "").toLowerCase();
+  return /^[a-z0-9_]{1,40}$/.test(v) ? v : "unknown";
+}
+
+function resendErrorName(body) {
+  try {
+    return sanitizeCode(JSON.parse(body).name);
+  } catch {
+    return "unknown";
+  }
+}
+
+async function sendOrderConfirmationEmail(order, fetchImpl = fetch, { idempotencyKey = order && order.id ? `vibe-order-${order.id}-customer` : undefined } = {}) {
   const { subject, html, text } = buildOrderEmail(order);
-  return sendEmail({ to: order.customer_email, subject, html, text }, fetchImpl);
+  return sendEmail({ to: order.customer_email, subject, html, text, idempotencyKey }, fetchImpl);
 }
 
 // Fase 39.2 — aviso interno a VIBE. ORDERS_NOTIFICATION_EMAIL es una
 // variable de entorno separada de EMAIL_FROM_ADDRESS (esa es el
 // remitente transaccional; esta es el buzón real de VIBE que debe
 // recibir el aviso) — nunca un valor hardcodeado en el código.
-async function sendInternalOrderNotificationEmail(order, fetchImpl = fetch) {
+async function sendInternalOrderNotificationEmail(order, fetchImpl = fetch, { idempotencyKey = order && order.id ? `vibe-order-${order.id}-internal` : undefined } = {}) {
   const to = process.env.ORDERS_NOTIFICATION_EMAIL;
   if (!to) {
     console.error("[orders/email] No configurado: falta ORDERS_NOTIFICATION_EMAIL. No se envía el aviso interno del pedido (el pedido queda registrado igual).");
     return { sent: false, reason: "ORDERS_NOTIFICATION_EMAIL_NOT_CONFIGURED" };
   }
   const { subject, html, text } = buildInternalOrderEmail(order);
-  return sendEmail({ to, subject, html, text }, fetchImpl);
+  return sendEmail({ to, subject, html, text, idempotencyKey }, fetchImpl);
 }
 
-module.exports = { buildOrderEmail, buildInternalOrderEmail, sendEmail, sendOrderConfirmationEmail, sendInternalOrderNotificationEmail };
+module.exports = { buildOrderEmail, buildInternalOrderEmail, sendEmail, sendOrderConfirmationEmail, sendInternalOrderNotificationEmail, sanitizeCode };

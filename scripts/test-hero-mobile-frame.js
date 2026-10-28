@@ -51,7 +51,10 @@ test("el fondo desenfocado (respaldo para piezas de otra proporción) solo exist
 });
 test("el fondo es decorativo: misma imagen que la pieza mobile, alt vacío y aria-hidden", () => {
   assert.match(js, /const backdropSrc = hasMobileVariant \? s\.mobileImage : s\.image;/);
-  assert.match(js, /<img class="hero-slide-backdrop" src="\$\{esc\(backdropSrc\)\}" alt="" aria-hidden="true"/);
+  // Fase 57 — + srcset optimizado opcional: el mismo de la pieza visible
+  // (mobileImageSrcset con variante mobile, imageSrcset si no).
+  assert.match(js, /<img class="hero-slide-backdrop" src="\$\{esc\(backdropSrc\)\}"\$\{backdropAttrs\} alt="" aria-hidden="true"/);
+  assert.match(js, /const backdropSet = hasMobileVariant \? s\.mobileImageSrcset : s\.imageSrcset;/);
 });
 test("Fase 54 — indicadores superpuestos abajo sobre la pieza (9px + 11px = centro a 20px), con sombra de contraste", () => {
   assert.match(heroMobile, /\.hero-dots\{bottom:9px;gap:0;pointer-events:none;filter:drop-shadow\(/);

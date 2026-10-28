@@ -48,6 +48,11 @@ async function patchWith(body, stored, { failRead = false } = {}) {
   console.error = () => {};
   global.fetch = async (url, opts = {}) => {
     const method = opts.method || "GET";
+    // Fase 56 — la validación lee la taxonomía editable (config/taxonomy.json
+    // en Storage); en estos tests no existe → taxonomía por defecto.
+    if (String(url).includes("/storage/v1/object/") && String(url).includes("config/taxonomy.json")) {
+      return { ok: false, status: 404, text: async () => "" };
+    }
     calls.push({ method, url: String(url), body: opts.body ? JSON.parse(opts.body) : null });
     if (method === "GET") {
       if (failRead) return { ok: false, status: 500, text: async () => "{}" };

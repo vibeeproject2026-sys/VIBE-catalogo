@@ -1,0 +1,7 @@
+# Fase 56 — dominio oficial: https://www.vibebeautycol.com
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /api/
+
+Sitemap: https://www.vibebeautycol.com/sitemap.xml

@@ -6,6 +6,7 @@
 
 import { products as demoProducts, categories as demoCategories } from "./products.js";
 import { EDITORIAL_STRING_FIELDS, EDITORIAL_ARRAY_FIELDS } from "./taxonomy.js";
+import { normalizeShades, normalizePresentations } from "./variants.js";
 
 const API_BASE = "/api/catalog";
 
@@ -29,6 +30,11 @@ function withEditorialDetails(target, source) {
 // the real API fails, and available on purpose for local development via
 // ?dataSource=demo) — it is no longer what a real visitor sees by
 // default.
+// Fase 56 — ya NO hay respaldo automático a demo: si la API real falla,
+// getProducts() lanza y el sitio muestra "catálogo no disponible" con un
+// botón para reintentar (nunca productos ni precios de demostración que
+// alguien podría intentar comprar). Demo solo existe a propósito, con
+// ?dataSource=demo, para desarrollo local.
 let CONFIGURED_MODE = "api"; // "demo" | "api"
 
 function resolveMode() {
@@ -51,7 +57,7 @@ function resolveMode() {
 // consola entre ruido de nivel "warn".
 function warn(context, error) {
   console.error(
-    `[VIBE data-source] ${context} — la API real falló, usando demo como respaldo técnico. Esto NO debería ocurrir en producción con la API sana.`,
+    `[VIBE data-source] ${context} — la API real falló; no se muestran datos de demostración.`,
     error && error.message ? error.message : error
   );
 }
@@ -60,6 +66,7 @@ function normalizeVariants(product) {
   if (Array.isArray(product.variants) && product.variants.length) return product.variants;
   return [{ id: "default", name: product.presentation || "Único", price: product.price, sku: null }];
 }
+
 
 // Demo products already have everything app.js expects (including real
 // variants with their own price/sku). We only add the fields the UI now
@@ -88,11 +95,25 @@ function normalizeDemoProduct(p) {
     promoPrice: null,
     promoText: null,
     variants: normalizeVariants(p),
+    shades: [],
+    presentations: [],
   };
   // Fase 34 — los productos demo tampoco tienen ninguna ficha granular
   // real detrás: todo cae a null/[] igual que cualquier otro campo
   // editorial demo, nunca inventado.
   return withEditorialDetails(normalized, {});
+}
+
+// Fase 57 — tonos y presentaciones son dos dimensiones independientes
+// (ver js/variants.js). `variants` queda con una sola variante base (precio
+// del POS, presentación de texto si la ficha la tiene, nunca «Único»
+// inventado); la combinación elegida la arma resolveVariant() en app.js.
+function optionFields(p) {
+  return {
+    shades: normalizeShades(p.shades),
+    presentations: normalizePresentations(p.presentations),
+    variants: [{ id: "default", name: p.presentation || "", price: p.price, sku: null }],
+  };
 }
 
 // The catalog API (Fase 6) never returns `variants` — synthesize a single
@@ -120,6 +141,9 @@ function normalizeApiProduct(p) {
     usage: p.usage ?? "",
     presentation: p.presentation ?? "",
     image: p.image ?? null,
+    // Fase 57 — srcset WebP optimizado, solo si el servidor lo envía (el
+    // original figura en el manifiesto de versiones); si no, null.
+    imageSrcset: typeof p.imageSrcset === "string" && p.imageSrcset ? p.imageSrcset : null,
     images: Array.isArray(p.images) ? p.images : [],
     imageLabel: "VIBE",
     // Fase 28 — faltaba en Fase 26: catalog_metadata.brand ya se
@@ -135,7 +159,7 @@ function normalizeApiProduct(p) {
     promoActive: Boolean(p.promoActive),
     promoPrice: p.promoPrice ?? null,
     promoText: p.promoText ?? null,
-    variants: normalizeVariants(p),
+    ...optionFields(p),
   }, p);
 }
 
@@ -173,9 +197,24 @@ export async function getProducts() {
       return await getProductsFromApi();
     } catch (e) {
       warn("getProducts()", e);
+      throw e;
     }
   }
   return getDemoProducts();
+}
+
+// Fase 56 — taxonomía VIBE vigente (editable desde el Admin). Devuelve
+// null si no se puede obtener: el sitio sigue con la de código.
+export async function getTaxonomy(fetchImpl = fetch) {
+  if (resolveMode() !== "api") return null;
+  try {
+    const res = await fetchImpl(`${API_BASE}/categories?view=taxonomy`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data && data.taxonomy ? data.taxonomy : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function getCategories() {

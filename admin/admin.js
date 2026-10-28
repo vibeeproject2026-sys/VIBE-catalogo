@@ -16,7 +16,7 @@
 // sent anywhere except as the Authorization header on /api/admin/*
 // requests.
 
-import { getCategoriesInGroup, getSubcategories, VIBE_CATEGORY_GROUPS, SUBCATEGORIES_BY_CATEGORY, publicPlacement, isListedSubcategory, needsClassificationReview, suggestClassification } from "../js/taxonomy.js";
+import { getCategoriesInGroup, getSubcategories, VIBE_CATEGORY_GROUPS, SUBCATEGORIES_BY_CATEGORY, publicPlacement, isListedSubcategory, needsClassificationReview, suggestClassification, applyTaxonomy } from "../js/taxonomy.js";
 import { SECTION_DESTINATIONS, describeSlideDestination } from "../js/hero-links.js";
 
 const TOKEN_KEY = "vibe_admin_token";
@@ -106,11 +106,15 @@ async function uploadProductImage(productId, file, slot, statusEl) {
   return payload;
 }
 
-async function deleteSecondaryImage(productId, url, statusEl) {
+// Fase 56 — quita una imagen (principal o secundaria) de la ficha. Por
+// defecto el archivo se CONSERVA en Storage; solo con deleteFile (casilla
+// expresa en la confirmación) el servidor intenta borrarlo, y únicamente si
+// ninguna otra ficha ni slide lo usa.
+async function removeProductImage(productId, slot, url, deleteFile, statusEl) {
   const res = await adminFetch("/api/admin/product-images", {
     method: "DELETE",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ product_id: productId, path: url }),
+    body: JSON.stringify({ product_id: productId, slot, path: url, deleteFile: deleteFile === true }),
   });
   if (res.status === 401) {
     clearToken();
@@ -119,10 +123,47 @@ async function deleteSecondaryImage(productId, url, statusEl) {
   }
   const payload = await res.json().catch(() => ({}));
   if (!res.ok) {
-    if (statusEl) setImageStatus(statusEl, "error", "No se eliminó la imagen. Motivo: " + ((payload && payload.error) || "error desconocido."));
+    if (statusEl) setImageStatus(statusEl, "error", "No se quitó la imagen. Motivo: " + ((payload && payload.error) || "error desconocido."));
     return null;
   }
   return payload;
+}
+
+const FILE_RESULT_TEXT = {
+  kept: "El archivo original se conserva en el almacenamiento.",
+  shared: "El archivo no se borró porque otra ficha o un slide lo usa.",
+  not_owned: "El archivo no se borró: no pertenece a esta ficha.",
+  unverified: "El archivo no se borró: no se pudo verificar si está en uso.",
+  delete_failed: "No se pudo borrar el archivo; la imagen igual quedó quitada de la ficha.",
+};
+function fileResultText(file) {
+  if (file && file.deleted) return "El archivo también se borró del almacenamiento.";
+  return FILE_RESULT_TEXT[(file && file.reason) || "kept"] || FILE_RESULT_TEXT.kept;
+}
+
+// Confirmación de quitar imagen (diálogo #imageRemoveDialog). Resuelve
+// { confirmed, deleteFile }; Cancelar/Esc → confirmed:false sin cambios.
+function confirmImageRemoval(label, url) {
+  const dlg = $("#imageRemoveDialog");
+  $("#imageRemoveTitle").textContent = `¿Quitar ${label} de esta ficha?`;
+  $("#imageRemovePreview").innerHTML = url ? `<img src="${esc(url)}" alt="">` : "";
+  $("#imageRemoveDeleteFile").checked = false;
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (confirmed) => {
+      if (done) return;
+      done = true;
+      $("#imageRemoveConfirm").removeEventListener("click", onConfirm);
+      dlg.removeEventListener("close", onClose);
+      resolve({ confirmed, deleteFile: confirmed && $("#imageRemoveDeleteFile").checked });
+      if (dlg.open) dlg.close();
+    };
+    const onConfirm = () => finish(true);
+    const onClose = () => finish(false);
+    $("#imageRemoveConfirm").addEventListener("click", onConfirm);
+    dlg.addEventListener("close", onClose);
+    dlg.showModal();
+  });
 }
 
 // Taxonomía VIBE aprobada en Fase 20.2 (VIBE_CATEGORY_GROUPS, importada de
@@ -181,7 +222,7 @@ function renderSecondaryThumbs(images) {
     .map(
       (url) => `<div class="secondary-thumb">
         <img src="${esc(url)}" alt="">
-        <button type="button" class="delete-secondary" data-url="${esc(url)}">Eliminar</button>
+        <button type="button" class="delete-secondary" data-url="${esc(url)}" aria-label="Quitar esta imagen adicional de la ficha">Quitar</button>
       </div>`
     )
     .join("")}</div>`;
@@ -235,7 +276,9 @@ function showLogin(message) {
 
 async function loadProducts() {
   $("#loadError").classList.add("hidden");
+  const taxPromise = taxState.loaded ? null : loadTaxonomyAdmin();
   const res = await adminFetch("/api/admin/products");
+  if (taxPromise) await taxPromise;
   if (res.status === 401) {
     clearToken();
     showLogin("Token incorrecto o vencido. Vuelve a ingresarlo.");
@@ -352,6 +395,14 @@ function renderTable() {
     : `<p class="empty-state">Ningún producto coincide con la búsqueda o el filtro.</p>`;
 }
 
+// Fase 55 — pedidos cuyo aviso a VIBE requiere revisión (solo si el
+// seguimiento está disponible).
+function noticeReviewSub() {
+  if (!ordersState.loaded || !ordersState.notificationTracking) return "";
+  const n = ordersState.orders.filter(needsNoticeReview).length;
+  return n ? `${n} con aviso a VIBE por revisar` : "";
+}
+
 // ---- Fase 52 — Inicio: cifras reales y lo que hoy se ve en el catálogo ----
 function renderHome() {
   if (!$("#homeStats")) return;
@@ -366,7 +417,7 @@ function renderHome() {
     stat(published.length, "publicados en el catálogo") +
     stat(withFicha, "fichas editoriales") +
     stat(products.length, "productos en el POS", `${inStock} con stock`) +
-    stat(recentOrders === null ? "—" : recentOrders, "pedidos en los últimos 7 días");
+    stat(recentOrders === null ? "—" : recentOrders, "pedidos en los últimos 7 días", noticeReviewSub());
 
   $("#homePublished").innerHTML = published.length
     ? published
@@ -397,20 +448,53 @@ function renderHome() {
 }
 
 // ---- Fase 52 — Clasificación (consulta) ----
+// ---- Fase 56 — taxonomía administrable (categorías y subcategorías) ----
+// Fuente: /api/admin/products?resource=taxonomy (documento editable en el
+// servidor; por defecto, la taxonomía de código). Toda acción es explícita,
+// muestra los productos afectados y pide confirmación; nada se reasigna por
+// similitud. Los valores históricos solo se corrigen desde cada ficha.
+let taxState = { loaded: false, doc: null, usage: [] };
+
+function taxToPublic(doc) {
+  return {
+    groups: doc.groups.map((g) => ({ group: g.group, categories: g.categories.map((c) => c.name) })),
+    subcategories: Object.fromEntries(doc.groups.flatMap((g) => g.categories.map((c) => [c.name, c.subcategories]))),
+  };
+}
+
+async function loadTaxonomyAdmin() {
+  try {
+    const res = await adminFetch("/api/admin/products?resource=taxonomy");
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data || !data.taxonomy || !Array.isArray(data.taxonomy.groups)) return;
+    taxState = { loaded: true, doc: data.taxonomy, usage: Array.isArray(data.usage) ? data.usage : [] };
+    applyTaxonomy(taxToPublic(data.taxonomy));
+  } catch {
+    // Sin la taxonomía editable se sigue con la de código; las acciones de
+    // edición quedan deshabilitadas (ver renderTaxonomy).
+  }
+}
+
 function renderTaxonomy() {
   if (!$("#taxonomyTree")) return;
+  const editable = taxState.loaded;
   const classified = state.products.filter((p) => p.editorialCategory);
   const productLink = (p) => `<button type="button" class="tax-product" data-edit="${p.id}">${esc(p.name)}${p.published ? "" : ` <span class="tax-muted">(no publicado)</span>`}</button>`;
+  const act = (attrs, label, cls = "") => (editable ? `<button type="button" class="tax-act ${cls}" ${attrs}>${label}</button>` : "");
   const groups = VIBE_CATEGORY_GROUPS.map(({ group, categories }) => {
     const inGroup = classified.filter((p) => categories.includes(p.editorialCategory));
     const cats = categories
-      .map((c) => {
+      .map((c, ci) => {
         const inCat = classified.filter((p) => p.editorialCategory === c);
         const approved = SUBCATEGORIES_BY_CATEGORY[c] || [];
         const subChips = approved
           .map((sub) => {
             const n = inCat.filter((p) => p.subcategory === sub).length;
-            return `<span class="sub-chip${n ? "" : " sub-zero"}">${esc(sub)}<b>${n}</b></span>`;
+            const attrs = `data-tax-sub="${esc(sub)}" data-tax-cat="${esc(c)}" title="Renombrar, mover o eliminar «${esc(sub)}»"`;
+            return editable
+              ? `<button type="button" class="sub-chip sub-edit${n ? "" : " sub-zero"}" ${attrs}>${esc(sub)}<b>${n}</b></button>`
+              : `<span class="sub-chip${n ? "" : " sub-zero"}">${esc(sub)}<b>${n}</b></span>`;
           })
           .join("");
         const historical = [...new Set(inCat.map((p) => p.subcategory).filter((v) => v && !approved.includes(v)))];
@@ -418,17 +502,19 @@ function renderTaxonomy() {
           .map((v) => `<span class="sub-chip sub-hist" title="Revisión pendiente: valor fuera de la lista controlada; se conserva hasta que lo revises">${esc(v)}<b>${inCat.filter((p) => p.subcategory === v).length}</b></span>`)
           .join("");
         const noSub = inCat.filter((p) => !p.subcategory).length;
+        const cAttr = `data-tax-cat="${esc(c)}"`;
         return `<div class="tax-cat">
-          <div class="tax-cat-head"><b>${esc(c)}</b><span class="tax-count">${inCat.length} ${inCat.length === 1 ? "producto" : "productos"}</span></div>
-          <div class="sub-chips">${subChips}${histChips}${noSub ? `<span class="sub-chip sub-none">Sin subcategoría<b>${noSub}</b></span>` : ""}</div>
+          <div class="tax-cat-head"><b>${esc(c)}</b><span class="tax-count">${inCat.length} ${inCat.length === 1 ? "producto" : "productos"}</span>
+            <span class="tax-actions">${act(`data-tax-reorder="-1" ${cAttr} aria-label="Subir «${esc(c)}» en ${esc(group)}" ${ci === 0 ? "disabled" : ""}`, "↑")}${act(`data-tax-reorder="1" ${cAttr} aria-label="Bajar «${esc(c)}» en ${esc(group)}" ${ci === categories.length - 1 ? "disabled" : ""}`, "↓")}${act(`data-tax-action="renameCategory" ${cAttr}`, "Renombrar")}${act(`data-tax-action="setCategoryGroup" ${cAttr}`, "Cambiar grupo")}${act(`data-tax-action="deleteCategory" ${cAttr}`, "Eliminar", "tax-danger")}</span></div>
+          <div class="sub-chips">${subChips}${histChips}${noSub ? `<span class="sub-chip sub-none">Sin subcategoría<b>${noSub}</b></span>` : ""}${act(`data-tax-action="addSubcategory" ${cAttr}`, "+ Subcategoría", "tax-add")}</div>
           ${inCat.length ? `<div class="tax-products">${inCat.map(productLink).join("")}</div>` : ""}
         </div>`;
       })
       .join("");
-    return `<section class="tax-group"><div class="tax-group-head"><h2>${esc(group)}</h2><span class="tax-count">${inGroup.length} con clasificación VIBE</span></div>${cats}</section>`;
+    return `<section class="tax-group"><div class="tax-group-head"><h2>${esc(group)}</h2><span class="tax-count">${inGroup.length} con clasificación VIBE</span>${act(`data-tax-action="addCategory" data-tax-group="${esc(group)}"`, "+ Categoría", "tax-add")}</div>${cats}</section>`;
   }).join("");
   const unclassifiedPublished = state.products.filter((p) => p.published && !p.editorialCategory);
-  const legend = `<p class="tax-legend"><span class="sub-chip sub-hist">Revisión pendiente<b>n</b></span> subcategoría guardada que no está en la lista controlada: se conserva hasta que la revises desde el editor del producto (con una sugerencia editable).</p>`;
+  const legend = `<p class="tax-legend"><span class="sub-chip sub-hist">Revisión pendiente<b>n</b></span> subcategoría guardada que no está en la lista controlada: se conserva hasta que la revises desde el editor del producto (con una sugerencia editable).${editable ? " Toca una subcategoría para renombrarla, moverla o eliminarla." : " La edición de la clasificación no está disponible en este momento (no se pudo cargar del servidor)."}</p>`;
   const unclassified = unclassifiedPublished.length
     ? `<section class="tax-group tax-note"><div class="tax-group-head"><h2>Publicados sin categoría VIBE</h2><span class="tax-count">aparecen por su categoría POS</span></div><div class="tax-products">${unclassifiedPublished.map((p) => `${productLink(p)}<span class="tax-muted">${esc(placementText(p) || "Solo «Todos»")}</span>`).join("")}</div></section>`
     : "";
@@ -445,6 +531,202 @@ function renderTaxonomy() {
     .map(([c, v]) => `<span class="pos-chip"><b>${esc(c)}</b>${v.total} en el POS · ${v.ficha} con ficha</span>`)
     .join("");
 }
+
+// Productos (con ficha) afectados por una categoría/subcategoría, según el
+// servidor (incluye no publicados).
+function taxAffected(category, subcategory) {
+  return taxState.usage.filter((p) => p.category === category && (subcategory === undefined || p.subcategory === subcategory));
+}
+function affectedHtml(list) {
+  if (!list.length) return `<p class="tax-impact">Ningún producto la usa.</p>`;
+  return `<p class="tax-impact">${list.length === 1 ? "1 producto la usa" : `${list.length} productos la usan`}:</p><ul class="tax-impact-list">${list.map((p) => `<li>#${p.id} ${esc(p.name)}${p.published ? "" : " (no publicado)"}</li>`).join("")}</ul>`;
+}
+function categoryOptions(exclude, placeholder) {
+  return `<option value="">${placeholder}</option>` + VIBE_CATEGORY_GROUPS.map((g) => `<optgroup label="${esc(g.group)}">${g.categories.filter((c) => c !== exclude).map((c) => `<option value="${esc(c)}">${esc(c)}</option>`).join("")}</optgroup>`).join("");
+}
+
+// Abre el diálogo de una acción. `build` devuelve { title, body, confirm,
+// danger?, collect() → payload | { error } }.
+function openTaxDialog(spec) {
+  const dlg = $("#taxDialog");
+  $("#taxDialogTitle").textContent = spec.title;
+  $("#taxDialogBody").innerHTML = spec.body;
+  $("#taxDialogError").classList.add("hidden");
+  const btn = $("#taxDialogConfirm");
+  btn.textContent = spec.confirm;
+  btn.className = `button ${spec.danger ? "danger" : "dark"}`;
+  btn.disabled = false;
+  btn.onclick = async () => {
+    const payload = spec.collect();
+    if (payload.error) return showTaxError(payload.error);
+    btn.disabled = true;
+    const result = await taxPost(payload);
+    btn.disabled = false;
+    if (result.ok) {
+      dlg.close();
+      showTaxNotice(spec.done || "Clasificación actualizada.");
+      return;
+    }
+    if (result.data && Array.isArray(result.data.affected) && spec.onConflict) {
+      spec.onConflict(result.data);
+      return;
+    }
+    showTaxError((result.data && result.data.error) || "No se pudo guardar. No se cambió nada.");
+  };
+  if (spec.afterRender) spec.afterRender();
+  if (!dlg.open) dlg.showModal();
+  const first = $("#taxDialogBody input, #taxDialogBody select");
+  if (first) first.focus();
+}
+function showTaxError(msg) {
+  $("#taxDialogError").textContent = msg;
+  $("#taxDialogError").classList.remove("hidden");
+}
+function showTaxNotice(msg) {
+  const el = $("#taxNotice");
+  el.textContent = msg;
+  el.classList.remove("hidden");
+}
+
+async function taxPost(payload) {
+  let res;
+  try {
+    res = await adminFetch("/api/admin/products?resource=taxonomy", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...payload, revision: taxState.doc.revision }),
+    });
+  } catch {
+    return { ok: false, data: { error: "Sin conexión. No se cambió nada." } };
+  }
+  if (res.status === 401) {
+    $("#taxDialog").close();
+    clearToken();
+    showLogin("Token incorrecto o vencido.");
+    return { ok: false, data: {} };
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) return { ok: false, data };
+  taxState = { loaded: true, doc: data.taxonomy, usage: Array.isArray(data.usage) ? data.usage : taxState.usage };
+  applyTaxonomy(taxToPublic(data.taxonomy));
+  await loadProducts();
+  renderTaxonomy();
+  return { ok: true, data };
+}
+
+const GROUP_NAMES_ADMIN = () => VIBE_CATEGORY_GROUPS.map((g) => g.group);
+function openTaxAction(action, el) {
+  const cat = el.dataset.taxCat;
+  const nameInput = (label, value = "") => `<label>${label}<input id="taxName" maxlength="60" value="${esc(value)}" autocomplete="off"></label>`;
+  const val = (id) => ($(`#${id}`) ? $(`#${id}`).value.trim() : "");
+  if (action === "addCategory") {
+    const group = el.dataset.taxGroup;
+    return openTaxDialog({ title: `Nueva categoría en ${group}`, body: nameInput("Nombre de la categoría"), confirm: "Crear categoría", done: "Categoría creada.",
+      collect: () => (val("taxName") ? { action, group, name: val("taxName") } : { error: "Escribe un nombre." }) });
+  }
+  if (action === "renameCategory") {
+    const used = taxAffected(cat);
+    return openTaxDialog({ title: `Renombrar «${cat}»`, body: nameInput("Nuevo nombre", cat) + affectedHtml(used) + (used.length ? `<p class="tax-note-text">Esos productos pasan a la categoría con el nombre nuevo (no cambia nada más de su ficha).</p>` : ""), confirm: "Renombrar", done: "Categoría renombrada.",
+      collect: () => (val("taxName") ? { action, name: cat, newName: val("taxName") } : { error: "Escribe un nombre." }) });
+  }
+  if (action === "setCategoryGroup") {
+    const current = VIBE_CATEGORY_GROUPS.find((g) => g.categories.includes(cat))?.group;
+    return openTaxDialog({ title: `Grupo de «${cat}»`, body: `<label>Grupo<select id="taxGroup">${GROUP_NAMES_ADMIN().map((g) => `<option value="${esc(g)}" ${g === current ? "selected" : ""}>${esc(g)}</option>`).join("")}</select></label><p class="tax-note-text">Cambia dónde aparece en la navegación pública. Los productos no cambian.</p>`, confirm: "Guardar", done: "Grupo actualizado.",
+      collect: () => ({ action, name: cat, group: val("taxGroup") }) });
+  }
+  if (action === "deleteCategory") {
+    const used = taxAffected(cat);
+    const reassign = used.length
+      ? `<label>Pasar sus productos a<select id="taxDestCat">${categoryOptions(cat, "Elige una categoría…")}</select></label><label>Subcategoría de destino (opcional)<select id="taxDestSub"><option value="">Sin subcategoría</option></select></label>`
+      : "";
+    return openTaxDialog({ title: `¿Eliminar la categoría «${cat}»?`, danger: true, confirm: "Eliminar categoría", done: "Categoría eliminada.",
+      body: affectedHtml(used) + reassign + `<p class="tax-note-text">Sus subcategorías también se eliminan de la lista. No se publica ni despublica ningún producto.</p>`,
+      afterRender: () => {
+        const destCat = $("#taxDestCat");
+        if (destCat) destCat.addEventListener("change", () => {
+          $("#taxDestSub").innerHTML = `<option value="">Sin subcategoría</option>` + (SUBCATEGORIES_BY_CATEGORY[destCat.value] || []).map((s) => `<option value="${esc(s)}">${esc(s)}</option>`).join("");
+        });
+      },
+      collect: () => {
+        if (!used.length) return { action, name: cat };
+        if (!val("taxDestCat")) return { error: "Elige a qué categoría pasan sus productos, o cancela." };
+        return { action, name: cat, reassign: { category: val("taxDestCat"), subcategory: val("taxDestSub") || null } };
+      } });
+  }
+  if (action === "addSubcategory") {
+    return openTaxDialog({ title: `Nueva subcategoría en «${cat}»`, body: nameInput("Nombre de la subcategoría"), confirm: "Crear subcategoría", done: "Subcategoría creada.",
+      collect: () => (val("taxName") ? { action, category: cat, name: val("taxName") } : { error: "Escribe un nombre." }) });
+  }
+}
+
+function openSubcategoryActions(el) {
+  const cat = el.dataset.taxCat;
+  const sub = el.dataset.taxSub;
+  const used = taxAffected(cat, sub);
+  const val = (id) => ($(`#${id}`) ? $(`#${id}`).value.trim() : "");
+  openTaxDialog({
+    title: `«${sub}» en ${cat}`,
+    body: affectedHtml(used) + `<fieldset class="tax-choice"><legend>¿Qué quieres hacer?</legend>
+      <label class="checkbox-field"><input type="radio" name="taxSubAction" value="renameSubcategory" checked> Renombrar</label>
+      <label class="checkbox-field"><input type="radio" name="taxSubAction" value="moveSubcategory"> Mover a otra categoría</label>
+      <label class="checkbox-field"><input type="radio" name="taxSubAction" value="deleteSubcategory"> Eliminar</label>
+      <label class="checkbox-field"><input type="radio" name="taxSubAction" value="reorderSubcategory"> Cambiar su posición en la lista</label></fieldset>
+      <div id="taxSubFields"></div>`,
+    confirm: "Aplicar",
+    done: "Subcategoría actualizada.",
+    afterRender: () => {
+      const render = () => {
+        const a = document.querySelector('input[name="taxSubAction"]:checked').value;
+        $("#taxDialogConfirm").className = `button ${a === "deleteSubcategory" ? "danger" : "dark"}`;
+        const siblings = SUBCATEGORIES_BY_CATEGORY[cat] || [];
+        const pos = siblings.indexOf(sub);
+        $("#taxSubFields").innerHTML =
+          a === "reorderSubcategory"
+            ? `<label>Mover<select id="taxDirection">${pos > 0 ? `<option value="-1">Una posición antes (queda antes de «${esc(siblings[pos - 1])}»)</option>` : ""}${pos < siblings.length - 1 ? `<option value="1">Una posición después (queda después de «${esc(siblings[pos + 1])}»)</option>` : ""}</select></label><p class="tax-note-text">Solo cambia el orden en la navegación y en el Admin. Ningún producto cambia.</p>`
+            : a === "renameSubcategory"
+            ? `<label>Nuevo nombre<input id="taxName" maxlength="60" value="${esc(sub)}" autocomplete="off"></label>${used.length ? `<p class="tax-note-text">Esos productos conservan su categoría y pasan al nombre nuevo.</p>` : ""}`
+            : a === "moveSubcategory"
+              ? `<label>Mover a<select id="taxDestCat">${categoryOptions(cat, "Elige una categoría…")}</select></label>${used.length ? `<p class="tax-note-text">Esos productos se mueven con ella: cambia su categoría, conservan la subcategoría.</p>` : ""}`
+              : used.length
+                ? `<label>Pasar sus productos a<select id="taxDestSub"><option value="__choose__">Elige…</option><option value="">Sin subcategoría</option>${(SUBCATEGORIES_BY_CATEGORY[cat] || []).filter((x) => x !== sub).map((x) => `<option value="${esc(x)}">${esc(x)}</option>`).join("")}</select></label>`
+                : `<p class="tax-note-text">Se elimina de la lista. Ningún producto la usa.</p>`;
+      };
+      document.querySelectorAll('input[name="taxSubAction"]').forEach((r) => r.addEventListener("change", render));
+      render();
+    },
+    collect: () => {
+      const a = document.querySelector('input[name="taxSubAction"]:checked').value;
+      if (a === "renameSubcategory") return val("taxName") ? { action: a, category: cat, name: sub, newName: val("taxName") } : { error: "Escribe un nombre." };
+      if (a === "moveSubcategory") return val("taxDestCat") ? { action: a, category: cat, name: sub, toCategory: val("taxDestCat") } : { error: "Elige la categoría de destino." };
+      if (a === "reorderSubcategory") return val("taxDirection") ? { action: a, category: cat, name: sub, direction: Number(val("taxDirection")) } : { error: "Es la única subcategoría: no hay otro orden posible." };
+      if (!used.length) return { action: a, category: cat, name: sub };
+      const to = $("#taxDestSub").value;
+      if (to === "__choose__") return { error: "Elige a qué subcategoría pasan sus productos (o «Sin subcategoría»), o cancela." };
+      return { action: a, category: cat, name: sub, reassignTo: to };
+    },
+  });
+}
+
+// Fase 57 — subir/bajar una categoría dentro de su grupo (sin diálogo: no
+// afecta productos). Se aplica sobre la revisión a la vista, como el resto.
+async function reorderCategory(btn) {
+  btn.disabled = true;
+  const result = await taxPost({ action: "reorderCategory", name: btn.dataset.taxCat, direction: Number(btn.dataset.taxReorder) });
+  if (result.ok) showTaxNotice("Orden actualizado.");
+  else {
+    btn.disabled = false;
+    showTaxNotice((result.data && result.data.error) || "No se pudo cambiar el orden. No se cambió nada.");
+  }
+}
+
+$("#taxonomyTree").addEventListener("click", (e) => {
+  const r = e.target.closest("[data-tax-reorder]");
+  if (r) return reorderCategory(r);
+  const a = e.target.closest("[data-tax-action]");
+  if (a) return openTaxAction(a.dataset.taxAction, a);
+  const sub = e.target.closest("[data-tax-sub]");
+  if (sub) openSubcategoryActions(sub);
+});
 
 function arrayFieldToText(arr) {
   return Array.isArray(arr) ? arr.join("\n") : "";
@@ -612,6 +894,22 @@ async function openEdit(productId) {
     </details>
 
     <details class="admin-accordion" open>
+      <summary>Tonos y presentaciones</summary>
+      <div class="admin-accordion-body">
+        <p class="section-hint">Dos opciones independientes: configura solo las que este producto realmente tenga. Con <b>varias</b> opciones activas la clienta debe elegir antes de agregar al carrito; con <b>una sola</b> se muestra sin selector; <b>vacío</b> = sin selector. El POS no maneja precio ni inventario por opción: todas usan el precio y el stock del producto. Desactiva una opción cuando no haya unidades de ella.</p>
+        <h4 class="option-block-title">Tonos</h4>
+        <p class="section-hint">Muestras circulares en la ficha pública. Un tono sin color queda <b>pendiente</b> y no se muestra.</p>
+        <div id="shadeRows" class="shade-rows"></div>
+        <button type="button" id="addShadeBtn" class="button">+ Agregar tono</button>
+        <p id="shadeStatus" class="section-hint" role="status"></p>
+        <h4 class="option-block-title">Presentaciones</h4>
+        <p class="section-hint">Etiqueta comercial real de cada presentación (ej. «15 ml», «30 ml», «Individual»). Si no configuras ninguna, el pedido conserva el texto del campo <b>Presentación</b> de la ficha, si existe.</p>
+        <div id="presentationRows" class="shade-rows"></div>
+        <button type="button" id="addPresentationBtn" class="button">+ Agregar presentación</button>
+      </div>
+    </details>
+
+    <details class="admin-accordion" open>
       <summary>3. Imágenes</summary>
       <div class="admin-accordion-body">
         <div class="image-block">
@@ -621,6 +919,7 @@ async function openEdit(productId) {
           </div>
           <input type="file" id="mainImageInput" accept="image/webp,image/jpeg,image/png">
           <button type="button" id="uploadMainBtn" class="button dark">Subir / reemplazar principal</button>
+          <button type="button" id="removeMainBtn" class="button remove-image-btn${m.image ? "" : " hidden"}">Quitar imagen principal</button>
           <p id="mainImageStatus" class="image-status"></p>
         </div>
         <label>Imagen (ruta o URL)
@@ -803,6 +1102,148 @@ async function openEdit(productId) {
   $("textarea[name=manufacturer_info]").value = d.manufacturerInfo || "";
   $("textarea[name=search_keywords]").value = arrayFieldToText(m.search_keywords);
 
+  // Fase 56 — tonos (variantes de color). Borrador local; se guarda con el
+  // resto de la ficha (additional_info.shades). Nunca toca el POS.
+  let shadesDraft = Array.isArray(d.shades) ? d.shades.map((sh) => ({ ...sh })) : [];
+  const newShadeId = () => `s-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  function markDirty() {
+    editState.fichaDirty = true;
+  }
+  function renderShadeRows() {
+    $("#shadeRows").innerHTML = shadesDraft.length
+      ? shadesDraft
+          .map(
+            (sh, i) => `<div class="shade-row" data-i="${i}">
+          <span class="shade-dot${sh.hex ? "" : " shade-dot-empty"}" style="--shade:${esc(sh.hex || "#ffffff")}" aria-hidden="true"></span>
+          <label class="shade-color">Color<input type="color" name="shade_color" value="${esc(sh.hex || "#cccccc")}" data-shade-color="${i}" aria-label="Color del tono ${esc(sh.name || i + 1)}"></label>
+          <label class="shade-name">Nombre<input name="shade_name" value="${esc(sh.name || "")}" maxlength="40" data-shade-name="${i}" placeholder="Ej. Rojo pasión"></label>
+          <label class="checkbox-field shade-active"><input type="checkbox" name="shade_active" data-shade-active="${i}" ${sh.active ? "checked" : ""}> Activo</label>
+          ${sh.hex ? "" : `<span class="pill pill-warn">Pendiente: elige un color</span>`}
+          <span class="shade-tools">
+            <button type="button" class="tax-act" data-shade-move="${i}:-1" aria-label="Subir" ${i === 0 ? "disabled" : ""}>↑</button>
+            <button type="button" class="tax-act" data-shade-move="${i}:1" aria-label="Bajar" ${i === shadesDraft.length - 1 ? "disabled" : ""}>↓</button>
+            <button type="button" class="tax-act tax-danger" data-shade-remove="${i}">Quitar</button>
+          </span>
+        </div>`
+          )
+          .join("")
+      : `<p class="no-image">Este producto no tiene tonos configurados.</p>`;
+  }
+  renderShadeRows();
+  $("#addShadeBtn").addEventListener("click", () => {
+    shadesDraft.push({ id: newShadeId(), name: "", hex: null, active: false, order: shadesDraft.length });
+    markDirty();
+    renderShadeRows();
+    const inputs = document.querySelectorAll("[data-shade-name]");
+    if (inputs.length) inputs[inputs.length - 1].focus();
+  });
+  $("#shadeRows").addEventListener("input", (e) => {
+    const t = e.target;
+    if (t.dataset.shadeName !== undefined) shadesDraft[Number(t.dataset.shadeName)].name = t.value;
+    if (t.dataset.shadeColor !== undefined) {
+      const sh = shadesDraft[Number(t.dataset.shadeColor)];
+      const wasPending = !sh.hex;
+      sh.hex = t.value;
+      if (wasPending) renderShadeRows();
+      else t.closest(".shade-row").querySelector(".shade-dot").style.setProperty("--shade", t.value);
+    }
+  });
+  $("#shadeRows").addEventListener("change", (e) => {
+    const t = e.target;
+    if (t.dataset.shadeActive !== undefined) shadesDraft[Number(t.dataset.shadeActive)].active = t.checked;
+  });
+  $("#shadeRows").addEventListener("click", (e) => {
+    const mv = e.target.closest("[data-shade-move]");
+    const rm = e.target.closest("[data-shade-remove]");
+    if (mv) {
+      const [i, d2] = mv.dataset.shadeMove.split(":").map(Number);
+      const j = i + d2;
+      if (j < 0 || j >= shadesDraft.length) return;
+      [shadesDraft[i], shadesDraft[j]] = [shadesDraft[j], shadesDraft[i]];
+      markDirty();
+      renderShadeRows();
+    }
+    if (rm) {
+      const i = Number(rm.dataset.shadeRemove);
+      const sh = shadesDraft[i];
+      if (!confirm(`¿Quitar el tono «${sh.name || "sin nombre"}» de esta ficha? Si alguna clienta lo tiene en el carrito, el checkout le pedirá elegir otro.`)) return;
+      shadesDraft.splice(i, 1);
+      markDirty();
+      renderShadeRows();
+    }
+  });
+  function shadesPayload() {
+    return shadesDraft.map((sh, i) => ({ id: sh.id, name: (sh.name || "").trim(), hex: sh.hex || null, active: sh.active === true && Boolean(sh.hex), order: i }));
+  }
+
+  // Fase 57 — presentaciones (additional_info.presentations), dimensión
+  // independiente de los tonos. Mismo patrón de borrador local.
+  let presentationsDraft = Array.isArray(d.presentations) ? d.presentations.map((pr) => ({ ...pr })) : [];
+  const newPresentationId = () => `p-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  function renderPresentationRows() {
+    $("#presentationRows").innerHTML = presentationsDraft.length
+      ? presentationsDraft
+          .map(
+            (pr, i) => `<div class="shade-row presentation-row" data-i="${i}">
+          <label class="shade-name">Etiqueta<input name="presentation_name" value="${esc(pr.name || "")}" maxlength="40" data-presentation-name="${i}" placeholder="Ej. 30 ml"></label>
+          <label class="checkbox-field shade-active"><input type="checkbox" name="presentation_active" data-presentation-active="${i}" ${pr.active ? "checked" : ""}> Activa</label>
+          <span class="shade-tools">
+            <button type="button" class="tax-act" data-presentation-move="${i}:-1" aria-label="Subir presentación ${esc(pr.name || i + 1)}" ${i === 0 ? "disabled" : ""}>↑</button>
+            <button type="button" class="tax-act" data-presentation-move="${i}:1" aria-label="Bajar presentación ${esc(pr.name || i + 1)}" ${i === presentationsDraft.length - 1 ? "disabled" : ""}>↓</button>
+            <button type="button" class="tax-act tax-danger" data-presentation-remove="${i}">Quitar</button>
+          </span>
+        </div>`
+          )
+          .join("")
+      : `<p class="no-image">Este producto no tiene presentaciones configuradas.</p>`;
+  }
+  renderPresentationRows();
+  $("#addPresentationBtn").addEventListener("click", () => {
+    presentationsDraft.push({ id: newPresentationId(), name: "", active: true, order: presentationsDraft.length });
+    markDirty();
+    renderPresentationRows();
+    const inputs = document.querySelectorAll("[data-presentation-name]");
+    if (inputs.length) inputs[inputs.length - 1].focus();
+  });
+  $("#presentationRows").addEventListener("input", (e) => {
+    const t = e.target;
+    if (t.dataset.presentationName !== undefined) presentationsDraft[Number(t.dataset.presentationName)].name = t.value;
+  });
+  $("#presentationRows").addEventListener("change", (e) => {
+    const t = e.target;
+    if (t.dataset.presentationActive !== undefined) presentationsDraft[Number(t.dataset.presentationActive)].active = t.checked;
+  });
+  $("#presentationRows").addEventListener("click", (e) => {
+    const mv = e.target.closest("[data-presentation-move]");
+    const rm = e.target.closest("[data-presentation-remove]");
+    if (mv) {
+      const [i, d2] = mv.dataset.presentationMove.split(":").map(Number);
+      const j = i + d2;
+      if (j < 0 || j >= presentationsDraft.length) return;
+      [presentationsDraft[i], presentationsDraft[j]] = [presentationsDraft[j], presentationsDraft[i]];
+      markDirty();
+      renderPresentationRows();
+    }
+    if (rm) {
+      const i = Number(rm.dataset.presentationRemove);
+      const pr = presentationsDraft[i];
+      if (!confirm(`¿Quitar la presentación «${pr.name || "sin nombre"}» de esta ficha? Si alguna clienta la tiene en el carrito, el checkout le pedirá elegir otra.`)) return;
+      presentationsDraft.splice(i, 1);
+      markDirty();
+      renderPresentationRows();
+    }
+  });
+  function presentationsPayload() {
+    return presentationsDraft.map((pr, i) => ({ id: pr.id, name: (pr.name || "").trim(), active: pr.active === true, order: i }));
+  }
+  // Nombre repetido dentro de una dimensión (sin distinguir mayúsculas,
+  // acentos ni espacios) → no se guarda.
+  const optionKey = (s) => (s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim().toLowerCase();
+  const hasDuplicateNames = (list) => {
+    const keys = list.map((o) => optionKey(o.name)).filter(Boolean);
+    return new Set(keys).size !== keys.length;
+  };
+
   // Fase 53 — subcategoría efectiva según el selector.
   function currentSubcategory() {
     const choice = $('[name="subcategory_choice"]').value;
@@ -813,6 +1254,18 @@ async function openEdit(productId) {
   $("#editForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     const fd = readAllFields();
+    if (shadesDraft.some((sh) => !(sh.name || "").trim())) {
+      setSaveStatus("No se guardó: cada tono necesita un nombre (pestaña Identidad y clasificación › Tonos y presentaciones).", true);
+      return;
+    }
+    if (presentationsDraft.some((pr) => !(pr.name || "").trim())) {
+      setSaveStatus("No se guardó: cada presentación necesita su etiqueta (pestaña Identidad y clasificación › Tonos y presentaciones).", true);
+      return;
+    }
+    if (hasDuplicateNames(shadesDraft) || hasDuplicateNames(presentationsDraft)) {
+      setSaveStatus("No se guardó: hay tonos o presentaciones con el mismo nombre. Cada opción debe tener un nombre distinto.", true);
+      return;
+    }
     const payload = {
       product_id: product.id,
       image: fd.image || null,
@@ -874,6 +1327,8 @@ async function openEdit(productId) {
         manufacturerInfo: fd.manufacturer_info || null,
         commercialAngle: fd.commercial_angle || null,
         usageOccasion: fd.usage_occasion || null,
+        shades: shadesPayload(),
+        presentations: presentationsPayload(),
       },
     };
 
@@ -1074,6 +1529,25 @@ async function openEdit(productId) {
     if (result) {
       $("#mainImagePreview").innerHTML = `<img src="${esc(result.image)}" alt="">`;
       $("input[name=image]").value = result.image || "";
+      $("#removeMainBtn").classList.remove("hidden");
+      await loadProducts();
+    }
+  });
+
+  // Fase 56 — quitar la imagen principal (el archivo se conserva salvo
+  // confirmación expresa). La ficha puede quedar sin imagen.
+  $("#removeMainBtn").addEventListener("click", async () => {
+    const url = $("input[name=image]").value.trim();
+    const statusEl = $("#mainImageStatus");
+    if (!url) return;
+    const { confirmed, deleteFile } = await confirmImageRemoval("la imagen principal", url);
+    if (!confirmed) return;
+    const result = await removeProductImage(product.id, "main", url, deleteFile, statusEl);
+    if (result) {
+      $("#mainImagePreview").innerHTML = `<span class="no-image">Sin imagen</span>`;
+      $("input[name=image]").value = "";
+      $("#removeMainBtn").classList.add("hidden");
+      setImageStatus(statusEl, "ok", "Imagen principal quitada de la ficha. " + fileResultText(result.file));
       await loadProducts();
     }
   });
@@ -1096,12 +1570,13 @@ async function openEdit(productId) {
   $("#secondaryList").addEventListener("click", async (e) => {
     const btn = e.target.closest(".delete-secondary");
     if (!btn) return;
-    if (!confirm("¿Eliminar esta imagen secundaria?")) return;
+    const { confirmed, deleteFile } = await confirmImageRemoval("esta imagen adicional", btn.dataset.url);
+    if (!confirmed) return;
     const statusEl = $("#secondaryImageStatus");
-    const result = await deleteSecondaryImage(product.id, btn.dataset.url, statusEl);
+    const result = await removeProductImage(product.id, "secondary", btn.dataset.url, deleteFile, statusEl);
     if (result) {
       $("#secondaryList").innerHTML = renderSecondaryThumbs(result.images);
-      setImageStatus(statusEl, "ok", "Imagen eliminada correctamente.");
+      setImageStatus(statusEl, "ok", "Imagen quitada de la ficha. " + fileResultText(result.file));
       await loadProducts();
     }
   });
@@ -1153,6 +1628,7 @@ const EDITOR_TABS = [
 const SECTION_TAB = {
   "Promoción VIBE": "promo",
   "2. Identificación": "identity",
+  "Tonos y presentaciones": "identity",
   "3. Imágenes": "images",
   "4. Descripción": "content",
   "5. Beneficios": "content",
@@ -1696,7 +2172,7 @@ function openHeroEdit(slide) {
 // nada, no hay DDL) — solo deja de mostrarse como indicador operativo.
 // ==========================================================================
 
-let ordersState = { orders: [], loaded: false };
+let ordersState = { orders: [], loaded: false, notificationTracking: false };
 
 async function loadOrders() {
   $("#ordersLoadError").classList.add("hidden");
@@ -1714,6 +2190,7 @@ async function loadOrders() {
   }
   const data = await res.json();
   ordersState.orders = data.orders || [];
+  ordersState.notificationTracking = data.notificationTracking === true;
   ordersState.loaded = true;
   renderOrdersTable();
 }
@@ -1728,9 +2205,54 @@ function formatOrderDate(iso) {
 
 const ORDER_STATUS_LABELS = { received: "Recibido", confirmed: "Confirmado", cancelled: "Cancelado" };
 
+// ---- Fase 55 — aviso interno a VIBE por pedido ----
+// Estado guardado en el servidor (migración 0004): "accepted" = el
+// proveedor de correo aceptó el aviso (la entrega en el buzón no se puede
+// confirmar desde aquí); "failed"/"not_configured" = requiere revisión;
+// null = sin dato (pedidos anteriores a esta fase), nunca se presenta como
+// avisado.
+const INTERNAL_NOTICE = {
+  accepted: { label: "Enviado", pill: "pill-ok", title: "El proveedor de correo aceptó el aviso a VIBE (la entrega en el buzón no se confirma desde aquí)." },
+  failed: { label: "Falló", pill: "pill-warn", title: "El aviso a VIBE no se pudo enviar. Revisa el pedido y reintenta." },
+  not_configured: { label: "No configurado", pill: "pill-warn", title: "El correo de avisos no está configurado en el servidor." },
+};
+const needsNoticeReview = (o) => o.internal_notification_status === "failed" || o.internal_notification_status === "not_configured";
+
+function internalNoticeCell(o) {
+  if (!ordersState.notificationTracking) return `<span class="pill pill-muted" title="Falta aplicar la migración 0004">—</span>`;
+  const info = INTERNAL_NOTICE[o.internal_notification_status];
+  const chip = info
+    ? `<span class="pill ${info.pill}" title="${esc(info.title)}">${info.label}</span>`
+    : `<span class="pill pill-muted" title="Pedido anterior al registro de avisos: no hay dato.">Sin dato</span>`;
+  const retry = o.internal_notification_status === "accepted"
+    ? ""
+    : ` <button type="button" class="order-retry link-btn" data-retry-notice="${esc(o.id)}" aria-label="Reintentar aviso a VIBE del pedido #${esc(o.id)}">Reintentar aviso</button>`;
+  return chip + retry;
+}
+
+function renderOrdersReview() {
+  const el = $("#ordersReview");
+  if (!el) return;
+  if (!ordersState.notificationTracking) {
+    el.textContent = ordersState.orders.length ? "Seguimiento del aviso a VIBE no disponible todavía (falta aplicar la migración 0004)." : "";
+    el.classList.toggle("hidden", !ordersState.orders.length);
+    el.classList.remove("is-warn");
+    return;
+  }
+  const review = ordersState.orders.filter(needsNoticeReview).length;
+  const unknown = ordersState.orders.filter((o) => !o.internal_notification_status).length;
+  const parts = [];
+  if (review) parts.push(`${review} ${review === 1 ? "pedido requiere" : "pedidos requieren"} revisión: el aviso a VIBE no se envió.`);
+  if (unknown) parts.push(`${unknown} ${unknown === 1 ? "pedido anterior" : "pedidos anteriores"} sin dato de aviso.`);
+  el.textContent = parts.join(" ");
+  el.classList.toggle("hidden", !parts.length);
+  el.classList.toggle("is-warn", review > 0);
+}
+
 function renderOrdersTable() {
   const list = ordersState.orders;
   $("#ordersCount").textContent = list.length === 1 ? "1 pedido" : `${list.length} pedidos`;
+  renderOrdersReview();
   $("#ordersRows").innerHTML = list.length
     ? list
         .map(
@@ -1744,11 +2266,47 @@ function renderOrdersTable() {
         <td>${money(Number(o.total))}</td>
         <td>${esc(ORDER_STATUS_LABELS[o.status] || o.status)}</td>
         <td>${o.email_sent ? "Sí" : "No"}</td>
+        <td class="notice-cell">${internalNoticeCell(o)}</td>
         <td><button type="button" class="order-delete" data-delete-order="${esc(o.id)}" aria-label="Eliminar pedido #${esc(o.id)}">Eliminar</button></td>
       </tr>`
         )
         .join("")
-    : `<tr><td colspan="10"><span class="section-hint">Todavía no hay ningún pedido registrado.</span></td></tr>`;
+    : `<tr><td colspan="11"><span class="section-hint">Todavía no hay ningún pedido registrado.</span></td></tr>`;
+}
+
+// Fase 55 — reintento del aviso interno. Pide confirmación; el servidor
+// vuelve a exigir el token, rechaza pedidos ya avisados y reintentos en
+// menos de un minuto, y nunca reenvía el email al cliente ni WhatsApp.
+async function retryInternalNotice(id) {
+  const order = ordersState.orders.find((o) => String(o.id) === String(id));
+  if (!order) return;
+  const ok = confirm(`¿Reenviar el aviso interno del pedido #${order.id} al correo de VIBE?\n\nSolo se reenvía el aviso a VIBE: el cliente no recibe nada y el pedido no cambia.`);
+  if (!ok) return;
+  const btn = document.querySelector(`[data-retry-notice="${CSS.escape(String(order.id))}"]`);
+  if (btn) { btn.disabled = true; btn.textContent = "Enviando…"; }
+  let res;
+  try {
+    res = await adminFetch("/api/admin/orders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "retry-internal-notification", id: order.id }) });
+  } catch {
+    res = null;
+  }
+  if (res && res.status === 401) {
+    clearToken();
+    showLogin("Token incorrecto o vencido.");
+    return;
+  }
+  const data = res ? await res.json().catch(() => ({})) : {};
+  if (data && data.internalNotification) {
+    Object.assign(order, {
+      internal_notification_status: data.internalNotification.status,
+      internal_notification_at: data.internalNotification.at,
+      internal_notification_error: data.internalNotification.error,
+    });
+  }
+  renderOrdersTable();
+  renderHome();
+  if (res && res.ok) showOrdersNotice(`Aviso del pedido #${order.id} enviado al correo de VIBE (aceptado por el proveedor).` + (data.recorded === false ? " No se pudo registrar el resultado; recarga para verificarlo." : ""));
+  else showOrdersNotice(`No se envió el aviso del pedido #${order.id}: ${(data && data.error) || (data && data.internalNotification ? "el proveedor de correo lo rechazó" : "error de conexión")}.`, true);
 }
 
 // ---- Fase 53 — eliminar un pedido (cualquier estado) ----
@@ -1813,6 +2371,8 @@ async function confirmOrderDelete() {
 $("#ordersRows").addEventListener("click", (e) => {
   const btn = e.target.closest("[data-delete-order]");
   if (btn) openOrderDelete(btn.dataset.deleteOrder);
+  const retry = e.target.closest("[data-retry-notice]");
+  if (retry && !retry.disabled) retryInternalNotice(retry.dataset.retryNotice);
 });
 $("#orderDeleteConfirm").addEventListener("click", confirmOrderDelete);
 $("#orderDeleteDialog").addEventListener("close", () => {

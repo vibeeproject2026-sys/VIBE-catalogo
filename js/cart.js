@@ -11,4 +11,70 @@
 // es null salvo que quien llama a addToCart lo pase explícitamente (ver
 // js/app.js: solo el PDP lo pasa, y solo cuando hay promoción real
 // resuelta server-side) — nunca se calcula ni se infiere aquí.
-const KEY="vibe-cart-v1";let items=JSON.parse(localStorage.getItem(KEY)||"[]");const save=()=>localStorage.setItem(KEY,JSON.stringify(items));const sameId=(a,b)=>String(a)===String(b);export const getCart=()=>[...items];export const addToCart=(p,v,q=1)=>{const x=items.find(i=>sameId(i.productId,p.id)&&sameId(i.variantId,v.id));if(x)x.quantity+=q;else items.push({productId:p.id,variantId:v.id,name:p.name,brand:p.brand??null,variantName:v.name,price:v.price,originalPrice:v.originalPrice??null,quantity:q,sku:v.sku,image:p.image});save()};export const changeQuantity=(pid,vid,d)=>{const x=items.find(i=>sameId(i.productId,pid)&&sameId(i.variantId,vid));if(!x)return;x.quantity+=d;if(x.quantity<1)items=items.filter(i=>!(sameId(i.productId,pid)&&sameId(i.variantId,vid)));save()};export const removeFromCart=(pid,vid)=>{items=items.filter(i=>!(sameId(i.productId,pid)&&sameId(i.variantId,vid)));save()};export const clearCart=()=>{items=[];save()};export const getCartCount=()=>items.reduce((n,i)=>n+i.quantity,0);export const getCartTotal=()=>items.reduce((n,i)=>n+i.price*i.quantity,0);
+// Fase 57 — cada línea guarda también shadeId/shadeName y
+// presentationId/presentationName; variantId es la clave de la combinación
+// (js/variants.js#variantKey), así combinaciones distintas del mismo
+// producto son líneas separadas y la misma combinación se agrupa.
+// Fase 56 — se reescribe legible (misma API pública) y se agregan:
+// - variantHex: color del tono elegido (solo para mostrarlo en el carrito);
+// - syncCartPrices(resolver): actualiza el precio guardado de cada línea al
+//   vigente del catálogo y devuelve qué cambió, para avisar al cliente. El
+//   servidor sigue siendo la autoridad final (recalcula al crear el pedido).
+const KEY = "vibe-cart-v1";
+let items = (() => {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(KEY) || "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+})();
+const save = () => localStorage.setItem(KEY, JSON.stringify(items));
+const sameId = (a, b) => String(a) === String(b);
+const sameLine = (i, pid, vid) => sameId(i.productId, pid) && sameId(i.variantId, vid);
+
+export const getCart = () => [...items];
+
+export const addToCart = (p, v, q = 1) => {
+  const x = items.find((i) => sameLine(i, p.id, v.id));
+  if (x) x.quantity += q;
+  else items.push({ productId: p.id, variantId: v.id, name: p.name, brand: p.brand ?? null, variantName: v.name, variantHex: v.hex ?? null, shadeId: v.shadeId ?? null, shadeName: v.shadeName ?? null, presentationId: v.presentationId ?? null, presentationName: v.presentationName ?? null, price: v.price, originalPrice: v.originalPrice ?? null, quantity: q, sku: v.sku, image: p.image });
+  save();
+};
+
+export const changeQuantity = (pid, vid, d) => {
+  const x = items.find((i) => sameLine(i, pid, vid));
+  if (!x) return;
+  x.quantity += d;
+  if (x.quantity < 1) items = items.filter((i) => !sameLine(i, pid, vid));
+  save();
+};
+
+export const removeFromCart = (pid, vid) => {
+  items = items.filter((i) => !sameLine(i, pid, vid));
+  save();
+};
+
+export const clearCart = () => {
+  items = [];
+  save();
+};
+
+export const getCartCount = () => items.reduce((n, i) => n + i.quantity, 0);
+export const getCartTotal = () => items.reduce((n, i) => n + i.price * i.quantity, 0);
+
+// resolver(item) → { price, originalPrice } vigentes, o null si el
+// producto/variante ya no existe (esa línea no se toca: el checkout la
+// marca como no disponible). Devuelve [{ name, variantName, from, to }].
+export const syncCartPrices = (resolver) => {
+  const changes = [];
+  for (const i of items) {
+    const current = resolver(i);
+    if (!current || typeof current.price !== "number" || !Number.isFinite(current.price)) continue;
+    if (current.price !== i.price) changes.push({ name: i.name, variantName: i.variantName, from: i.price, to: current.price });
+    i.price = current.price;
+    i.originalPrice = current.originalPrice ?? null;
+  }
+  if (changes.length) save();
+  return changes;
+};

@@ -198,7 +198,12 @@ async function main() {
       let capturedBody = null;
       let capturedMethod = null;
       global.fetch = async (url, opts) => {
-        capturedMethod = opts.method;
+        // Fase 56 — la validación lee la taxonomía editable (config/taxonomy.json
+    // en Storage); en estos tests no existe → taxonomía por defecto.
+    if (String(url).includes("/storage/v1/object/") && String(url).includes("config/taxonomy.json")) {
+      return { ok: false, status: 404, text: async () => "" };
+    }
+    capturedMethod = opts.method;
         capturedBody = JSON.parse(opts.body);
         return { ok: true, status: 200, text: async () => JSON.stringify([{ product_id: 56, published: true }]) };
       };

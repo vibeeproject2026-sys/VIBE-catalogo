@@ -1,0 +1,7 @@
+# Fase 58 — solo se despliega lo que el sitio usa en ejecución.
+# Documentación interna, pruebas, scripts de imágenes y migraciones SQL
+# no se publican como archivos estáticos (antes respondían 200).
+docs/
+scripts/
+supabase/
+README.md

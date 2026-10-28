@@ -14,6 +14,7 @@ const { joinCatalog, shapeProduct } = require("./_lib/merge");
 const { resolveCategoryGroup } = require("./_lib/categoryGroups");
 const { applyCors } = require("./_lib/cors");
 const { sendJson, sendError, methodNotAllowed } = require("./_lib/http");
+const { loadTaxonomy, publicTaxonomy } = require("../_lib/taxonomyStore");
 
 const PRODUCT_COLUMNS = "id,name,price,stock,category";
 const METADATA_COLUMNS = "product_id,subcategory,featured,editorial_order,published";
@@ -30,6 +31,21 @@ module.exports = async function handler(req, res) {
   } catch (e) {
     console.error("[catalog/categories] " + e.message);
     return sendError(res, 500, "Servicio no disponible temporalmente.");
+  }
+
+  // Fase 56 — ?view=taxonomy: la taxonomía VIBE vigente (editable desde el
+  // Admin; por defecto, la de código). Solo nombres de grupos, categorías y
+  // subcategorías: nada de productos ni datos internos. Si no se puede
+  // leer, el sitio sigue con la taxonomía de código.
+  if (req.query && req.query.view === "taxonomy") {
+    try {
+      const taxonomy = publicTaxonomy(await loadTaxonomy(env));
+      res.setHeader("Cache-Control", "public, max-age=60, s-maxage=60, stale-while-revalidate=300");
+      return sendJson(res, 200, { taxonomy });
+    } catch (e) {
+      console.error("[catalog/categories] taxonomía no disponible (" + (e && e.status ? "HTTP " + e.status : "error") + ").");
+      return sendError(res, 502, "Taxonomía no disponible.");
+    }
   }
 
   try {

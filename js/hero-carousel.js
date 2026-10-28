@@ -54,11 +54,21 @@ function heroSlideHtml(s, i) {
   // mobile es más alto que ella. La pieza real sigue completa encima
   // (object-fit:contain). Oculto en tablet/desktop (ver .hero-slide-backdrop).
   const backdropSrc = hasMobileVariant ? s.mobileImage : s.image;
+  // Fase 57 — versiones WebP optimizadas solo si la API las envía (el
+  // original figura en config/image-variants.json). El fondo usa el MISMO
+  // srcset/sizes que la imagen visible para que el navegador elija el mismo
+  // archivo (una sola descarga). Si una versión falla, js/app.js vuelve al
+  // original (data-fallback-src). Sin srcset: exactamente como antes.
+  const SIZES_DESKTOP = "(max-width: 1180px) 100vw, 1180px";
+  const backdropSet = hasMobileVariant ? s.mobileImageSrcset : s.imageSrcset;
+  const backdropAttrs = backdropSet ? ` srcset="${esc(backdropSet)}" sizes="${hasMobileVariant ? "100vw" : SIZES_DESKTOP}" data-fallback-src="${esc(backdropSrc)}"` : "";
+  const mainAttrs = s.imageSrcset ? ` srcset="${esc(s.imageSrcset)}" sizes="${SIZES_DESKTOP}"` : "";
+  const mainFallback = s.imageSrcset || (hasMobileVariant && s.mobileImageSrcset) ? ` data-fallback-src="${esc(s.image)}"` : "";
   return `<${tag} class="hero-slide${i === 0 ? " active" : ""}"${hrefAttr} data-index="${i}">
-    <img class="hero-slide-backdrop" src="${esc(backdropSrc)}" alt="" aria-hidden="true" loading="${i === 0 ? "eager" : "lazy"}" decoding="async">
+    <img class="hero-slide-backdrop" src="${esc(backdropSrc)}"${backdropAttrs} alt="" aria-hidden="true" loading="${i === 0 ? "eager" : "lazy"}" decoding="async">
     <picture>
-      ${hasMobileVariant ? `<source media="(max-width: 640px)" srcset="${esc(s.mobileImage)}">` : ""}
-      <img src="${esc(s.image)}" alt="${esc(s.alt || "")}" loading="${i === 0 ? "eager" : "lazy"}">
+      ${hasMobileVariant ? `${s.mobileImageSrcset ? `<source media="(max-width: 640px)" srcset="${esc(s.mobileImageSrcset)}" sizes="100vw" data-optimized>` : ""}<source media="(max-width: 640px)" srcset="${esc(s.mobileImage)}">` : ""}
+      <img src="${esc(s.image)}"${mainAttrs}${mainFallback} alt="${esc(s.alt || "")}" loading="${i === 0 ? "eager" : "lazy"}" decoding="async"${i === 0 ? ' fetchpriority="high"' : ""}>
     </picture>
     ${
       hasCopy
@@ -110,7 +120,11 @@ async function initHeroCarousel() {
   // distinta) para el marco mobile — y se expone como
   // --hero-desktop-ratio / --hero-mobile-ratio; el CSS las usa con
   // var(...,fallback) mientras esto carga o si la medición falla.
-  function probeRatio(src, cssVar) {
+  // Fase 57 — con versiones optimizadas, la sonda usa el MISMO srcset/sizes
+  // que la imagen visible: el navegador elige el mismo archivo (ya en
+  // caché) en vez de descargar además el original pesado. La proporción es
+  // idéntica en todos los anchos. Sin srcset, exactamente como antes.
+  function probeRatio(src, cssVar, srcset, sizes) {
     if (!src) return;
     const probe = new Image();
     probe.onload = () => {
@@ -118,10 +132,17 @@ async function initHeroCarousel() {
         root.style.setProperty(cssVar, `${probe.naturalWidth} / ${probe.naturalHeight}`);
       }
     };
+    if (srcset) {
+      probe.sizes = sizes;
+      probe.srcset = srcset;
+    }
     probe.src = src;
   }
-  probeRatio(slides[0].image, "--hero-desktop-ratio");
-  probeRatio(slides[0].mobileImage || slides[0].image, "--hero-mobile-ratio");
+  const first = slides[0];
+  const firstHasMobile = first.mobileImage && first.mobileImage !== first.image;
+  const SIZES_DESKTOP = "(max-width: 1180px) 100vw, 1180px";
+  probeRatio(first.image, "--hero-desktop-ratio", first.imageSrcset, SIZES_DESKTOP);
+  probeRatio(firstHasMobile ? first.mobileImage : first.image, "--hero-mobile-ratio", firstHasMobile ? first.mobileImageSrcset : first.imageSrcset, firstHasMobile ? "100vw" : SIZES_DESKTOP);
 
   dotsEl.innerHTML = slides
     .map((_, i) => `<button type="button" class="hero-dot${i === 0 ? " active" : ""}" data-index="${i}" aria-label="Ir a la pieza ${i + 1}"></button>`)

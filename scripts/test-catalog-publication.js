@@ -60,6 +60,9 @@ function mockRes() {
 function createDb({ honorFilters = true } = {}) {
   const db = { products: [], catalog_metadata: [] };
   const fetchImpl = async (url, options = {}) => {
+    // Fase 56 — la validación lee la taxonomía editable (config/taxonomy.json
+    // en Storage); en estas pruebas no existe → taxonomía por defecto.
+    if (String(url).includes("/storage/v1/object/") && String(url).includes("config/taxonomy.json")) return { ok: false, status: 404, text: async () => "" };
     const u = new URL(url);
     const table = u.pathname.split("/").pop();
     const method = options.method || "GET";

@@ -11,6 +11,7 @@ const { getEnv } = require("../catalog/_lib/env");
 const { applyCors } = require("../catalog/_lib/cors");
 const { sendJson, sendError, methodNotAllowed } = require("../catalog/_lib/http");
 const { loadSlides, getActiveSlides, shapePublicSlide } = require("../_lib/heroSlides");
+const { loadImageVariants, srcsetFor } = require("../_lib/imageVariants");
 
 module.exports = async function handler(req, res) {
   applyCors(req, res);
@@ -27,8 +28,12 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    const slides = await loadSlides(env);
-    const active = getActiveSlides(slides).map(shapePublicSlide);
+    const [slides, imageVariants] = await Promise.all([loadSlides(env), loadImageVariants(env)]);
+    // Fase 57 — srcset optimizado solo si el original figura en el
+    // manifiesto (config/image-variants.json); si no, null y se usa el original.
+    const active = getActiveSlides(slides)
+      .map(shapePublicSlide)
+      .map((s) => ({ ...s, imageSrcset: srcsetFor(imageVariants, s.image), mobileImageSrcset: srcsetFor(imageVariants, s.mobileImage) }));
     // Fase 36 — s-maxage=300/swr=600 (hasta 15 min en el peor caso) es lo
     // que hacía que un cambio guardado en Admin tardara demasiado en
     // reflejarse en el catálogo público vía la CDN de Vercel. 30s es

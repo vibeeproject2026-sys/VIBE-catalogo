@@ -1,5 +1,5 @@
-import { getProducts } from "./data-source.js";
-import { getCart, addToCart, changeQuantity, removeFromCart, clearCart, getCartCount, getCartTotal } from "./cart.js";
+import { getProducts, getTaxonomy } from "./data-source.js";
+import { getCart, addToCart, changeQuantity, removeFromCart, clearCart, getCartCount, getCartTotal, syncCartPrices } from "./cart.js";
 import {
   getGroups,
   getCategoriesInGroup,
@@ -22,10 +22,12 @@ import {
   breadcrumbForProduct,
   selectRelated,
   clampQuantity,
+  applyTaxonomy,
 } from "./taxonomy.js";
 import { readStateFromSearch, buildUrl } from "./url-state.js";
 import { computeOrderSummary, validateCheckoutForm } from "./checkout.js";
 import { bindCartSwipe } from "./cart-swipe.js";
+import { hasOptions, resolveVariant, selectionStatus, autoShadeId, autoPresentationId, lineOptionProblem } from "./variants.js";
 
 // Fase 27: se agregan los filtros/orden de la PLP. Todos arrancan
 // "apagados" — ningún filtro activo por defecto, igual que antes.
@@ -41,7 +43,9 @@ const DEFAULT_FILTERS = {
   brand: null,
   sort: "relevance",
 };
-const state = { ...DEFAULT_FILTERS, product: null, variant: null, products: [] };
+// Fase 57 — shadeId/presentationId: opciones elegidas en la ficha abierta
+// (dos dimensiones independientes, ver js/variants.js).
+const state = { ...DEFAULT_FILTERS, product: null, variant: null, shadeId: null, presentationId: null, products: [] };
 const $ = s => document.querySelector(s);
 const money = n => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(n);
 const esc = s => String(s ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
@@ -128,7 +132,11 @@ function productImage(p, cls = "product-photo") {
   // ve la usuaria en la mayoría de las cards. Ahora reutiliza el mismo
   // lenguaje oscuro+wordmark rosa que .pdp-no-image/.discover-empty
   // (.card-img-empty en CSS) — con presencia editorial en vez de vacío.
-  return p.image ? `<img class="${cls}" src="${p.image}" alt="${esc(p.name)}" loading="lazy">` : `<span class="card-img-empty">${esc(p.imageLabel)}</span>`;
+  // Fase 57 — con versiones optimizadas (p.imageSrcset), el navegador
+  // elige el ancho justo; data-fallback-src devuelve el original si alguna
+  // versión falla (ver listener "error" más abajo).
+  const optimized = p.image && p.imageSrcset ? ` srcset="${esc(p.imageSrcset)}" sizes="(max-width: 900px) 50vw, 300px" data-fallback-src="${esc(p.image)}"` : "";
+  return p.image ? `<img class="${cls}" src="${p.image}"${optimized} alt="${esc(p.name)}" loading="lazy" decoding="async">` : `<span class="card-img-empty">${esc(p.imageLabel)}</span>`;
 }
 
 // Fase 41 — pedido explícito: la card retail-premium retira categoría/
@@ -137,6 +145,24 @@ function productImage(p, cls = "product-photo") {
 // "Ver producto"→"+ Agregar" pero mantiene exactamente el mismo
 // comportamiento (navega al PDP) — nunca un quick-add-to-cart sin
 // pasar por la selección de variante/cantidad del PDP.
+// Fase 56 — adelanto de tonos en la tarjeta (máx. 5 muestras + "+N").
+// Fase 57 — más presentaciones: «N presentaciones» si hay varias activas,
+// o su nombre si es una sola. Va en una ranura fija (.card-options) que
+// mide 0 cuando el producto no tiene opciones.
+function cardOptionsHtml(p) {
+  const out = [];
+  const shades = p.shades || [];
+  if (shades.length) {
+    const shown = shades.slice(0, 5);
+    const more = shades.length - shown.length;
+    out.push(`<p class="card-shades" aria-label="${shades.length} ${shades.length === 1 ? "tono" : "tonos"}">${shown.map((v) => `<span class="card-shade${v.active ? "" : " card-shade-off"}" style="--shade:${esc(v.hex)}" aria-hidden="true"></span>`).join("")}${more > 0 ? `<span class="card-shades-more">+${more}</span>` : ""}</p>`);
+  }
+  const pres = (p.presentations || []).filter((x) => x.active);
+  if (pres.length > 1) out.push(`<p class="card-presentations">${pres.length} presentaciones</p>`);
+  else if (pres.length === 1) out.push(`<p class="card-presentations">${esc(pres[0].name)}</p>`);
+  return out.join("");
+}
+
 function productCard(p) {
   // Fase 26: precio promocional solo si promoActive viene resuelto por el
   // servidor (nunca calculado aquí) y hay un promoPrice real. El badge
@@ -152,12 +178,17 @@ function productCard(p) {
       ${productImage(p)}
     </button>
     <div class="card-body">
-      ${p.brand ? `<p class="card-brand">${esc(p.brand)}</p>` : ""}
+      <p class="card-brand"${p.brand ? "" : ' aria-hidden="true"'}>${p.brand ? esc(p.brand) : ""}</p>
       <h3>${esc(p.name)}</h3>
-      <span class="price">${money(showPromo ? p.promoPrice : p.price)}</span>
-      ${showPromo ? `<span class="old">${money(p.price)}</span>` : p.oldPrice ? `<span class="old">${money(p.oldPrice)}</span>` : ""}
-      ${p.available === false ? `<span class="availability-badge">Agotado</span>` : ""}
-      <button class="button card-cta" data-product="${p.id}">+ Agregar</button>
+      <div class="card-options">${cardOptionsHtml(p)}</div>
+      <div class="card-buy">
+        <p class="card-price-row">
+          <span class="price">${money(showPromo ? p.promoPrice : p.price)}</span>
+          ${showPromo ? `<span class="old">${money(p.price)}</span>` : p.oldPrice ? `<span class="old">${money(p.oldPrice)}</span>` : ""}
+          ${p.available === false ? `<span class="availability-badge">Agotado</span>` : ""}
+        </p>
+        <button class="button card-cta" data-product="${p.id}">+ Agregar</button>
+      </div>
     </div>
   </article>`;
 }
@@ -182,6 +213,7 @@ function renderCatalogHeading() {
   if (curated) {
     $("#catalogTitle").textContent = CURATED_HEADINGS[curated].title;
     $("#catalogSubtitle").textContent = CURATED_HEADINGS[curated].subtitle;
+    $("#catalogSubtitle").classList.remove("catalog-lead-intro");
     return;
   }
   $("#catalogTitle").textContent = isAll ? "Catálogo" : state.group;
@@ -191,6 +223,9 @@ function renderCatalogHeading() {
   // Fase 48 — el mensaje "Esenciales de belleza…" pasó a la zona de marca
   // (columna derecha del encabezado, fija en el HTML).
   $("#catalogSubtitle").textContent = isAll ? "Explora por categoría y encuentra tu próximo esencial." : "";
+  // Fase 56 — en mobile se retira solo esta frase introductoria (CSS
+  // .catalog-lead-intro); escritorio la conserva tal cual.
+  $("#catalogSubtitle").classList.toggle("catalog-lead-intro", isAll);
 }
 
 function renderActiveFilters() {
@@ -303,23 +338,12 @@ function removeFilter(key) {
   applyFiltersAndRender();
 }
 
-// Fase 26/41 — "Ofertas VIBE" en Home (antes "Promociones"): única
-// fuente, promoActive === true (ya resuelto server-side). Sin datos
-// reales, la sección completa queda ausente — nunca un bloque vacío.
-// El link de nav "Ofertas" ya no depende de esto (Fase 41: dejó de ser
-// condicional, siempre apunta a la página completa #ofertas, que
-// maneja su propio estado vacío — ver renderOfertasPage()).
-function renderOfertasHome() {
-  const list = selectPromotions(state.products);
-  const hasPromotions = list.length > 0;
-  $("#ofertasHome").classList.toggle("hidden", !hasPromotions);
-  if (hasPromotions) $("#ofertasHomeGrid").innerHTML = list.map(productCard).join("");
-}
-
-// Fase 41 — página completa "Ofertas" (#ofertas, ver index.html): misma
-// fuente real que renderOfertasHome(), sin paginación (la PLP tampoco
-// la tiene hoy) — muestra todas las promociones activas. Sin ninguna,
-// estado vacío honesto con salida al catálogo, nunca una grilla rota.
+// Fase 41 — sección "Ofertas" (#ofertas, ver index.html): única fuente,
+// promoActive === true (ya resuelto server-side), sin paginación (la PLP
+// tampoco la tiene hoy) — muestra todas las promociones activas. Sin
+// ninguna, estado vacío honesto con salida al catálogo, nunca una grilla
+// rota. Fase 56 — es la ÚNICA sección de promociones: el adelanto que
+// había en el Home mostraba las mismas tarjetas y las duplicaba.
 function renderOfertasPage() {
   const list = selectPromotions(state.products);
   const hasPromotions = list.length > 0;
@@ -429,6 +453,36 @@ const TRASH_ICON = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden=
 // etiqueta) y, detrás, la acción que revela el gesto de deslizar en
 // mobile (js/cart-swipe.js). Ambos usan data-a="del": la eliminación
 // siempre pasa por el mismo handler de #cartItems.
+// Fase 57 — opciones de una línea: «Tono: X · Presentación: Y». Las
+// líneas guardadas antes de esta fase solo tienen variantName (se muestra
+// salvo los genéricos «Único»/«Default», que no dicen nada).
+function lineOptionsMeta(i) {
+  const parts = [];
+  if (i.shadeName) parts.push(`<span class="cart-shade" style="--shade:${esc(i.variantHex || "#cccccc")}" aria-hidden="true"></span>Tono: ${esc(i.shadeName)}`);
+  if (i.presentationName) parts.push(`Presentación: ${esc(i.presentationName)}`);
+  if (!parts.length && i.variantName && i.variantName !== "Único" && i.variantName !== "Default") parts.push(esc(i.variantName));
+  return parts.map((t) => `<span class="opt-part">${t}</span>`).join(" · ");
+}
+
+// Fase 57 — si una versión optimizada (srcset) no carga, se vuelve al
+// original: se quitan srcset/sizes y las <source> optimizadas y se usa
+// data-fallback-src. "error" no burbujea: se escucha en captura.
+document.addEventListener(
+  "error",
+  (e) => {
+    const img = e.target;
+    if (!(img instanceof HTMLImageElement) || !img.dataset.fallbackSrc) return;
+    const picture = img.closest("picture");
+    const optimizedSources = picture ? picture.querySelectorAll("source[data-optimized]") : [];
+    if (!img.hasAttribute("srcset") && !optimizedSources.length) return; // ya es el original
+    optimizedSources.forEach((s) => s.remove());
+    img.removeAttribute("srcset");
+    img.removeAttribute("sizes");
+    img.src = img.dataset.fallbackSrc;
+  },
+  true
+);
+
 function cartItemHtml(i) {
   const showPromo = i.originalPrice != null && i.originalPrice > i.price;
   const ids = `data-p="${i.productId}" data-v="${i.variantId}"`;
@@ -439,15 +493,15 @@ function cartItemHtml(i) {
     <div>
       ${i.brand ? `<p class="cart-item-brand">${esc(i.brand)}</p>` : ""}
       <h3>${esc(i.name)}</h3>
-      <div class="meta">${esc(i.variantName)}</div>
+      <div class="meta">${lineOptionsMeta(i)}</div>
       <div class="cart-item-unit-price">
         <span>${money(i.price)}</span>
         ${showPromo ? `<span class="old">${money(i.originalPrice)}</span>` : ""}
       </div>
       <div class="qty">
-        <button data-a="dec" data-p="${i.productId}" data-v="${i.variantId}">−</button>
-        <span>${i.quantity}</span>
-        <button data-a="inc" data-p="${i.productId}" data-v="${i.variantId}">+</button>
+        <button data-a="dec" data-p="${i.productId}" data-v="${i.variantId}" aria-label="Quitar una unidad de ${esc(i.name)}">−</button>
+        <span aria-label="Cantidad">${i.quantity}</span>
+        <button data-a="inc" data-p="${i.productId}" data-v="${i.variantId}" aria-label="Agregar una unidad de ${esc(i.name)}">+</button>
       </div>
     </div>
     <div class="cart-item-side">
@@ -474,7 +528,7 @@ function renderCart() {
   const items = getCart();
   $("#checkoutButton").disabled = !items.length;
   $("#checkoutButton").style.opacity = items.length ? "1" : ".45";
-  $("#cartItems").innerHTML = items.length ? items.map(cartItemHtml).join("") : cartEmptyHtml();
+  $("#cartItems").innerHTML = items.length ? priceChangesNotice(pendingPriceNotice) + items.map(cartItemHtml).join("") : cartEmptyHtml();
 }
 
 function openCart() {
@@ -499,7 +553,92 @@ function currentEffectivePrice() {
   const p = state.product;
   if (!p) return 0;
   if (p.promoActive === true && p.promoPrice != null) return p.promoPrice;
-  return selected().price;
+  return (selected() || p.variants[0]).price;
+}
+
+// Fase 56 — paleta de tonos (muestras circulares); un tono inactivo se ve
+// tachado y no se puede elegir. Nada se preselecciona cuando hay varios.
+// Fase 57 — tonos y presentaciones por separado. Con una sola opción en
+// una dimensión se muestra (sin selector) y se aplica sola; con varias,
+// la clienta elige. Roving tabindex: el elegido, o el primero activo.
+function optionRadio({ cls, dim, opt, on, tabbable, style = "", text = "" }) {
+  const label = opt.active ? opt.name : `${opt.name} (no disponible)`;
+  return `<button type="button" class="${cls}${on ? " selected" : ""}${opt.active ? "" : ` ${cls}-off`}" role="radio" aria-checked="${on}" aria-label="${esc(label)}" title="${esc(label)}" data-${dim}="${esc(opt.id)}" data-active="${opt.active}" ${opt.active ? "" : 'aria-disabled="true"'} tabindex="${tabbable ? 0 : -1}"${style}>${text}</button>`;
+}
+function radioList(list, currentId, render) {
+  const firstActive = list.find((x) => x.active);
+  const hasCurrent = list.some((x) => String(x.id) === String(currentId));
+  return list.map((opt) => {
+    const on = String(opt.id) === String(currentId);
+    return render(opt, on, on || (!hasCurrent && opt === firstActive));
+  }).join("");
+}
+function shadePickerHtml(p) {
+  const list = p.shades || [];
+  if (!list.length) return "";
+  if (list.length === 1) {
+    const sh = list[0];
+    return `<div class="shade-picker shade-single"><p class="shade-label"><span class="cart-shade" style="--shade:${esc(sh.hex)}" aria-hidden="true"></span>Tono: <strong>${esc(sh.name)}</strong>${sh.active ? "" : " · no disponible"}</p></div>`;
+  }
+  const current = list.find((x) => String(x.id) === String(state.shadeId));
+  const swatches = radioList(list, state.shadeId, (opt, on, tabbable) => optionRadio({ cls: "shade", dim: "shade", opt, on, tabbable, style: ` style="--shade:${esc(opt.hex)}"` }));
+  return `<div class="shade-picker">
+    <p class="shade-label">Tono: <strong id="shadeName">${current ? esc(current.name) : "elige uno"}</strong></p>
+    <div class="shade-swatches" role="radiogroup" aria-label="Tonos disponibles">${swatches}</div>
+  </div>`;
+}
+function presentationPickerHtml(p) {
+  const list = p.presentations || [];
+  if (!list.length) return "";
+  if (list.length === 1) {
+    const pr = list[0];
+    return `<div class="presentation-picker presentation-single"><p class="shade-label">Presentación: <strong>${esc(pr.name)}</strong>${pr.active ? "" : " · no disponible"}</p></div>`;
+  }
+  const current = list.find((x) => String(x.id) === String(state.presentationId));
+  const chips = radioList(list, state.presentationId, (opt, on, tabbable) => optionRadio({ cls: "presentation-option", dim: "presentation", opt, on, tabbable, text: esc(opt.name) }));
+  return `<div class="presentation-picker">
+    <p class="shade-label">Presentación: <strong id="presentationName">${current ? esc(current.name) : "elige una"}</strong></p>
+    <div class="presentation-options" role="radiogroup" aria-label="Presentaciones disponibles">${chips}</div>
+  </div>`;
+}
+
+function addButtonState(p) {
+  if (p.available === false) return { disabled: true, label: "Agotado" };
+  if (hasOptions(p)) {
+    const { missing, blocked } = selectionStatus(p, state.shadeId, state.presentationId);
+    if (blocked === "shade") return { disabled: true, label: p.shades.length > 1 ? "Tonos no disponibles" : "Tono no disponible" };
+    if (blocked === "presentation") return { disabled: true, label: p.presentations.length > 1 ? "Presentaciones no disponibles" : "Presentación no disponible" };
+    if (missing.length === 2) return { disabled: true, label: "Elige tono y presentación" };
+    if (missing[0] === "shade") return { disabled: true, label: "Elige un tono" };
+    if (missing[0] === "presentation") return { disabled: true, label: "Elige una presentación" };
+  }
+  return { disabled: false, label: "Agregar al carrito" };
+}
+
+// Refleja la selección actual en los controles de la ficha sin
+// re-renderizarla (conserva foco y cantidad).
+function syncOptionUi() {
+  const p = state.product;
+  document.querySelectorAll(".variant[data-variant]").forEach((x) => x.classList.toggle("selected", x.dataset.variant === state.variant));
+  for (const [sel, key, nameEl, list] of [[".shade[data-shade]", "shadeId", "#shadeName", p.shades], [".presentation-option[data-presentation]", "presentationId", "#presentationName", p.presentations]]) {
+    const nodes = [...document.querySelectorAll(sel)];
+    if (!nodes.length) continue;
+    const attr = key === "shadeId" ? "shade" : "presentation";
+    const hasCurrent = nodes.some((x) => x.dataset[attr] === String(state[key]));
+    const firstActive = nodes.find((x) => x.dataset.active === "true");
+    nodes.forEach((x) => {
+      const on = x.dataset[attr] === String(state[key]);
+      x.classList.toggle("selected", on);
+      x.setAttribute("aria-checked", on ? "true" : "false");
+      x.tabIndex = on || (!hasCurrent && x === firstActive) ? 0 : -1;
+    });
+    const cur = (list || []).find((o) => String(o.id) === String(state[key]));
+    if ($(nameEl) && cur) $(nameEl).textContent = cur.name;
+  }
+  const st = addButtonState(p);
+  $("#addButton").disabled = st.disabled;
+  $("#addButton").textContent = st.label;
+  $("#detailPrice").textContent = money(currentEffectivePrice());
 }
 
 function pdpGalleryHtml(p) {
@@ -590,7 +729,8 @@ function renderProductDetail(p) {
   const unavailable = p.available === false;
   const priceInfo = pdpPriceInfo(p);
   const badgeText = pdpBadge(p);
-  const hasVariants = p.variants.length > 1;
+  const hasVariants = !hasOptions(p) && p.variants.length > 1;
+  const addState = addButtonState(p);
 
   $("#productDetail").innerHTML = `<div class="detail-img pdp-gallery" data-gallery>${pdpGalleryHtml(p)}</div>
   <div class="detail-copy">
@@ -612,6 +752,8 @@ function renderProductDetail(p) {
     </div>
     ${priceInfo.showPromo && p.promoText ? `<p class="pdp-promo-text">${esc(p.promoText)}</p>` : ""}
     ${hasVariants ? `<div class="variants">${p.variants.map((v) => `<button type="button" class="variant ${v.id === state.variant ? "selected" : ""}" data-variant="${v.id}">${esc(v.name)}</button>`).join("")}</div>` : ""}
+    ${shadePickerHtml(p)}
+    ${presentationPickerHtml(p)}
     <!-- Fase 37 — reorden de jerarquía inspirado en el benchmark (imagen
          → marca → nombre → precio → variante → DISPONIBILIDAD → CTA):
          antes "Agotado" aparecía antes de las variantes; ahora va justo
@@ -619,11 +761,11 @@ function renderProductDetail(p) {
     ${unavailable ? `<span class="availability-badge">Agotado</span>` : ""}
     <div class="detail-actions">
       <div class="quantity">
-        <button type="button" data-q="-1" ${unavailable ? "disabled" : ""}>−</button>
+        <button type="button" data-q="-1" aria-label="Quitar una unidad" ${unavailable ? "disabled" : ""}>−</button>
         <input id="detailQty" type="number" min="1" value="1" aria-label="Cantidad" ${unavailable ? "disabled" : ""}>
-        <button type="button" data-q="1" ${unavailable ? "disabled" : ""}>+</button>
+        <button type="button" data-q="1" aria-label="Agregar una unidad" ${unavailable ? "disabled" : ""}>+</button>
       </div>
-      <button id="addButton" class="button dark pdp-buy-button" ${unavailable ? "disabled" : ""}>${unavailable ? "Agotado" : "Agregar al carrito"}</button>
+      <button id="addButton" class="button dark pdp-buy-button" ${addState.disabled ? "disabled" : ""}>${addState.label}</button>
     </div>
     ${pdpSpecHtml(p)}
     ${pdpTraitsHtml(p)}
@@ -677,6 +819,14 @@ function renderProductNotFound() {
 // pushHistory=false se usa al reconstruir el estado desde la URL (carga
 // inicial de un link compartido, o navegación con back/forward) — en esos
 // casos la URL ya es la correcta y no debe empujarse una entrada nueva.
+// Fase 56 — URL canónica: la portada, o la ficha abierta (/?product=ID,
+// las mismas URL que lista /sitemap.xml). Siempre el dominio oficial.
+const CANONICAL_BASE = "https://www.vibebeautycol.com/";
+function setCanonical(productId) {
+  const link = document.querySelector('link[rel="canonical"]');
+  if (link) link.href = productId == null ? CANONICAL_BASE : `${CANONICAL_BASE}?product=${encodeURIComponent(productId)}`;
+}
+
 function openProduct(id, { pushHistory = true } = {}) {
   const p = findProduct(state.products, id);
   if (!p) {
@@ -686,7 +836,12 @@ function openProduct(id, { pushHistory = true } = {}) {
     return;
   }
   state.product = p;
+  setCanonical(p.id);
+  // Fase 56/57 — con varias opciones en una dimensión, nada preseleccionado
+  // (la clienta elige); con una sola, se aplica sola.
   state.variant = p.variants[0].id;
+  state.shadeId = autoShadeId(p);
+  state.presentationId = autoPresentationId(p);
   renderProductDetail(p);
   if (pushHistory) {
     try {
@@ -699,7 +854,9 @@ function openProduct(id, { pushHistory = true } = {}) {
 }
 
 function selected() {
-  return state.product.variants.find(v => v.id === state.variant) || state.product.variants[0];
+  const p = state.product;
+  if (hasOptions(p)) return resolveVariant(p, state.shadeId, state.presentationId);
+  return p.variants.find((v) => String(v.id) === String(state.variant)) || p.variants[0];
 }
 
 function selectGalleryThumb(thumb) {
@@ -996,7 +1153,6 @@ $("#activeFilters").addEventListener("click", (e) => {
 });
 
 bindProductGrid("#productGrid");
-bindProductGrid("#ofertasHomeGrid");
 bindProductGrid("#ofertasGrid");
 
 $("#cartButton").onclick = openCart;
@@ -1057,11 +1213,20 @@ $("#productDialog").addEventListener("click", e => {
     return;
   }
 
+  // Fase 57 — tono y presentación se eligen por separado; una opción
+  // inactiva no se puede elegir.
+  const opt = e.target.closest("[data-shade], [data-presentation]");
+  if (opt) {
+    if (opt.dataset.active === "false") return;
+    if (opt.dataset.shade !== undefined) state.shadeId = opt.dataset.shade;
+    else state.presentationId = opt.dataset.presentation;
+    syncOptionUi();
+    return;
+  }
   const v = e.target.closest("[data-variant]");
   if (v) {
     state.variant = v.dataset.variant;
-    document.querySelectorAll(".variant").forEach(x => x.classList.toggle("selected", x.dataset.variant === state.variant));
-    $("#detailPrice").textContent = money(currentEffectivePrice());
+    syncOptionUi();
     return;
   }
 
@@ -1074,6 +1239,7 @@ $("#productDialog").addEventListener("click", e => {
 
   if (e.target.id === "addButton" && state.product && state.product.available !== false) {
     const variant = selected();
+    if (!variant) return; // Fase 56/57 — opciones obligatorias elegidas y activas
     const qty = Math.max(1, Number($("#detailQty").value) || 1);
     // Respeta el precio efectivo (promocional cuando aplica), nunca el
     // precio original de la variante — ver currentEffectivePrice(). Se
@@ -1092,6 +1258,17 @@ $("#productDialog").addEventListener("click", e => {
 // esté en un campo de formulario (ej. el input de cantidad), donde las
 // flechas deben seguir su comportamiento nativo de edición de texto.
 $("#productDialog").addEventListener("keydown", (e) => {
+  // Fase 56/57 — dentro de un grupo de opciones (tonos o presentaciones),
+  // las flechas recorren solo las opciones disponibles de ese grupo.
+  const radio = e.target.closest && e.target.closest('[role="radiogroup"] [role="radio"]');
+  if (radio && ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) {
+    e.preventDefault();
+    const list = [...radio.closest('[role="radiogroup"]').querySelectorAll('[role="radio"][data-active="true"]')];
+    const idx = list.indexOf(radio);
+    const next = list[(idx + (e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 1) + list.length) % list.length];
+    if (next) { next.focus(); next.click(); }
+    return;
+  }
   if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
   const tag = document.activeElement && document.activeElement.tagName;
   if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
@@ -1149,6 +1326,7 @@ $("#productDialog").addEventListener(
 let suppressHistoryOnClose = false;
 $("#productDialog").addEventListener("close", () => {
   state.product = null;
+  setCanonical(null);
   const trigger = productTrigger;
   productTrigger = null;
   restoreProductTriggerFocus(trigger);
@@ -1177,8 +1355,64 @@ $("#productDialog").addEventListener("close", () => {
 function cartLinesWithAvailability() {
   return getCart().map((item) => {
     const product = findProduct(state.products, item.productId);
-    return { ...item, unavailable: !product || product.available === false };
+    if (!product || product.available === false) return { ...item, unavailable: true, unavailableReason: "product" };
+    // Fase 56/57 — las opciones guardadas (tono, presentación) deben seguir
+    // existiendo y activas con la configuración vigente del producto.
+    if (lineOptionProblem(product, item)) return { ...item, unavailable: true, unavailableReason: "option" };
+    return { ...item, unavailable: false };
   });
+}
+
+// Fase 56 — precio vigente de cada línea según el catálogo cargado (el
+// promocional cuando aplica). Actualiza el carrito y devuelve los cambios
+// para avisar a la clienta. El servidor vuelve a calcular todo al crear
+// el pedido (y rechaza un total distinto del mostrado).
+function syncCartWithCatalog() {
+  return syncCartPrices((item) => {
+    const p = findProduct(state.products, item.productId);
+    if (!p || lineOptionProblem(p, item)) return null;
+    // Sin precio por opción en el POS: toda combinación usa el precio base
+    // (las variantes demo sí traen precio propio).
+    const v = hasOptions(p) ? p.variants[0] : p.variants.find((x) => String(x.id) === String(item.variantId)) || p.variants[0];
+    const promo = p.promoActive === true && p.promoPrice != null;
+    return { price: promo ? p.promoPrice : v.price, originalPrice: promo ? p.price : null };
+  });
+}
+function priceChangesNotice(changes) {
+  if (!changes || !changes.length) return "";
+  return `<p class="notice price-notice" role="status">Actualizamos ${changes.length === 1 ? "un precio" : "algunos precios"} de tu carrito: ${changes.map((c) => `${esc(c.name)} ${money(c.from)} → ${money(c.to)}`).join(" · ")}. Revisa el total antes de enviar.</p>`;
+}
+let pendingPriceNotice = [];
+
+// Fase 56 — clave de idempotencia por intento lógico de compra: la misma
+// mientras el carrito no cambie (así un reintento tras un corte de red no
+// duplica el pedido); se descarta tras un pedido exitoso.
+const CHECKOUT_KEY = "vibe-checkout-attempt";
+function cartSignature() {
+  return getCart().map((i) => `${i.productId}:${i.variantId}:${i.quantity}`).sort().join("|");
+}
+function checkoutIdempotencyKey() {
+  const sig = cartSignature();
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(CHECKOUT_KEY) || "null");
+    if (saved && saved.sig === sig && typeof saved.key === "string") return saved.key;
+  } catch {
+    // sessionStorage no disponible: se usa una clave nueva
+  }
+  const key = (crypto.randomUUID ? crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`).slice(0, 64);
+  try {
+    sessionStorage.setItem(CHECKOUT_KEY, JSON.stringify({ sig, key }));
+  } catch {
+    // sin persistencia: sigue funcionando para este intento
+  }
+  return key;
+}
+function clearCheckoutAttempt() {
+  try {
+    sessionStorage.removeItem(CHECKOUT_KEY);
+  } catch {
+    // nada que limpiar
+  }
 }
 
 // Sección 3 — no hay backend de pedidos ni de inventario nuevo: se
@@ -1192,10 +1426,12 @@ function cartLinesWithAvailability() {
 async function refreshAvailability() {
   try {
     const fresh = await getProducts();
-    fresh.forEach((fp) => {
-      const idx = state.products.findIndex((p) => String(p.id) === String(fp.id));
-      if (idx !== -1) state.products[idx] = { ...state.products[idx], available: fp.available };
-    });
+    // Fase 56 — se refresca el producto completo (precio, promoción, tonos
+    // y disponibilidad), no solo "available"; un producto que ya no viene
+    // en el catálogo queda fuera (su línea se marca no disponible).
+    state.products = fresh;
+    pendingPriceNotice = syncCartWithCatalog();
+    renderCart();
     return true;
   } catch (e) {
     console.error("[VIBE] No se pudo revalidar disponibilidad en tiempo real antes del checkout; se usa el último estado conocido.", e);
@@ -1215,8 +1451,8 @@ function checkoutSummaryHtml(availabilityStale) {
         <div class="checkout-line-info">
           ${l.brand ? `<p class="cart-item-brand">${esc(l.brand)}</p>` : ""}
           <h3>${esc(l.name)}</h3>
-          <div class="meta">${esc(l.variantName)} · Cantidad: ${l.quantity}</div>
-          ${l.unavailable ? `<p class="checkout-line-warning">Ya no está disponible — quítalo para continuar.</p>` : ""}
+          <div class="meta">${[lineOptionsMeta(l), `Cantidad: ${l.quantity}`].filter(Boolean).join(" · ")}</div>
+          ${l.unavailable ? `<p class="checkout-line-warning">${l.unavailableReason === "option" ? "La opción elegida (tono o presentación) ya no está disponible o cambió — quita esta línea y vuelve a elegir en el producto." : "Ya no está disponible — quítalo para continuar."}</p>` : ""}
         </div>
         <div class="checkout-line-right">
           <span class="cart-price">${money(l.lineSubtotal)}</span>
@@ -1227,6 +1463,7 @@ function checkoutSummaryHtml(availabilityStale) {
     .join("");
   return `<div class="checkout-summary">
     <h3 class="checkout-summary-title">Resumen de tu pedido</h3>
+    ${priceChangesNotice(pendingPriceNotice)}
     ${rows}
     <div class="total"><span>Total</span><strong>${money(summary.total)}</strong></div>
     ${availabilityStale ? `<p class="notice">No pudimos revalidar la disponibilidad justo ahora — se muestra la última conocida.</p>` : ""}
@@ -1266,6 +1503,8 @@ function checkoutFormHtml() {
       Autorizo a VIBE a contactarme por WhatsApp al número registrado para gestionar y finalizar mi pedido.
     </label>
     <span class="field-error" id="err-contactConsent" role="alert"></span>
+    <!-- Fase 56 — campo trampa antispam: oculto para personas y lectores de pantalla. -->
+    <div class="hp-field" aria-hidden="true"><label>No completar<input name="website" tabindex="-1" autocomplete="off"></label></div>
     <button type="submit" id="checkoutSubmit" class="button dark full">ENVIAR PEDIDO</button>
     <p class="field-error" id="checkoutSubmitError" role="alert"></p>
     <small>Tu pedido queda registrado en VIBE. Nuestro equipo te contactará por WhatsApp para confirmar disponibilidad, envío y forma de pago.</small>
@@ -1307,11 +1546,25 @@ function renderCheckoutForm({ availabilityStale = false } = {}) {
   const submitBtn = $("#checkoutSubmit");
   if (submitBtn) {
     submitBtn.disabled = hasUnavailable;
-    if (hasUnavailable) submitBtn.textContent = "Quita los productos agotados para continuar";
+    if (hasUnavailable) submitBtn.textContent = (lines.some((l) => l.unavailableReason === "option") ? "Corrige las opciones no disponibles para continuar" : "Quita los productos agotados para continuar");
+  }
+}
+
+function rerenderCheckoutSummary() {
+  const el = document.querySelector("#checkoutBody .checkout-summary");
+  if (!el) return renderCheckoutForm();
+  el.outerHTML = checkoutSummaryHtml(false);
+  const lines = cartLinesWithAvailability();
+  const hasUnavailable = lines.some((l) => l.unavailable);
+  const submitBtn = $("#checkoutSubmit");
+  if (submitBtn) {
+    submitBtn.disabled = hasUnavailable || !lines.length;
+    submitBtn.textContent = hasUnavailable ? (lines.some((l) => l.unavailableReason === "option") ? "Corrige las opciones no disponibles para continuar" : "Quita los productos agotados para continuar") : "ENVIAR PEDIDO";
   }
 }
 
 async function openCheckout() {
+  pendingPriceNotice = [];
   renderCheckoutForm();
   $("#checkoutDialog").showModal();
   const ok = await refreshAvailability();
@@ -1377,6 +1630,7 @@ $("#checkoutDialog").addEventListener("submit", async (e) => {
 
   const lines = cartLinesWithAvailability();
   if (lines.some((l) => l.unavailable)) return; // el botón ya está deshabilitado en este caso — guarda extra.
+  const expectedTotal = computeOrderSummary(lines).total;
 
   const submitBtn = $("#checkoutSubmit");
   const errorEl = $("#checkoutSubmitError");
@@ -1394,10 +1648,28 @@ $("#checkoutDialog").addEventListener("submit", async (e) => {
       body: JSON.stringify({
         customer: { name: data.name, phone: data.phone, email: data.email, city: data.city, address: data.address, notes: data.notes },
         contactConsent: data.contactConsent,
-        items: lines.map((l) => ({ productId: l.productId, variantId: l.variantId, variantName: l.variantName, sku: l.sku, quantity: l.quantity })),
+        // Fase 57 — ids de tono/presentación: el servidor los valida contra la
+        // ficha del producto y toma de ahí los nombres (variantName no se usa).
+        items: lines.map((l) => ({ productId: l.productId, variantId: l.variantId, shadeId: l.shadeId ?? null, presentationId: l.presentationId ?? null, variantName: l.variantName, sku: l.sku, quantity: l.quantity })),
+        // Fase 56 — el total que la clienta vio (el servidor rechaza si
+        // cambió), la clave del intento (evita duplicados al reintentar) y
+        // el campo trampa antispam.
+        expectedTotal,
+        idempotencyKey: checkoutIdempotencyKey(),
+        website: data.website || "",
       }),
     });
     const payload = await res.json().catch(() => null);
+
+    if (res.status === 409 && payload && (payload.code === "PRICE_CHANGED" || payload.code === "VARIANT_UNAVAILABLE")) {
+      // Fase 56 — precios o tonos cambiaron: se actualiza el resumen (sin
+      // borrar el formulario) y la clienta confirma de nuevo con el total real.
+      await refreshAvailability();
+      rerenderCheckoutSummary();
+      if (errorEl) errorEl.textContent = payload.error;
+      if (!$("#checkoutSubmit").disabled) $("#checkoutSubmit").textContent = "ENVIAR PEDIDO";
+      return;
+    }
 
     if (!res.ok) {
       if (errorEl) errorEl.textContent = (payload && payload.error) || "No se pudo enviar tu pedido. Intenta de nuevo.";
@@ -1406,6 +1678,9 @@ $("#checkoutDialog").addEventListener("submit", async (e) => {
       return;
     }
 
+    // 201 = pedido nuevo; 200 + replayed = este mismo intento ya estaba
+    // registrado (p. ej. tras un corte de red): se confirma ese pedido.
+    clearCheckoutAttempt();
     clearCart();
     renderCart();
     renderCheckoutConfirmation(payload);
@@ -1504,26 +1779,49 @@ window.addEventListener("popstate", () => {
   pendingTriggerFocus = null;
 });
 
+// Fase 56 — catálogo real no disponible (API caída): nunca se muestra un
+// catálogo de demostración.
+function renderCatalogUnavailable() {
+  const html = `<div id="catalogUnavailable" class="catalog-unavailable" role="alert">
+      <p class="catalog-unavailable-title">El catálogo no está disponible en este momento</p>
+      <p class="catalog-unavailable-text">No pudimos cargar los productos. Tu carrito sigue guardado. Intenta de nuevo en unos segundos o escríbenos por WhatsApp.</p>
+      <button type="button" class="button dark" data-retry-catalog>Reintentar</button>
+    </div>`;
+  $("#productGrid").innerHTML = html;
+  $("#discoverVibeGrid").innerHTML = `<p class="empty">Categorías no disponibles por ahora.</p>`;
+  $("#resultCount").textContent = "";
+  $("#productGrid [data-retry-catalog]").addEventListener("click", () => loadCatalog());
+}
+
 async function loadCatalog() {
   const urlState = readStateFromSearch(window.location.search);
   applyUrlToFilterState(urlState);
 
   $("#productGrid").innerHTML = `<p class="empty">Cargando catálogo...</p>`;
   $("#discoverVibeGrid").innerHTML = `<p class="empty">Cargando categorías...</p>`;
+  $("#catalogUnavailable")?.remove();
 
+  // Fase 56 — la taxonomía editable se pide en paralelo; si falla, se
+  // sigue con la de código (nunca bloquea el catálogo).
+  const taxonomyPromise = getTaxonomy().catch(() => null);
   try {
     state.products = await getProducts();
   } catch (e) {
     console.error("[VIBE] No se pudo inicializar el catálogo.", e);
-    const message = `<p class="empty">No pudimos cargar el catálogo en este momento. Intenta de nuevo más tarde.</p>`;
-    $("#productGrid").innerHTML = message;
-    $("#discoverVibeGrid").innerHTML = message;
+    // Fase 56 — sin productos de demostración: estado claro de
+    // indisponibilidad, sin tarjetas ni precios, y opción de reintentar.
+    state.products = [];
+    renderCatalogUnavailable();
     return;
   }
+  const taxonomy = await taxonomyPromise;
+  if (taxonomy) applyTaxonomy(taxonomy);
+  // Fase 56 — el carrito guardado se alinea con los precios vigentes.
+  pendingPriceNotice = syncCartWithCatalog();
+  renderCart();
 
   renderNav();
   renderProducts();
-  renderOfertasHome();
   renderOfertasPage();
   renderDiscoverVibe();
 

@@ -21,6 +21,7 @@ const { requireAdmin } = require("./_lib/auth");
 const { sendJson, sendError, methodNotAllowed } = require("../catalog/_lib/http");
 const { resolveCategoryGroup } = require("../catalog/_lib/categoryGroups");
 const { isListedSubcategory, isApprovedCategory, validateClassification } = require("../_lib/subcategories");
+const { loadTaxonomy, subcategoriesByCategory } = require("../_lib/taxonomyStore");
 
 const PRODUCT_COLUMNS = "id,name,price,stock,category";
 const METADATA_COLUMNS =
@@ -38,8 +39,12 @@ async function checkClassification(fields, productId, env) {
   }
   const catSent = "category" in fields;
   const subSent = "subcategory" in fields;
-  const catOk = !catSent || !fields.category || isApprovedCategory(fields.category);
-  const subOk = !subSent || !fields.subcategory || (catSent && isListedSubcategory(fields.category, fields.subcategory));
+  if (!fields.category && !fields.subcategory) return null;
+  // Fase 56 — listas vigentes (editables desde el Admin; por defecto, las
+  // de código). Si no se pueden leer, el llamador responde 502 sin guardar.
+  const lists = subcategoriesByCategory(await loadTaxonomy(env));
+  const catOk = !catSent || !fields.category || isApprovedCategory(fields.category, lists);
+  const subOk = !subSent || !fields.subcategory || (catSent && isListedSubcategory(fields.category, fields.subcategory, lists));
   if (catOk && subOk) return null;
   const rows = await pgrestSelect({
     table: "catalog_metadata",
@@ -52,6 +57,7 @@ async function checkClassification(fields, productId, env) {
     category: catSent ? fields.category : stored.category,
     subcategory: subSent ? fields.subcategory : null,
     stored,
+    lists,
   });
   return result.ok ? null : result.error;
 }

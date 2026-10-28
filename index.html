@@ -5,6 +5,22 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="description" content="VIBE — Catálogo digital de belleza multimarca. Calidad seleccionada, curaduría real y una experiencia pensada para ti.">
 <title>VIBE — Catálogo</title>
+<!-- Fase 56 — dominio canónico y vista previa al compartir (WhatsApp,
+     Instagram, etc.). La imagen es el logo oficial ya existente del Master
+     Logo Asset Pack (vibe-logo-social.png), sin crear piezas nuevas. -->
+<link rel="canonical" href="https://www.vibebeautycol.com/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="VIBE">
+<meta property="og:locale" content="es_CO">
+<meta property="og:url" content="https://www.vibebeautycol.com/">
+<meta property="og:title" content="VIBE — Catálogo de belleza multimarca">
+<meta property="og:description" content="Calidad seleccionada, curaduría real y una experiencia pensada para ti.">
+<meta property="og:image" content="https://www.vibebeautycol.com/assets/brand/logo/vibe-logo-social.png">
+<meta property="og:image:width" content="504">
+<meta property="og:image:height" content="207">
+<meta property="og:image:alt" content="VIBE">
+<meta name="twitter:card" content="summary">
+<meta name="theme-color" content="#0b0b0b">
 <!-- Fase 42.4 — favicon oficial: símbolo B/E del Master Logo Asset Pack
      (assets/brand/logo/vibe-mark-light.png), preparado en 3 tamaños
      estándar (16/32/48px, transparencia real, geometría/colores sin
@@ -24,7 +40,7 @@
 <header>
   <div class="wrap nav">
     <a class="logo" href="#inicio" aria-label="VIBE">
-      <span class="logo-image"><img src="assets/brand/logo/vibe-logo-light.png" alt="VIBE"></span>
+      <span class="logo-image"><picture><source type="image/webp" srcset="assets/brand/logo/vibe-logo-light.webp"><img src="assets/brand/logo/vibe-logo-light.png" alt="VIBE" width="504" height="207"></picture></span>
       <small>VIBRANT ICONIC BEAUTY ESSENTIALS</small>
     </a>
     <!-- Fase 41 — Discover desaparece de la navegación (el brief lo
@@ -122,7 +138,7 @@
   <div class="wrap">
     <div class="heading">
       <div><p class="eyebrow">DESCUBRE</p><h2>Descubre tu <span class="title-accent">VIBE</span></h2></div>
-      <p>Explora por categoría y encuentra tu próximo esencial.</p>
+      <p class="discover-lead">Explora por categoría y encuentra tu próximo esencial.</p>
     </div>
     <div class="discover-tile-row">
       <div id="discoverVibeGrid" class="discover-tile-grid"></div>
@@ -144,7 +160,7 @@
       <div class="catalog-heading-main">
         <p class="eyebrow">COLECCIÓN</p>
         <h2 id="catalogTitle">Catálogo</h2>
-        <p id="catalogSubtitle" class="catalog-lead">Explora por categoría y encuentra tu próximo esencial.</p>
+        <p id="catalogSubtitle" class="catalog-lead catalog-lead-intro">Explora por categoría y encuentra tu próximo esencial.</p>
       </div>
       <div class="catalog-brand">
         <p class="catalog-brand-title">Beauty for your <span class="title-accent">VIBE.</span></p>
@@ -171,25 +187,11 @@
   </div>
 </section>
 
-<!-- Fase 41 — antes "Promociones": misma fuente de datos
-     (selectPromotions(), promoActive===true resuelto server-side),
-     mismo principio de ausencia total sin datos reales
-     (renderOfertasHome() en app.js). Ahora enlaza a la página completa
-     de Ofertas (#ofertas) en vez de solo scrollear dentro del Home.
-     Fase 42.6 — reordenada después de #catalogo para que la
-     arquitectura del Home quede Hero→Descubre tu VIBE→Catálogo→
-     Ofertas→Instagram→Footer. -->
-<section id="ofertasHome" class="featured hidden">
-  <div class="wrap">
-    <div class="heading heading-ofertas">
-      <div><p class="eyebrow eyebrow-chip">SOLO EN OFERTAS VIBE</p><h2>Pequeños precios. <span class="title-accent">Grandes VIBES.</span></h2></div>
-      <p>Tus favoritos de belleza, con precios especiales.</p>
-    </div>
-    <div id="ofertasHomeGrid" class="grid"></div>
-    <a class="button outline" href="#ofertas">Ver todas las ofertas →</a>
-  </div>
-</section>
-
+<!-- Fase 56 — antes había aquí un adelanto de Ofertas (#ofertasHome)
+     que mostraba LAS MISMAS promociones que la sección #ofertas de abajo:
+     en cuanto existía una promoción activa, el bloque aparecía dos veces
+     seguidas. Ahora hay una única sección de promociones (#ofertas), con
+     el titular creativo cuando hay promociones (ofertasHeadingCopy). -->
 <!-- Fase 41 — página completa de Ofertas (antes solo existía el teaser
      de Home). Misma fuente real (selectPromotions(), promoActive===true
      resuelto server-side) — nunca una promoción inventada. Sin ninguna
@@ -347,7 +349,7 @@
 <footer>
   <div class="wrap footer-grid">
     <div class="footer-brand">
-      <div class="footer-logo-image"><img src="assets/brand/logo/vibe-logo-light.png" alt="VIBE"></div>
+      <div class="footer-logo-image"><picture><source type="image/webp" srcset="assets/brand/logo/vibe-logo-light.webp"><img src="assets/brand/logo/vibe-logo-light.png" alt="VIBE" width="504" height="207" loading="lazy" decoding="async"></picture></div>
       <small>VIBRANT ICONIC BEAUTY ESSENTIALS</small>
     </div>
     <nav class="footer-col" aria-labelledby="footerExploreTitle">

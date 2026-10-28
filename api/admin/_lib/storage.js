@@ -12,12 +12,19 @@
 
 const BUCKET = "product-images";
 
-function buildMainPath(productId, ext) {
-  return `products/${productId}/main.${ext}`;
+// Fase 56 — `version` (opcional) hace el nombre único por subida: así
+// reemplazar o volver a subir una imagen nunca sobrescribe el archivo
+// original anterior, que se conserva aunque se desvincule de la ficha.
+function buildMainPath(productId, ext, version) {
+  return `products/${productId}/main${version ? "-" + version : ""}.${ext}`;
 }
 
-function buildSecondaryPath(productId, ext, seq) {
-  return `products/${productId}/${String(seq).padStart(2, "0")}.${ext}`;
+function buildSecondaryPath(productId, ext, seq, version) {
+  return `products/${productId}/${String(seq).padStart(2, "0")}${version ? "-" + version : ""}.${ext}`;
+}
+
+function uploadVersion(now = Date.now()) {
+  return now.toString(36);
 }
 
 function publicUrl(env, path) {
@@ -41,7 +48,20 @@ function pathFromUrl(env, url) {
   if (typeof url !== "string" || !url.startsWith(prefix)) return null;
   const rest = url.slice(prefix.length);
   const queryIdx = rest.indexOf("?");
-  return queryIdx === -1 ? rest : rest.slice(0, queryIdx);
+  const path = queryIdx === -1 ? rest : rest.slice(0, queryIdx);
+  // Fase 58 — un path con segmentos "." / ".." (también codificados),
+  // barras invertidas, segmentos vacíos o caracteres de control no es un
+  // archivo que hayamos generado: null = nunca se borra ni se usa. Sin
+  // esto, ".../products/5/../../hero/x.png" pasaba el control de prefijo
+  // products/5/ de deleteFileIfExclusive.
+  let decoded;
+  try {
+    decoded = decodeURIComponent(path);
+  } catch {
+    return null;
+  }
+  if (!path || /[\\\u0000-\u001f]/.test(decoded) || decoded.split("/").some((seg) => seg === "" || seg === "." || seg === "..")) return null;
+  return path;
 }
 
 // Next unused secondary sequence number, scanning existing images for the
@@ -52,7 +72,7 @@ function nextSecondarySeq(env, currentImages) {
   for (const url of currentImages) {
     const path = pathFromUrl(env, url);
     if (!path) continue;
-    const m = path.match(/\/(\d+)\.[a-z0-9]+$/i);
+    const m = path.match(/\/(\d+)(?:-[a-z0-9]+)?\.[a-z0-9]+$/i);
     if (m) {
       const n = parseInt(m[1], 10);
       if (n > max) max = n;
@@ -61,14 +81,16 @@ function nextSecondarySeq(env, currentImages) {
   return max + 1;
 }
 
-async function uploadObject({ env, path, buffer, contentType, fetchImpl = fetch }) {
+// `upsert:false` (fotos de producto, Fase 56): si el nombre ya existiera,
+// Storage rechaza la subida en vez de sobrescribir el archivo.
+async function uploadObject({ env, path, buffer, contentType, upsert = true, fetchImpl = fetch }) {
   const res = await fetchImpl(`${env.url}/storage/v1/object/${BUCKET}/${path}`, {
     method: "POST",
     headers: {
       apikey: env.serviceRoleKey,
       Authorization: `Bearer ${env.serviceRoleKey}`,
       "Content-Type": contentType,
-      "x-upsert": "true",
+      "x-upsert": upsert ? "true" : "false",
     },
     body: buffer,
   });
@@ -145,6 +167,7 @@ async function downloadObject({ env, path, fetchImpl = fetch }) {
 }
 
 module.exports = {
+  uploadVersion,
   BUCKET,
   buildMainPath,
   buildSecondaryPath,

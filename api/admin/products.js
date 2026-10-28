@@ -19,6 +19,7 @@ const { pgrestSelect } = require("../catalog/_lib/supabaseRead");
 const { requireAdmin } = require("./_lib/auth");
 const { sendJson, sendError, methodNotAllowed } = require("../catalog/_lib/http");
 const { resolveCategoryGroup } = require("../catalog/_lib/categoryGroups");
+const { handleTaxonomy } = require("./_lib/taxonomyAdmin");
 
 const PRODUCT_COLUMNS = "id,name,price,stock,category";
 // Fase 39 — se agrega `category` (columna editorial, distinta de la
@@ -31,7 +32,11 @@ const METADATA_COLUMNS =
   "product_id,category,image,images,short_description,description,benefits,ingredients,usage,presentation,subcategory,brand,badge,search_keywords,featured,editorial_order,published";
 
 module.exports = async function handler(req, res) {
-  if (req.method !== "GET") return methodNotAllowed(res, ["GET"]);
+  // Fase 56 — ?resource=taxonomy: administración de categorías y
+  // subcategorías (ver _lib/taxonomyAdmin.js). Vive en este mismo endpoint
+  // para no sumar funciones serverless (límite del plan de Vercel).
+  const isTaxonomy = req.query && req.query.resource === "taxonomy";
+  if (req.method !== "GET" && !(isTaxonomy && req.method === "POST")) return methodNotAllowed(res, isTaxonomy ? ["GET", "POST"] : ["GET"]);
   if (!requireAdmin(req, res)) return;
 
   let env;
@@ -41,6 +46,8 @@ module.exports = async function handler(req, res) {
     console.error("[admin/products] " + e.message);
     return sendError(res, 500, "Servicio no disponible temporalmente.");
   }
+
+  if (isTaxonomy) return handleTaxonomy(req, res, env);
 
   try {
     const [products, metadataRows] = await Promise.all([

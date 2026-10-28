@@ -27,6 +27,8 @@ fs.copyFileSync(path.join(repoRoot, "js", "products.js"), path.join(tmpDir, "pro
 // Fase 34: data-source.js ahora importa taxonomy.js (EDITORIAL_STRING_FIELDS/EDITORIAL_ARRAY_FIELDS).
 fs.copyFileSync(path.join(repoRoot, "js", "taxonomy.js"), path.join(tmpDir, "taxonomy.js"));
 fs.copyFileSync(path.join(repoRoot, "js", "data-source.js"), path.join(tmpDir, "data-source.js"));
+// Fase 57: data-source.js importa variants.js (tonos/presentaciones).
+fs.copyFileSync(path.join(repoRoot, "js", "variants.js"), path.join(tmpDir, "variants.js"));
 
 let passed = 0;
 let failed = 0;
@@ -220,20 +222,21 @@ async function main() {
   });
 
   console.log("TEST 8 — el fallback a demo solo ocurre por una falla real, y nunca queda oculto");
-  await test("getProducts() cae a demo si la API responde con error, y lo reporta como error (no warn) — una falla de producción no debe pasar desapercibida", async () => {
+  // Fase 56 — ya NO cae a demo: un catálogo de demostración con precios
+  // inventados no debe verse nunca en producción. getProducts() lanza y
+  // app.js muestra "catálogo no disponible" con opción de reintentar.
+  await test("getProducts() NO cae a demo si la API responde con error: lanza (sin productos ni precios ficticios) y lo reporta como error", async () => {
     __internal.setMode("api");
     const originalFetch = globalThis.fetch;
     const originalError = console.error;
     let errored = false;
-    console.error = (...args) => {
+    console.error = () => {
       errored = true;
-      originalError.call(console, ...args);
     };
     globalThis.fetch = async () => ({ ok: false, status: 503, json: async () => ({ error: "no disponible" }) });
     try {
-      const products = await getProducts();
-      assert.equal(products.length, 6); // volvió a los datos demo — la Home no se cae
-      assert.equal(errored, true); // pero la falla real quedó registrada con severidad de error, no oculta
+      await assert.rejects(() => getProducts());
+      assert.equal(errored, true); // la falla real queda registrada con severidad de error
     } finally {
       globalThis.fetch = originalFetch;
       console.error = originalError;

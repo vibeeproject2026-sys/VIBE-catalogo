@@ -234,5 +234,32 @@ test("archivo sin dimensiones legibles -> error claro, no inventa dimensiones", 
   assert.ok(r.errors.some((e) => e.includes("dimensiones")));
 });
 
+test("Fase 56 — con versión, cada subida tiene nombre único (nunca sobrescribe el original anterior)", () => {
+  assert.equal(buildMainPath(56, "webp", "kq9"), "products/56/main-kq9.webp");
+  assert.equal(buildSecondaryPath(56, "jpg", 3, "kq9"), "products/56/03-kq9.jpg");
+  assert.notEqual(buildMainPath(56, "webp", "a1"), buildMainPath(56, "webp", "a2"));
+});
+test("Fase 56 — nextSecondarySeq también entiende nombres versionados", () => {
+  const env = { url: "https://example.supabase.co" };
+  assert.equal(nextSecondarySeq(env, [publicUrl(env, "products/56/01.webp"), publicUrl(env, "products/56/04-kq9.png")]), 5);
+});
+test("Fase 58 — pathFromUrl rechaza recorridos de ruta (.., ., codificados, \\, segmentos vacíos)", () => {
+  const env = { url: "https://example.supabase.co" };
+  const base = publicUrl(env, "");
+  for (const bad of [
+    "products/5/../../hero/x/main.png",
+    "products/5/%2e%2e/%2E%2E/config/image-variants.json",
+    "products/5/./main.png",
+    "products/5//main.png",
+    "products/5/..%2f..%2fconfig/x.json",
+    "products/5\\..\\x.png",
+    "products/5/%00main.png",
+    "products/5/%E0%A4%A.png",
+  ]) assert.equal(pathFromUrl(env, base + bad), null, bad);
+  // Lo legítimo sigue igual (incluido el ?v= de cache-busting).
+  assert.equal(pathFromUrl(env, base + "products/5/main-kq9.webp?v=1"), "products/5/main-kq9.webp");
+  assert.equal(pathFromUrl(env, base + "hero/hero-muitk6vo-gbbxrm/main.png"), "hero/hero-muitk6vo-gbbxrm/main.png");
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

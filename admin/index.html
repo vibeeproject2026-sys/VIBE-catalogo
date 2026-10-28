@@ -102,8 +102,9 @@
       <header class="view-head">
         <p class="eyebrow">Clasificación</p>
         <h1>Clasificación VIBE</h1>
-        <p class="view-sub">Grupo › Categoría › Subcategoría de los productos con ficha. La categoría POS es el dato de origen y no se modifica. Para cambiar la clasificación de un producto, ábrelo desde aquí.</p>
+        <p class="view-sub">Grupo › Categoría › Subcategoría. Aquí creas, renombras, mueves y eliminas categorías y subcategorías; cada cambio muestra los productos afectados y pide confirmación. La categoría POS es el dato de origen y no se modifica. Para cambiar la clasificación de un producto, ábrelo desde aquí.</p>
       </header>
+      <p id="taxNotice" class="orders-notice hidden" role="status" aria-live="polite"></p>
       <div id="taxonomyTree" class="taxonomy-tree"></div>
       <section class="home-panel" id="taxonomyPosPanel">
         <div class="panel-head"><h2>Categorías de origen (POS)</h2></div>
@@ -150,6 +151,7 @@
       </header>
 
       <p class="result-line"><span id="ordersCount" class="result-count"></span></p>
+      <p id="ordersReview" class="orders-review hidden" role="status"></p>
       <p id="ordersNotice" class="orders-notice hidden" role="status" aria-live="polite"></p>
       <p id="ordersLoadError" class="login-error hidden"></p>
 
@@ -165,7 +167,8 @@
               <th>Ciudad</th>
               <th>Total</th>
               <th>Estado</th>
-              <th>Email enviado</th>
+              <th>Email al cliente</th>
+              <th>Aviso a VIBE</th>
               <th><span class="visually-hidden">Acciones</span></th>
             </tr>
           </thead>
@@ -193,6 +196,34 @@
     <div class="confirm-actions">
       <button type="submit" value="cancel" id="orderDeleteCancel" class="button">Cancelar</button>
       <button type="button" id="orderDeleteConfirm" class="button danger">Eliminar pedido</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Fase 56 — confirmación para quitar una imagen de una ficha. Por
+     defecto solo se desvincula: el archivo original se conserva. -->
+<dialog id="imageRemoveDialog" class="confirm-dialog" aria-labelledby="imageRemoveTitle">
+  <form method="dialog" class="confirm-box">
+    <h2 id="imageRemoveTitle">¿Quitar la imagen?</h2>
+    <div id="imageRemovePreview" class="image-remove-preview"></div>
+    <p class="confirm-summary">La imagen dejará de mostrarse en esta ficha y en el catálogo público. El archivo original se conserva en el almacenamiento.</p>
+    <label class="checkbox-field image-remove-file"><input type="checkbox" id="imageRemoveDeleteFile"> Borrar también el archivo del almacenamiento (solo si ninguna otra ficha ni slide lo usa). No se puede deshacer.</label>
+    <div class="confirm-actions">
+      <button type="submit" value="cancel" id="imageRemoveCancel" class="button">Cancelar</button>
+      <button type="button" id="imageRemoveConfirm" class="button danger">Quitar imagen</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Fase 56 — acciones sobre categorías y subcategorías. -->
+<dialog id="taxDialog" class="confirm-dialog" aria-labelledby="taxDialogTitle">
+  <form method="dialog" class="confirm-box tax-dialog">
+    <h2 id="taxDialogTitle"></h2>
+    <div id="taxDialogBody"></div>
+    <p id="taxDialogError" class="login-error hidden" role="alert"></p>
+    <div class="confirm-actions">
+      <button type="submit" value="cancel" class="button">Cancelar</button>
+      <button type="button" id="taxDialogConfirm" class="button dark">Guardar</button>
     </div>
   </form>
 </dialog>

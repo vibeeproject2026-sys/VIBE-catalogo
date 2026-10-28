@@ -79,6 +79,9 @@ function makeStatefulSupabase({ products, initialMetadata = {} }) {
   const metadataByProduct = new Map(Object.entries(initialMetadata).map(([k, v]) => [Number(k), v]));
 
   const fetchImpl = async (url, opts = {}) => {
+    // Fase 56 — la validación lee la taxonomía editable (config/taxonomy.json
+    // en Storage); en estas pruebas no existe → taxonomía por defecto.
+    if (String(url).includes("/storage/v1/object/") && String(url).includes("config/taxonomy.json")) return { ok: false, status: 404, text: async () => "" };
     const method = opts.method || "GET";
     if (url.includes("/rest/v1/products")) {
       const m = url.match(/id=eq\.(\d+)/);

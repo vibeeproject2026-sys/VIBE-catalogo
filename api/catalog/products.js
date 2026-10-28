@@ -15,6 +15,7 @@ const { joinCatalog, shapeProduct, sortCatalog, applyFilters } = require("./_lib
 const { resolveCategoryGroup } = require("./_lib/categoryGroups");
 const { applyCors } = require("./_lib/cors");
 const { sendJson, sendError, methodNotAllowed } = require("./_lib/http");
+const { loadImageVariants, srcsetFor } = require("../_lib/imageVariants");
 
 // Explicit column whitelists — never `select=*`. This is what actually
 // keeps cost_base, cost_pack, min_stock, etc. out of reach, independent
@@ -28,6 +29,7 @@ const { sendJson, sendError, methodNotAllowed } = require("./_lib/http");
 // computed `promoActive` boolean server-side (see _lib/merge.js), so the
 // public API surface stays as narrow as everything else it returns.
 const PRODUCT_COLUMNS = "id,name,price,stock,category,promo_active,promo_price,promo_start,promo_end,promo_text";
+const SITE_URL = "https://www.vibebeautycol.com";
 // Fase 34 — additional_info ahora SÍ se selecciona: dejó de ser una nota
 // interna de texto libre y pasa a guardar un JSON estructurado con los
 // ~40 campos editoriales granulares de la ficha VIBE (tono, acabado,
@@ -63,7 +65,9 @@ module.exports = async function handler(req, res) {
   const featured = query.featured === "true" ? true : undefined;
 
   try {
-    const [products, metadataRows] = await Promise.all([
+    // Fase 57 — versiones optimizadas (si existe el manifiesto); nunca
+    // hace fallar el catálogo: sin manifiesto → Map vacío → originales.
+    const [products, metadataRows, imageVariants] = await Promise.all([
       pgrestSelect({
         table: "products",
         columns: PRODUCT_COLUMNS,
@@ -76,12 +80,32 @@ module.exports = async function handler(req, res) {
         filters: [["published", "eq.true"]],
         env,
       }),
+      query.format === "sitemap" ? new Map() : loadImageVariants(env),
     ]);
 
     const joined = joinCatalog(products, metadataRows);
     let items = joined.map(({ product, metadata }) => shapeProduct(product, metadata, resolveCategoryGroup));
     items = applyFilters(items, { category, subcategory, featured, search });
     items = sortCatalog(items);
+    items = items.map((p) => ({ ...p, imageSrcset: srcsetFor(imageVariants, p.image) }));
+
+    // Fase 56 — /sitemap.xml (rewrite en vercel.json): portada + fichas
+    // publicadas (las mismas que devuelve esta API; nunca productos sin
+    // publicar ni rutas inventadas), en el dominio oficial.
+    if (query.format === "sitemap") {
+      const urls = [SITE_URL + "/", ...items.map((p) => `${SITE_URL}/?product=${encodeURIComponent(p.id)}`)];
+      const xml = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+        ...urls.map((u) => `  <url><loc>${u.replace(/&/g, "&amp;")}</loc></url>`),
+        "</urlset>",
+        "",
+      ].join("\n");
+      res.setHeader("Content-Type", "application/xml; charset=utf-8");
+      res.setHeader("Cache-Control", "public, max-age=300, s-maxage=3600");
+      res.statusCode = 200;
+      return res.end(xml);
+    }
 
     res.setHeader("Cache-Control", "public, max-age=60, s-maxage=300, stale-while-revalidate=600");
     return sendJson(res, 200, { products: items });

@@ -71,6 +71,34 @@ export const SUBCATEGORIES_BY_CATEGORY = {
   "Complementos de belleza": ["Accesorios para el cabello", "Cuidado personal"],
 };
 
+// Fase 56 — la taxonomía es editable desde el Admin (documento
+// config/taxonomy.json, ver api/_lib/taxonomyStore.js). applyTaxonomy
+// actualiza EN EL LUGAR VIBE_CATEGORY_GROUPS, SUBCATEGORIES_BY_CATEGORY y
+// el mapa categoría → grupo, así navegación, filtros y selectores del
+// Admin usan la vigente sin cambiar nada más. Recibe la forma pública
+// { groups: [{ group, categories: [nombre] }], subcategories: { cat: [..] } }.
+// Una forma inválida se ignora (se conserva la taxonomía de código). Los
+// grupos son fijos: solo se aceptan los existentes.
+export function applyTaxonomy(tax) {
+  if (!tax || !Array.isArray(tax.groups) || !tax.subcategories || typeof tax.subcategories !== "object") return false;
+  const known = new Set(EDITORIAL_GROUPS);
+  const groups = tax.groups
+    .filter((g) => g && known.has(g.group) && Array.isArray(g.categories))
+    .map((g) => ({ group: g.group, categories: g.categories.filter((c) => typeof c === "string" && c.trim()) }));
+  if (groups.length !== EDITORIAL_GROUPS.length) return false;
+  VIBE_CATEGORY_GROUPS.splice(0, VIBE_CATEGORY_GROUPS.length, ...EDITORIAL_GROUPS.map((name) => groups.find((g) => g.group === name)));
+  for (const k of Object.keys(EDITORIAL_GROUP_BY_CATEGORY)) delete EDITORIAL_GROUP_BY_CATEGORY[k];
+  for (const k of Object.keys(SUBCATEGORIES_BY_CATEGORY)) delete SUBCATEGORIES_BY_CATEGORY[k];
+  for (const { group, categories } of VIBE_CATEGORY_GROUPS) {
+    for (const c of categories) {
+      EDITORIAL_GROUP_BY_CATEGORY[c] = group;
+      const subs = tax.subcategories[c];
+      SUBCATEGORIES_BY_CATEGORY[c] = Array.isArray(subs) ? subs.filter((s) => typeof s === "string" && s.trim()) : [];
+    }
+  }
+  return true;
+}
+
 // Fase 53 — ¿la subcategoría está en la lista controlada de su categoría?
 export function isListedSubcategory(category, subcategory) {
   return Boolean(SUBCATEGORIES_BY_CATEGORY[category] && SUBCATEGORIES_BY_CATEGORY[category].includes(subcategory));

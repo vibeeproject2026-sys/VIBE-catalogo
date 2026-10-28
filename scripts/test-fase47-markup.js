@@ -73,7 +73,7 @@ test("Catálogo: sin breadcrumb «Inicio» ni bloque negro; dos zonas (título y
   assert.doesNotMatch(html, /id="catalogBreadcrumb"/);
   assert.doesNotMatch(app, /catalogBreadcrumb/);
   const block = html.match(/<div class="heading heading-catalog">[\s\S]*?<\/div>\s*<\/div>/)[0];
-  assert.match(block, /COLECCIÓN[\s\S]*?id="catalogTitle">Catálogo<[\s\S]*?class="catalog-lead">Explora por categoría y encuentra tu próximo esencial\./);
+  assert.match(block, /COLECCIÓN[\s\S]*?id="catalogTitle">Catálogo<[\s\S]*?class="catalog-lead[^"]*">Explora por categoría y encuentra tu próximo esencial\./);
   assert.match(block, /class="catalog-brand-title">Beauty for your <span class="title-accent">VIBE\.<\/span>/);
   assert.match(block, /Esenciales de belleza seleccionados para elevar tu ritual\./);
   const rule = css.match(/\.heading-catalog\{[^}]*\}/)[0];
@@ -92,10 +92,15 @@ test("Ofertas (página): copy neutro por defecto, sin sugerir descuentos", () =>
   assert.match(block, /id="ofertasLead">Cuando haya promociones activas, las verás aquí\.</);
   assert.doesNotMatch(block.match(/<div class="heading[\s\S]*?<\/div>\s*<\/div>/)[0], /precios especiales|Pequeños precios/);
 });
-test("Ofertas (Home, visible solo con promociones): titular creativo", () => {
-  const block = html.match(/<section id="ofertasHome" class="featured hidden">[\s\S]*?<\/section>/)[0];
-  assert.match(block, /SOLO EN OFERTAS VIBE/);
-  assert.match(block, /Pequeños precios\. <span class="title-accent">Grandes VIBES\.<\/span>/);
+// Fase 56 — había dos secciones con las mismas promociones (#ofertasHome
+// y #ofertas): con una promoción activa el bloque se veía duplicado. Ahora
+// hay una sola; el titular creativo lo pone ofertasHeadingCopy cuando hay
+// promociones.
+test("Ofertas: una única sección de promociones (sin el adelanto duplicado)", () => {
+  assert.doesNotMatch(html, /id="ofertasHome"/);
+  assert.doesNotMatch(app, /ofertasHome/);
+  assert.equal((html.match(/<section id="ofertas"/g) || []).length, 1);
+  assert.match(app, /function renderOfertasPage\(\)/);
 });
 
 console.log("X del modal y carrito");

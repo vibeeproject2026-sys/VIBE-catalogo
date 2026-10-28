@@ -51,6 +51,9 @@ header.scrolled .nav{height:68px}
 .logo-image{display:block;width:164px;aspect-ratio:504/207;overflow:hidden;transition:width .25s ease}
 header.scrolled .logo-image{width:128px}
 .logo-image img{width:100%;height:100%;object-fit:contain;display:block}
+/* Fase 57 — logo en WebP sin pérdida (mismos píxeles, −29 %) con el PNG
+   como respaldo: <picture> ocupa todo el contenedor como antes ocupaba img. */
+.logo-image picture,.footer-logo-image picture{display:block;width:100%;height:100%}
 .logo small{font-size:6px;letter-spacing:.31em;color:#fff;white-space:nowrap}
 .nav-links{display:flex;gap:34px;color:#c4c4c4;font-size:14px;font-weight:700;letter-spacing:.02em}
 /* Fase 36 — antes solo cambiaba de color en hover; un subrayado que
@@ -294,8 +297,6 @@ header.scrolled .logo-image{width:128px}
    de color propio por sección (nunca inventando datos, solo tratamiento
    visual) para que cada una se lea como su propio momento comercial:
    Novedades = frescura, Promociones = urgencia de compra. */
-#ofertasHome{background:linear-gradient(180deg,#fff0f6,#fff)}
-#ofertasHome .eyebrow::before{background:#111}
 
 .catalog{background:#fff;color:#111;padding:88px 0 110px}
 .catalog .eyebrow{color:var(--pink)}
@@ -841,7 +842,7 @@ footer .wrap.footer-grid{display:grid;grid-template-columns:1.1fr 1fr 1.3fr;gap:
 .heading>p{max-width:36ch;margin:0;padding-left:14px;border-left:3px solid var(--pink);color:#2a2a2a;font-size:15px;font-weight:500;line-height:1.5}
 .heading>p:empty{display:none}
 .eyebrow.eyebrow-chip{color:#fff;background:var(--pink);padding:6px 12px 6px 10px;border-radius:999px}
-.eyebrow.eyebrow-chip::before,#ofertasHome .eyebrow.eyebrow-chip::before{width:14px;background:#fff}
+.eyebrow.eyebrow-chip::before{width:14px;background:#fff}
 
 /* Fase 45 — Preguntas frecuentes: acordeón compacto sobre blanco, que
    separa el bloque oscuro de Instagram del footer. */
@@ -1040,3 +1041,84 @@ footer .wrap.footer-grid{display:grid;grid-template-columns:1.1fr 1fr 1.3fr;gap:
   .catalog-brand-title{margin:0;font-size:11px;letter-spacing:.14em}
   .catalog-brand-text{font-size:14px;color:#777;line-height:1.4}
 }
+
+/* Fase 56 — catálogo real no disponible (sin productos de demostración). */
+.catalog-unavailable{grid-column:1/-1;max-width:520px;margin:24px auto;padding:28px 24px;border:1px solid #f0d6e2;border-radius:var(--radius);background:#fff7fb;text-align:center}
+.catalog-unavailable-title{margin:0 0 8px;font-size:20px;font-weight:800;color:#111}
+.catalog-unavailable-text{margin:0 0 18px;color:#555;line-height:1.5}
+
+/* Fase 56 — paleta de tonos (muestras circulares) en la ficha y el carrito. */
+.shade-picker{margin:14px 0 6px}
+.shade-label{margin:0 0 10px;font-size:13px;letter-spacing:.02em;color:#bdbdbd}
+.shade-label strong{color:#fff;font-weight:800}
+.shade-swatches{display:flex;flex-wrap:wrap;gap:10px}
+.shade{position:relative;width:34px;height:34px;padding:0;border-radius:50%;border:2px solid #111;background:var(--shade);box-shadow:0 0 0 1px #00000026;cursor:pointer;transition:box-shadow .15s ease,transform .15s ease}
+.shade:hover{transform:scale(1.06)}
+.shade.selected{box-shadow:0 0 0 2px #111,0 0 0 4px var(--pink)}
+.shade:focus-visible{outline:none;box-shadow:0 0 0 2px #111,0 0 0 4px #fff}
+.shade.shade-off{cursor:not-allowed;opacity:.45;transform:none}
+.shade.shade-off::after{content:"";position:absolute;left:50%;top:-3px;bottom:-3px;width:2px;background:#ddd;transform:translateX(-50%) rotate(45deg)}
+.cart-shade{display:inline-block;width:12px;height:12px;margin-right:6px;border-radius:50%;background:var(--shade);box-shadow:0 0 0 1px #00000033;vertical-align:-1px}
+@media(prefers-reduced-motion:reduce){.shade{transition:none}.shade:hover{transform:none}}
+/* Fase 57 — presentaciones: píldoras con el mismo lenguaje que .variant;
+   la elegida en rosa, la inactiva tachada y sin interacción. */
+.shade-single .cart-shade,.presentation-single .cart-shade{width:16px;height:16px;margin-right:8px;box-shadow:0 0 0 1px #ffffff55}
+.presentation-picker{margin:14px 0 6px}
+.opt-part{white-space:nowrap}
+.presentation-options{display:flex;flex-wrap:wrap;gap:8px}
+.presentation-option{min-height:40px;border:1px solid #444;background:transparent;color:#fff;border-radius:999px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer}
+.presentation-option.selected{background:var(--pink);border-color:var(--pink)}
+.presentation-option:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.presentation-option.presentation-option-off{cursor:not-allowed;opacity:.45;text-decoration:line-through}
+
+/* Fase 56 — campo trampa antispam (fuera de pantalla, nunca visible) y
+   aviso de precios actualizados en carrito/checkout. */
+.hp-field{position:absolute!important;left:-10000px!important;width:1px;height:1px;overflow:hidden}
+.price-notice{margin:0 0 12px;padding:10px 12px;border-radius:10px;background:#fff4e5;color:#7a4a00;font-size:13px;line-height:1.45}
+
+/* Fase 56 — encabezado del Catálogo en mobile: sin la frase introductoria
+   «Explora por categoría…» (se conservan título, «Beauty for your VIBE.»
+   y su texto). Escritorio y tablet sin cambios.
+   Fase 57 — la misma frase también vive en el encabezado de «Descubre tu
+   VIBE» (.discover-lead), justo encima del Catálogo: en Fase 56 solo se
+   cubrió la copia de #catalogSubtitle y la otra seguía visible en mobile.
+   Fase 58 — decisión de la propietaria: la frase de «Descubre tu VIBE»
+   se CONSERVA también en mobile; solo se oculta la copia del Catálogo. */
+@media(max-width:640px){
+  .catalog-lead-intro{display:none}
+}
+
+/* Fase 56 — tarjetas con estructura uniforme: la tarjeta es una columna
+   que llena la celda de la grilla (todas las de una fila miden lo mismo)
+   y el bloque de compra (precio, descuento, Agotado y «+ Agregar») queda
+   abajo con margin-top:auto. Nombres de varias líneas, marcas ausentes o
+   descuentos ya no desplazan los botones; sin alturas fijas ni recortes. */
+.card{display:flex;flex-direction:column}
+.card-body{flex:1;display:flex;flex-direction:column}
+.card-buy{margin-top:auto;padding-top:8px}
+.card-price-row{margin:0;display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 0}
+.card-buy .button{margin-top:12px}
+.card-brand:empty,.card-options:empty{margin:0}
+/* Fase 57 — la estructura flex de Fase 56 alineaba solo el botón: la marca
+   (presente o no), los nombres de 1–5 líneas, las opciones y un precio que
+   salta de línea («Agotado», descuento a 360 px) seguían corriendo precio y
+   textos entre tarjetas de una misma fila. Ahora cada tarjeta ocupa 6 filas
+   compartidas de la grilla (subgrid): imagen · marca · nombre · opciones ·
+   precio · «+ Agregar». Cada franja mide lo que necesita la tarjeta más alta
+   de esa fila, así que todo queda a la misma altura sin alturas fijas ni
+   recortes. Las ranuras vacías (sin marca, sin opciones) miden 0. Sin
+   soporte de subgrid se mantiene la columna flex de Fase 56. */
+@supports (grid-template-rows:subgrid){
+  .grid>.card{display:grid;grid-template-rows:subgrid;grid-row:span 6;row-gap:0;align-content:start}
+  .grid>.card>.card-body,.grid>.card .card-buy{display:contents}
+  .grid>.card>.card-img{margin-bottom:18px}
+  .grid>.card .card-body>*,.grid>.card .card-buy>*{margin-left:4px;margin-right:4px;min-width:0}
+  .grid>.card .card-buy>.card-price-row{padding-top:8px;align-self:start}
+  .grid>.card .card-buy>.button{width:auto;margin-bottom:18px;align-self:end}
+}
+.card-options>p{margin:6px 0 0}
+.card-presentations{font-size:12px;color:#666;font-weight:600}
+.card-shades{display:flex;align-items:center;gap:5px;margin:6px 0 0}
+.card-shade{width:14px;height:14px;border-radius:50%;background:var(--shade);box-shadow:0 0 0 1px #00000026}
+.card-shade-off{opacity:.35}
+.card-shades-more{font-size:11px;color:#777;font-weight:700;margin-left:2px}

@@ -240,15 +240,17 @@ async function main() {
     assert.ok(html.includes("Total del pedido"));
   });
   console.log("\nbuildOrderEmail — logo oficial + link del catálogo (Fase 40.1)");
-  test("nunca contiene el texto 'vibebeautycol.com' (esa URL no tiene página funcional todavía)", () => {
+  // Fase 56 — el catálogo vive en el dominio oficial: los emails ya no
+  // enlazan al dominio técnico de Vercel.
+  test("nunca enlaza al dominio técnico vibe-catalogo.vercel.app", () => {
     const { text, html } = buildOrderEmail(FAKE_ORDER);
-    assert.ok(!text.includes("vibebeautycol.com"));
-    assert.ok(!html.includes("vibebeautycol.com"));
+    assert.ok(!text.includes("vercel.app"));
+    assert.ok(!html.includes("vercel.app"));
   });
-  test("el enlace de marca del footer apunta exactamente a https://vibe-catalogo.vercel.app, con anchor 'Visita VIBE'", () => {
+  test("el enlace de marca del footer apunta exactamente a https://www.vibebeautycol.com, con anchor 'Visita VIBE'", () => {
     const { text, html } = buildOrderEmail(FAKE_ORDER);
-    assert.ok(text.includes("https://vibe-catalogo.vercel.app"));
-    assert.ok(html.includes('href="https://vibe-catalogo.vercel.app"'));
+    assert.ok(text.includes("https://www.vibebeautycol.com"));
+    assert.ok(html.includes('href="https://www.vibebeautycol.com"'));
     assert.ok(html.includes(">Visita VIBE<"));
   });
   test("el header usa el logo oficial real (assets/vibe-logo.svg exportado a PNG, nunca reconstruido) con alt text y tamaño fijo", () => {
@@ -348,13 +350,41 @@ async function main() {
   await test("con credenciales pero el proveedor falla -> {sent:false, reason:EMAIL_SEND_FAILED}, nunca lanza", async () => {
     await withEnv({ RESEND_API_KEY: "re_test", EMAIL_FROM_ADDRESS: "pedidos@vibe.test" }, async () => {
       const result = await sendEmail({ to: "a@b.com", subject: "x", html: "x", text: "x" }, async () => ({ ok: false, status: 500 }));
-      assert.deepEqual(result, { sent: false, reason: "EMAIL_SEND_FAILED" });
+      // Fase 55 — además un código saneado para registrar el fallo.
+      assert.deepEqual(result, { sent: false, reason: "EMAIL_SEND_FAILED", errorCode: "HTTP_500:unknown" });
     });
   });
   await test("un fallo de Resend sin método .text() en la respuesta no rompe el diagnóstico (mock defensivo)", async () => {
     await withEnv({ RESEND_API_KEY: "re_test", EMAIL_FROM_ADDRESS: "pedidos@vibe.test" }, async () => {
       const result = await sendEmail({ to: "a@b.com", subject: "x", html: "x", text: "x" }, async () => ({ ok: false, status: 403 }));
-      assert.deepEqual(result, { sent: false, reason: "EMAIL_SEND_FAILED" });
+      assert.deepEqual(result, { sent: false, reason: "EMAIL_SEND_FAILED", errorCode: "HTTP_403:unknown" });
+    });
+  });
+  await test("Fase 55 — el log de un rechazo de Resend solo lleva HTTP + nombre del error: nunca direcciones ni el mensaje libre", async () => {
+    await withEnv({ RESEND_API_KEY: "re_test", EMAIL_FROM_ADDRESS: "onboarding@resend.dev" }, async () => {
+      const logs = [];
+      const originalError = console.error;
+      console.error = (...a) => logs.push(a.join(" "));
+      try {
+        await sendEmail({ to: "cliente-real@gmail.com", subject: "x", html: "x", text: "x" }, async () => ({
+          ok: false,
+          status: 403,
+          text: async () => JSON.stringify({ statusCode: 403, name: "validation_error", message: "only send testing emails to your own email address (owner@example.com)" }),
+        }));
+        await sendEmail({ to: "cliente-real@gmail.com", subject: "x", html: "x", text: "x" }, async () => ({
+          ok: false,
+          status: 422,
+          text: async () => JSON.stringify({ name: "Invalid name with spaces cliente-real@gmail.com", message: "x" }),
+        }));
+        await sendEmail({ to: "cliente-real@gmail.com", subject: "x", html: "x", text: "x" }, async () => { const e = new TypeError("connect to cliente-real@gmail.com failed"); throw e; });
+      } finally {
+        console.error = originalError;
+      }
+      assert.equal(logs.length, 3);
+      assert.match(logs[0], /HTTP_403:validation_error/);
+      assert.match(logs[1], /HTTP_422:unknown/);
+      assert.match(logs[2], /NETWORK:typeerror/);
+      for (const l of logs) assert.doesNotMatch(l, /@|owner|cliente|testing emails/i, l);
     });
   });
   await test("el cuerpo del error real de Resend (403 dominio no verificado) se lee para diagnóstico, sin romper el flujo", async () => {
@@ -369,7 +399,7 @@ async function main() {
         status: 403,
         text: async () => resendErrorBody,
       }));
-      assert.deepEqual(result, { sent: false, reason: "EMAIL_SEND_FAILED" });
+      assert.deepEqual(result, { sent: false, reason: "EMAIL_SEND_FAILED", errorCode: "HTTP_403:validation_error" });
     });
   });
 
@@ -417,7 +447,7 @@ async function main() {
       { RESEND_API_KEY: "re_test", EMAIL_FROM_ADDRESS: "pedidos@vibebeautycol.com", ORDERS_NOTIFICATION_EMAIL: "ana.vibe@example.com" },
       async () => {
         const result = await sendInternalOrderNotificationEmail(FAKE_ORDER, async () => ({ ok: false, status: 500 }));
-        assert.deepEqual(result, { sent: false, reason: "EMAIL_SEND_FAILED" });
+        assert.deepEqual(result, { sent: false, reason: "EMAIL_SEND_FAILED", errorCode: "HTTP_500:unknown" });
       }
     );
   });

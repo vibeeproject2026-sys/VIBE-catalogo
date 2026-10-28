@@ -62,6 +62,8 @@ async function main() {
   // Fase 34: data-source.js ahora importa taxonomy.js (EDITORIAL_STRING_FIELDS/EDITORIAL_ARRAY_FIELDS).
   fs.copyFileSync(path.join(repoRoot, "js", "taxonomy.js"), path.join(tmpDir, "taxonomy.js"));
   fs.copyFileSync(path.join(repoRoot, "js", "data-source.js"), path.join(tmpDir, "data-source.js"));
+  // Fase 57: data-source.js importa variants.js (tonos/presentaciones).
+  fs.copyFileSync(path.join(repoRoot, "js", "variants.js"), path.join(tmpDir, "variants.js"));
 
   const cart = await import(pathToFileURL(path.join(tmpDir, "cart.js")).href);
   const dataSource = await import(pathToFileURL(path.join(tmpDir, "data-source.js")).href);

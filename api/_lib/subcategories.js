@@ -11,6 +11,10 @@
 //   revise, nunca se reasigna ni bloquea un guardado que no lo toca).
 // Fase 54 — ya no existe «Otra»: cualquier otro valor se rechaza y el
 // Admin ofrece la lista (y una sugerencia editable para los históricos).
+// Fase 56 — la taxonomía es editable desde el Admin (api/_lib/
+// taxonomyStore.js): las funciones aceptan la lista vigente en `lists`;
+// SUBCATEGORIES_BY_CATEGORY de aquí queda como valor por defecto (el de
+// código, mientras no exista el documento editable).
 
 const SUBCATEGORIES_BY_CATEGORY = {
   Rostro: ["Base y corrector", "Polvo y fijador", "Iluminador", "Rubor", "Kits de rostro"],
@@ -24,23 +28,23 @@ const SUBCATEGORIES_BY_CATEGORY = {
 
 const trimmed = (v) => (typeof v === "string" ? v.trim() : "");
 
-function isListedSubcategory(category, subcategory) {
-  const list = SUBCATEGORIES_BY_CATEGORY[category];
+function isListedSubcategory(category, subcategory, lists = SUBCATEGORIES_BY_CATEGORY) {
+  const list = lists[category];
   return Boolean(list && list.includes(subcategory));
 }
 
-function isApprovedCategory(category) {
-  return Object.prototype.hasOwnProperty.call(SUBCATEGORIES_BY_CATEGORY, category);
+function isApprovedCategory(category, lists = SUBCATEGORIES_BY_CATEGORY) {
+  return Object.prototype.hasOwnProperty.call(lists, category);
 }
 
 // Devuelve { ok: true } o { ok: false, error }.
-function validateClassification({ category, subcategory, stored = {} }) {
+function validateClassification({ category, subcategory, stored = {}, lists = SUBCATEGORIES_BY_CATEGORY }) {
   const cat = trimmed(category);
   const sub = trimmed(subcategory);
-  if (cat && !isApprovedCategory(cat) && cat !== trimmed(stored.category)) {
+  if (cat && !isApprovedCategory(cat, lists) && cat !== trimmed(stored.category)) {
     return { ok: false, error: `«${cat}» no es una categoría VIBE. Elige una de la lista.` };
   }
-  if (!sub || isListedSubcategory(cat, sub) || sub === trimmed(stored.subcategory)) return { ok: true };
+  if (!sub || isListedSubcategory(cat, sub, lists) || sub === trimmed(stored.subcategory)) return { ok: true };
   return {
     ok: false,
     error: cat

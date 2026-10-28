@@ -91,8 +91,8 @@ const AUTH_HEADER = { authorization: "Bearer admin-test-token" };
 //  - answers GET /rest/v1/catalog_metadata (current image/images)
 //  - answers POST /rest/v1/catalog_metadata (upsert) and records the body
 //  - answers POST/DELETE /storage/v1/object/... and records calls
-function mockFetch({ productExists = true, existingImage = null, existingImages = [] } = {}) {
-  const calls = { productsMethods: [], metadataWrites: [], storageUploads: [], storageDeletes: [] };
+function mockFetch({ productExists = true, existingImage = null, existingImages = [], otherRows = [], slides = [], deleteOk = true, allRowsFail = false } = {}) {
+  const calls = { productsMethods: [], metadataWrites: [], storageUploads: [], storageDeletes: [], uploadUpsert: [] };
   const fetchImpl = async (url, opts = {}) => {
     const method = opts.method || "GET";
     if (url.includes("/rest/v1/products")) {
@@ -105,12 +105,15 @@ function mockFetch({ productExists = true, existingImage = null, existingImages 
     }
     if (url.includes("/rest/v1/catalog_metadata")) {
       if (method === "GET") {
-        return {
-          ok: true,
-          status: 200,
-          text: async () =>
-            JSON.stringify(productExists ? [{ product_id: 56, image: existingImage, images: existingImages }] : []),
-        };
+        const own = productExists ? [{ product_id: 56, image: existingImage, images: existingImages }] : [];
+        // Fase 56 — lectura de TODAS las fichas (sin filtro por product_id)
+        // para comprobar si un archivo es exclusivo antes de borrarlo.
+        if (!url.includes("product_id=eq")) {
+          if (allRowsFail) return { ok: false, status: 500, text: async () => "{}" };
+          const after = calls.metadataWrites.length ? [{ product_id: 56, image: calls.metadataWrites.at(-1).image ?? existingImage, images: calls.metadataWrites.at(-1).images ?? existingImages }] : own;
+          return { ok: true, status: 200, text: async () => JSON.stringify([...after, ...otherRows]) };
+        }
+        return { ok: true, status: 200, text: async () => JSON.stringify(own) };
       }
       // POST upsert
       const body = JSON.parse(opts.body);
@@ -118,14 +121,19 @@ function mockFetch({ productExists = true, existingImage = null, existingImages 
       return {
         ok: true,
         status: 200,
-        text: async () => JSON.stringify([{ product_id: body.product_id, image: body.image ?? existingImage, images: body.images ?? existingImages }]),
+        text: async () => JSON.stringify([{ product_id: body.product_id, image: "image" in body ? body.image : existingImage, images: "images" in body ? body.images : existingImages }]),
       };
     }
     if (url.includes("/storage/v1/object/")) {
       if (method === "DELETE") {
         calls.storageDeletes.push(url);
-        return { ok: true, status: 200, text: async () => "" };
+        return { ok: deleteOk, status: deleteOk ? 200 : 500, text: async () => "" };
       }
+      if (method === "GET" && url.includes("hero/slides.json")) {
+        const buf = Buffer.from(JSON.stringify(slides));
+        return { ok: true, status: 200, arrayBuffer: async () => buf, text: async () => buf.toString() };
+      }
+      calls.uploadUpsert.push(opts.headers && opts.headers["x-upsert"]);
       calls.storageUploads.push({ url, contentType: opts.headers && opts.headers["Content-Type"], bodyLength: opts.body ? opts.body.length : 0 });
       return { ok: true, status: 200, text: async () => "" };
     }
@@ -224,10 +232,13 @@ async function main() {
         await handler(req, res);
         assert.equal(res.statusCode, 200);
         assert.equal(calls.storageUploads.length, 1);
-        assert.ok(calls.storageUploads[0].url.includes("products/56/main.png"));
+        // Fase 56 — nombre único por subida (main-<versión>.png) y sin
+        // sobrescritura: nunca pisa un archivo original anterior.
+        assert.match(calls.storageUploads[0].url, /products\/56\/main-[a-z0-9]+\.png$/);
+        assert.equal(calls.uploadUpsert[0], "false");
         assert.equal(calls.metadataWrites.length, 1);
         assert.equal(calls.metadataWrites[0].product_id, 56);
-        assert.ok(String(calls.metadataWrites[0].image).includes("products/56/main.png"));
+        assert.match(String(calls.metadataWrites[0].image), /products\/56\/main-[a-z0-9]+\.png$/);
         assert.equal("images" in calls.metadataWrites[0], false);
       } finally {
         global.fetch = originalFetch;
@@ -235,7 +246,7 @@ async function main() {
     });
   });
 
-  await test("reemplazo de imagen principal: borra la anterior (propia) de forma best-effort, tras actualizar la metadata", async () => {
+  await test("Fase 56 — reemplazo de imagen principal: actualiza la referencia y CONSERVA el archivo anterior (no lo borra)", async () => {
     await withEnv(BASE_ENV, async () => {
       const previousUrl = "https://example.supabase.co/storage/v1/object/public/product-images/products/56/main.jpg";
       const { fetchImpl, calls } = mockFetch({ productExists: true, existingImage: previousUrl, existingImages: [] });
@@ -251,10 +262,8 @@ async function main() {
         await handler(req, res);
         await flush();
         assert.equal(res.statusCode, 200);
-        // referencia actualizada primero (ya se ve en metadataWrites), y el
-        // archivo anterior (distinto, .jpg vs .png) se intenta limpiar:
-        assert.equal(calls.storageDeletes.length, 1);
-        assert.ok(calls.storageDeletes[0].includes("products/56/main.jpg"));
+        assert.notEqual(calls.metadataWrites[0].image, previousUrl);
+        assert.equal(calls.storageDeletes.length, 0);
       } finally {
         global.fetch = originalFetch;
       }
@@ -344,7 +353,8 @@ async function main() {
         const res = mockRes();
         await handler(req, res);
         assert.equal(res.statusCode, 200);
-        assert.ok(calls.storageUploads[0].url.includes("products/56/02.png"));
+        assert.match(calls.storageUploads[0].url, /products\/56\/02-[a-z0-9]+\.png$/);
+        assert.equal(calls.uploadUpsert[0], "false");
         assert.equal(calls.metadataWrites[0].images.length, 2);
         assert.deepEqual(calls.metadataWrites[0].images[0], existing[0]);
         assert.equal("image" in calls.metadataWrites[0], false);
@@ -356,7 +366,7 @@ async function main() {
 
   console.log("\neliminación de imagen secundaria");
 
-  await test("DELETE de una secundaria existente: actualiza metadata primero y luego intenta borrar el archivo", async () => {
+  await test("Fase 56 — quitar una secundaria: la saca de images[] y CONSERVA el archivo (sin borrado por defecto)", async () => {
     await withEnv(BASE_ENV, async () => {
       const target = "https://example.supabase.co/storage/v1/object/public/product-images/products/56/01.webp";
       const keep = "https://example.supabase.co/storage/v1/object/public/product-images/products/56/02.webp";
@@ -371,8 +381,9 @@ async function main() {
         assert.equal(res.statusCode, 200);
         assert.deepEqual(res.body.images, [keep]);
         assert.deepEqual(calls.metadataWrites[0].images, [keep]);
-        assert.equal(calls.storageDeletes.length, 1);
-        assert.ok(calls.storageDeletes[0].includes("products/56/01.webp"));
+        assert.deepEqual(Object.keys(calls.metadataWrites[0]).sort(), ["images", "product_id"]);
+        assert.equal(calls.storageDeletes.length, 0);
+        assert.deepEqual(res.body.file, { deleted: false, reason: "kept" });
       } finally {
         global.fetch = originalFetch;
       }
@@ -447,6 +458,161 @@ async function main() {
         await handler(req, res);
         assert.ok(calls.productsMethods.length > 0);
         assert.ok(calls.productsMethods.every((m) => m === "GET"), "products solo debe leerse, nunca escribirse");
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
+  });
+
+  console.log("\nFase 56 — quitar imágenes de una ficha");
+  const U = (p) => "https://example.supabase.co/storage/v1/object/public/product-images/" + p;
+  const del = async (mockOpts, body) => {
+    const { fetchImpl, calls } = mockFetch(mockOpts);
+    const originalFetch = global.fetch;
+    global.fetch = fetchImpl;
+    try {
+      const res = mockRes();
+      await handler({ method: "DELETE", headers: AUTH_HEADER, body }, res);
+      await flush();
+      return { res, calls };
+    } finally {
+      global.fetch = originalFetch;
+    }
+  };
+
+  await test("quitar la principal: image = null (solo ese campo), el archivo se conserva", async () => {
+    await withEnv(BASE_ENV, async () => {
+      const main = U("products/56/main.png");
+      const { res, calls } = await del({ existingImage: main, existingImages: [U("products/56/01.webp")] }, { product_id: 56, slot: "main", path: main });
+      assert.equal(res.statusCode, 200);
+      assert.deepEqual(calls.metadataWrites, [{ product_id: 56, image: null }]);
+      assert.equal(calls.storageDeletes.length, 0);
+      assert.equal(res.body.image, null);
+      assert.deepEqual(res.body.images, [U("products/56/01.webp")]);
+    });
+  });
+
+  await test("quitar la principal con una URL que no es la actual -> 404 sin escribir nada", async () => {
+    await withEnv(BASE_ENV, async () => {
+      const { res, calls } = await del({ existingImage: U("products/56/main.png") }, { product_id: 56, slot: "main", path: U("products/56/otra.png") });
+      assert.equal(res.statusCode, 404);
+      assert.equal(calls.metadataWrites.length, 0);
+    });
+  });
+
+  await test("producto sin imágenes: quitar devuelve 404 y no toca nada", async () => {
+    await withEnv(BASE_ENV, async () => {
+      const { res, calls } = await del({ existingImage: null, existingImages: [] }, { product_id: 56, slot: "main", path: U("products/56/main.png") });
+      assert.equal(res.statusCode, 404);
+      assert.equal(calls.metadataWrites.length + calls.storageDeletes.length, 0);
+    });
+  });
+
+  await test("slot inválido -> 400", async () => {
+    await withEnv(BASE_ENV, async () => {
+      const { res, calls } = await del({}, { product_id: 56, slot: "todo", path: U("products/56/main.png") });
+      assert.equal(res.statusCode, 400);
+      assert.equal(calls.metadataWrites.length, 0);
+    });
+  });
+
+  await test("borrar archivo con confirmación expresa: solo si es exclusivo (ni otra ficha ni slide lo usan)", async () => {
+    await withEnv(BASE_ENV, async () => {
+      const target = U("products/56/01.webp");
+      const { res, calls } = await del({ existingImages: [target], otherRows: [{ product_id: 99, image: U("products/99/main.png"), images: [] }], slides: [{ id: "s1", image: U("hero/s1/desktop.png") }] }, { product_id: 56, slot: "secondary", path: target, deleteFile: true });
+      assert.equal(res.statusCode, 200);
+      assert.deepEqual(res.body.file, { deleted: true });
+      assert.equal(calls.storageDeletes.length, 1);
+      assert.ok(calls.storageDeletes[0].endsWith("products/56/01.webp"));
+    });
+  });
+
+  await test("archivo compartido con otra ficha: se quita de esta ficha pero el archivo NO se borra", async () => {
+    await withEnv(BASE_ENV, async () => {
+      const target = U("products/56/01.webp");
+      const { res, calls } = await del({ existingImages: [target], otherRows: [{ product_id: 99, image: target, images: [] }] }, { product_id: 56, slot: "secondary", path: target, deleteFile: true });
+      assert.equal(res.statusCode, 200);
+      assert.deepEqual(res.body.file, { deleted: false, reason: "shared" });
+      assert.equal(calls.storageDeletes.length, 0);
+    });
+  });
+
+  await test("archivo usado también como principal de la misma ficha: no se borra", async () => {
+    await withEnv(BASE_ENV, async () => {
+      const target = U("products/56/01.webp");
+      const { res, calls } = await del({ existingImage: target, existingImages: [target] }, { product_id: 56, slot: "secondary", path: target, deleteFile: true });
+      assert.deepEqual(res.body.file, { deleted: false, reason: "shared" });
+      assert.equal(calls.storageDeletes.length, 0);
+    });
+  });
+
+  await test("archivo usado por un slide del Hero: no se borra", async () => {
+    await withEnv(BASE_ENV, async () => {
+      const target = U("products/56/01.webp");
+      const { res, calls } = await del({ existingImages: [target], slides: [{ id: "s1", image: target }] }, { product_id: 56, slot: "secondary", path: target, deleteFile: true });
+      assert.deepEqual(res.body.file, { deleted: false, reason: "shared" });
+      assert.equal(calls.storageDeletes.length, 0);
+    });
+  });
+
+  await test("archivo de otro producto o externo: nunca se borra", async () => {
+    await withEnv(BASE_ENV, async () => {
+      for (const target of [U("products/99/01.webp"), "assets/products/brush.svg"]) {
+        const { res, calls } = await del({ existingImages: [target] }, { product_id: 56, slot: "secondary", path: target, deleteFile: true });
+        assert.equal(res.statusCode, 200);
+        assert.deepEqual(res.body.file, { deleted: false, reason: "not_owned" });
+        assert.equal(calls.storageDeletes.length, 0);
+      }
+    });
+  });
+
+  await test("si no se puede verificar el uso del archivo, se conserva", async () => {
+    await withEnv(BASE_ENV, async () => {
+      const target = U("products/56/01.webp");
+      const { res, calls } = await del({ existingImages: [target], allRowsFail: true }, { product_id: 56, slot: "secondary", path: target, deleteFile: true });
+      assert.deepEqual(res.body.file, { deleted: false, reason: "unverified" });
+      assert.equal(calls.storageDeletes.length, 0);
+    });
+  });
+
+  await test("si Storage rechaza el borrado, se informa (deleted:false) y la imagen igual queda quitada", async () => {
+    await withEnv(BASE_ENV, async () => {
+      const target = U("products/56/01.webp");
+      const { res } = await del({ existingImages: [target], deleteOk: false }, { product_id: 56, slot: "secondary", path: target, deleteFile: true });
+      assert.equal(res.statusCode, 200);
+      assert.deepEqual(res.body.file, { deleted: false, reason: "delete_failed" });
+      assert.deepEqual(res.body.images, []);
+    });
+  });
+
+  await test("fallo al guardar: 502 y no se toca Storage", async () => {
+    await withEnv(BASE_ENV, async () => {
+      const target = U("products/56/01.webp");
+      const { fetchImpl, calls } = mockFetch({ existingImages: [target] });
+      const failing = async (url, opts = {}) => (url.includes("/rest/v1/catalog_metadata") && opts.method === "POST" ? { ok: false, status: 500, text: async () => "{}" } : fetchImpl(url, opts));
+      const originalFetch = global.fetch;
+      global.fetch = failing;
+      try {
+        const res = mockRes();
+        await handler({ method: "DELETE", headers: AUTH_HEADER, body: { product_id: 56, slot: "secondary", path: target, deleteFile: true } }, res);
+        assert.equal(res.statusCode, 502);
+        assert.equal(calls.storageDeletes.length, 0);
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
+  });
+
+  await test("quitar sin token -> 401 sin tocar nada", async () => {
+    await withEnv(BASE_ENV, async () => {
+      const { fetchImpl, calls } = mockFetch({});
+      const originalFetch = global.fetch;
+      global.fetch = fetchImpl;
+      try {
+        const res = mockRes();
+        await handler({ method: "DELETE", headers: {}, body: { product_id: 56, slot: "main", path: "x" } }, res);
+        assert.equal(res.statusCode, 401);
+        assert.equal(calls.metadataWrites.length + calls.storageDeletes.length, 0);
       } finally {
         global.fetch = originalFetch;
       }

@@ -105,7 +105,9 @@ async function sendWhatsAppNotification(order, fetchImpl = fetch) {
     }
     return { sent: true };
   } catch (e) {
-    console.error("[orders/whatsappNotify] Error de red al intentar notificar el pedido: " + (e && e.message ? e.message : e));
+    // Fase 56 — solo el tipo de error (nunca su mensaje libre, que podría
+    // incluir el número de destino o datos de la solicitud).
+    console.error("[orders/whatsappNotify] Error de red al intentar notificar el pedido (" + (e && e.name ? String(e.name).replace(/[^A-Za-z0-9_]/g, "").slice(0, 40) : "error") + ").");
     return { sent: false, reason: "WHATSAPP_SEND_FAILED" };
   }
 }
