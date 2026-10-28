@@ -567,7 +567,7 @@ Son **66 rutas**: los 38 archivos modificados más los 28 sin seguimiento (27 qu
 
 | ID | Estado | Evidencia |
 |---|---|---|
-| IMG-09 | **WebP publicados en Storage:** 66 archivos (22 originales × 3 anchos) en `optimized/{products,hero}/…`. El manifiesto se publica tras desplegar el código (14.6) | Ver «Detalle de IMG-09» debajo de esta tabla |
+| IMG-09 | **COMPLETADO Y VERIFICADO EN PRODUCCIÓN:** 66 WebP (22 originales × 3 anchos) en `optimized/{products,hero}/…` y manifiesto publicado tras desplegar el código (§14.8) | Ver «Detalle de IMG-09» debajo de esta tabla |
 | Excepciones (`products/122/main`, `hero/hero-muirbum2-nw5onl`) | Se publicaron sus versiones **sin pérdida**, idénticas píxel a píxel al original reducido: superan el criterio de calidad sin margen de error | La propietaria pidió conservar el original solo si no se supera el criterio; el WebP con pérdida queda descartado |
 | IMG-06 | **IMPLEMENTADO Y VERIFICADO (local, con los WebP reales)** | Ver «Detalle de IMG-06» debajo de esta tabla |
 | Corrección encontrada | El hover de la tarjeta cambiaba solo `src`; con `srcset` (al publicar el manifiesto) habría dejado de cambiar de foto | `swapImage` cambia `srcset` y `src` |
@@ -671,6 +671,31 @@ No se creó ni publicó ninguna ficha (ED-01).
 - **Cómo se aplican:** son idempotentes (`if not exists`). Están en `supabase/manual/`, para ejecutar en el SQL Editor de Supabase.
 - **Después de aplicarlas:** el código las usa automáticamente, sin desplegar nada.
 
+### 14.8 Publicación y verificación en www.vibebeautycol.com
+
+**Despliegue:**
+- **Commit:** `8f10f79`, con 10 archivos.
+- **Push:** a `main`.
+- **Vercel:** «Deployment has completed».
+
+**Manifiesto `config/image-variants.json`:**
+- **Publicación:** se subió **después** de que el código nuevo estuviera en línea (`x-upsert:false`), con **19 originales**.
+- **Por qué 19 y no 22:** durante esta fase alguien (no esta sesión) despublicó #106 desde el Admin y quitó sus fotos de la ficha (`published=false`, `image=null`). Sus 3 originales y sus WebP siguen en Storage, sin cambios.
+- **#56 no cambió:** su escritura fue bloqueada por permisos y no se ejecutó.
+
+**Verificación en producción** (Chromium real, sin simulaciones; `/api/orders/**` abortado):
+- **Imágenes** (`imgprod.js`, 17/17):
+  - 6 tarjetas, Hero, ficha, miniaturas, flechas, hover y carrito en WebP;
+  - si un WebP falla, se vuelve al original;
+  - sin errores de JS.
+- **Peso de la portada completa:** 2,66 MB en mobile y 2,18 MB en escritorio. Con los originales eran 15,59 MB (medido con 7 productos).
+- **Regresión** (`prod60.js`):
+  - a 360, 390, 820 y 1440: frase correcta, dispersión de tarjetas 0 px, 0 imágenes rotas y sin desborde;
+  - ficha → carrito → formulario de checkout, **sin enviar**;
+  - **0 llamadas** a la API de pedidos;
+  - columna «Legal» presente y **oculta** (sin datos).
+- **Caché:** tras publicar el manifiesto, la API de productos puede tardar hasta 5 minutos en reflejarlo (`s-maxage=300` del CDN). El Hero lo reflejó al instante.
+
 ## Historial
 
 - **2026-10-28 (Fase 57):**
@@ -698,3 +723,9 @@ No se creó ni publicó ninguna ficha (ED-01).
   - **Commit y despliegue:** `b6ce13d`, con push a `main` y despliegue de Production en Vercel completado.
   - **Migraciones:** 0002, 0004 y 0005 trasladadas a `supabase/manual/`, sin ejecutar.
   - **Verificación en producción:** catálogo, seguridad y SEO (§13.4).
+- **2026-10-28 (fase final integral):**
+  - **Imágenes:** imágenes optimizadas publicadas (66 WebP + manifiesto); galería, miniaturas, carrito y checkout optimizados; −83 % (mobile) y −86 % (escritorio) de peso.
+  - **Legal:** estructura legal vacía y oculta hasta tener datos reales.
+  - **Hallazgos:** #56 tiene la foto de #110; #106 fue despublicado por otra persona durante la fase.
+  - **Pendientes de la propietaria:** recomendación de la imagen para compartir y de las migraciones.
+  - **Commit:** `8f10f79`.
