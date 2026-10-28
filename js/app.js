@@ -139,6 +139,38 @@ function productImage(p, cls = "product-photo") {
   return p.image ? `<img class="${cls}" src="${p.image}"${optimized} alt="${esc(p.name)}" loading="lazy" decoding="async">` : `<span class="card-img-empty">${esc(p.imageLabel)}</span>`;
 }
 
+// Fase final — versiones optimizadas de CUALQUIER foto del producto
+// (galería, miniaturas, carrito, checkout), no solo la principal.
+const SIZES_CARD = "(max-width: 900px) 50vw, 300px";
+const SIZES_PDP = "(max-width: 900px) 100vw, 560px";
+const SIZES_THUMB = "96px";
+function srcsetOf(p, url) {
+  if (!p || !url) return null;
+  return (p.srcsetByUrl && p.srcsetByUrl[url]) || (url === p.image ? p.imageSrcset : null) || null;
+}
+function optimizedAttrs(p, url, sizes) {
+  const set = srcsetOf(p, url);
+  return set ? ` srcset="${esc(set)}" sizes="${sizes}" data-fallback-src="${esc(url)}"` : "";
+}
+// Cambia la foto de un <img> ya pintado (galería, hover de la tarjeta):
+// con srcset el navegador ignora src, así que se reemplazan los dos.
+function swapImage(img, p, url, sizes) {
+  const set = srcsetOf(p, url);
+  if (set) {
+    img.sizes = sizes;
+    img.srcset = set;
+    img.dataset.fallbackSrc = url;
+  } else {
+    img.removeAttribute("srcset");
+    img.removeAttribute("sizes");
+    delete img.dataset.fallbackSrc;
+  }
+  img.src = url;
+}
+function productById(id) {
+  return findProduct(state.products || [], id);
+}
+
 // Fase 41 — pedido explícito: la card retail-premium retira categoría/
 // descripción corta (esa información pasa a vivir solo en el PDP) y
 // deja la jerarquía imagen→marca→nombre→precio→CTA. El CTA se relabela
@@ -489,7 +521,7 @@ function cartItemHtml(i) {
   return `<div class="cart-item" data-swipe>
     <button type="button" class="cart-swipe-action" data-a="del" ${ids} tabindex="-1" aria-hidden="true">${TRASH_ICON}<span>Eliminar</span></button>
     <div class="cart-item-inner">
-    <div class="thumb">${i.image ? `<img src="${i.image}" alt="${esc(i.name)}">` : "VIBE"}</div>
+    <div class="thumb">${i.image ? `<img src="${esc(i.image)}"${optimizedAttrs(productById(i.productId), i.image, SIZES_THUMB)} alt="${esc(i.name)}">` : "VIBE"}</div>
     <div>
       ${i.brand ? `<p class="cart-item-brand">${esc(i.brand)}</p>` : ""}
       <h3>${esc(i.name)}</h3>
@@ -657,13 +689,13 @@ function pdpGalleryHtml(p) {
       ? `<button type="button" class="pdp-arrow pdp-arrow-prev" data-gallery-nav="-1" aria-label="Imagen anterior">‹</button>
          <button type="button" class="pdp-arrow pdp-arrow-next" data-gallery-nav="1" aria-label="Imagen siguiente">›</button>`
       : "";
-  const main = `<div class="pdp-gallery-main"><img id="pdpMainImage" class="detail-photo" src="${esc(images[0])}" alt="${esc(p.mainImageAlt || p.name)}" loading="eager">${arrows}</div>`;
+  const main = `<div class="pdp-gallery-main"><img id="pdpMainImage" class="detail-photo" src="${esc(images[0])}"${optimizedAttrs(p, images[0], SIZES_PDP)} alt="${esc(p.mainImageAlt || p.name)}" loading="eager">${arrows}</div>`;
   const thumbs =
     images.length > 1
       ? `<div class="pdp-thumbs">${images
           .map(
             (img, i) =>
-              `<button type="button" class="pdp-thumb${i === 0 ? " active" : ""}" data-thumb="${i}" aria-label="Imagen ${i + 1} de ${esc(p.name)}"><img src="${esc(img)}" alt="" loading="${i === 0 ? "eager" : "lazy"}"></button>`
+              `<button type="button" class="pdp-thumb${i === 0 ? " active" : ""}" data-thumb="${i}" aria-label="Imagen ${i + 1} de ${esc(p.name)}"><img src="${esc(img)}"${optimizedAttrs(p, img, SIZES_THUMB)} alt="" loading="${i === 0 ? "eager" : "lazy"}"></button>`
           )
           .join("")}</div>`
       : "";
@@ -863,7 +895,7 @@ function selectGalleryThumb(thumb) {
   const images = pdpGalleryImages(state.product);
   const idx = Number(thumb.dataset.thumb);
   const main = $("#pdpMainImage");
-  if (main && images[idx]) main.src = images[idx];
+  if (main && images[idx]) swapImage(main, state.product, images[idx], SIZES_PDP);
   document.querySelectorAll(".pdp-thumb").forEach((t) => t.classList.toggle("active", t === thumb));
 }
 
@@ -946,7 +978,7 @@ function stopCardHover(card) {
   }
   s.img.style.opacity = "0";
   setTimeout(() => {
-    s.img.src = s.images[0]; // siempre vuelve a la imagen principal
+    swapImage(s.img, s.product, s.images[0], SIZES_CARD); // siempre vuelve a la imagen principal
     s.img.style.opacity = "1";
   }, 250);
 }
@@ -967,14 +999,23 @@ function startCardHover(card) {
   if (images.length < 2) return; // una sola imagen -> sin animación (sección 2)
   // Precarga las adicionales solo ahora (intención real de ver la card),
   // nunca al renderizar el grid completo -> evita requests innecesarios.
-  images.slice(1).forEach(src => { new Image().src = src; });
-  const state_ = { images, img, intervalId: null, currentIndex: 0 };
+  // Fase final — precarga la misma versión que se va a mostrar.
+  images.slice(1).forEach((src) => {
+    const pre = new Image();
+    const set = srcsetOf(p, src);
+    if (set) {
+      pre.sizes = SIZES_CARD;
+      pre.srcset = set;
+    }
+    pre.src = src;
+  });
+  const state_ = { images, img, product: p, intervalId: null, currentIndex: 0 };
   state_.timeoutId = setTimeout(() => {
     state_.intervalId = setInterval(() => {
       state_.currentIndex = (state_.currentIndex + 1) % images.length;
       img.style.opacity = "0";
       state_.fadeTimeoutId = setTimeout(() => {
-        img.src = images[state_.currentIndex];
+        swapImage(img, p, images[state_.currentIndex], SIZES_CARD);
         img.style.opacity = "1";
       }, 250);
     }, CARD_HOVER_STEP_MS);
@@ -1447,7 +1488,7 @@ function checkoutSummaryHtml(availabilityStale) {
   const rows = summary.lines
     .map(
       (l) => `<div class="checkout-line${l.unavailable ? " unavailable" : ""}">
-        <div class="thumb">${l.image ? `<img src="${esc(l.image)}" alt="${esc(l.name)}">` : "VIBE"}</div>
+        <div class="thumb">${l.image ? `<img src="${esc(l.image)}"${optimizedAttrs(productById(l.productId), l.image, SIZES_THUMB)} alt="${esc(l.name)}">` : "VIBE"}</div>
         <div class="checkout-line-info">
           ${l.brand ? `<p class="cart-item-brand">${esc(l.brand)}</p>` : ""}
           <h3>${esc(l.name)}</h3>

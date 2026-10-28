@@ -648,6 +648,16 @@ footer .wrap.footer-grid{display:grid;grid-template-columns:1.1fr 1fr 1.3fr;gap:
 .footer-contact-label{font-size:10px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--pink)}
 .footer-contact-value{color:#e6e6e6;font-size:14px;overflow-wrap:anywhere}
 .footer-contact a:hover .footer-contact-value{color:#fff}
+/* Fase final — columna «Legal» (js/legal.js). Solo existe cuando hay
+   datos reales; entonces el pie pasa a 4 columnas en escritorio. */
+@media(min-width:901px){footer .wrap.footer-grid:has(#legal:not([hidden])){grid-template-columns:1.1fr 1fr 1.3fr 1.3fr}}
+.footer-legal-business{color:#aaa;font-size:13px;line-height:1.6;padding:6px 0}
+.footer-legal-policy summary{display:flex;align-items:center;min-height:44px;color:#aaa;font-size:13px;cursor:pointer}
+.footer-legal-policy summary:hover,.footer-legal-policy[open] summary{color:#fff}
+.footer-legal-policy summary:focus{outline:none}
+.footer-legal-policy summary:focus-visible{outline:2px solid var(--pink);outline-offset:3px;border-radius:4px}
+.footer-legal-text{color:#b7b7b7;font-size:13px;line-height:1.6;padding:0 0 10px}
+.footer-legal-text p{margin:0 0 8px}
 @media(prefers-reduced-motion:reduce){.footer-links a{transition:none}}
 
 @media(max-width:900px){

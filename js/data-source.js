@@ -145,6 +145,11 @@ function normalizeApiProduct(p) {
     // original figura en el manifiesto de versiones); si no, null.
     imageSrcset: typeof p.imageSrcset === "string" && p.imageSrcset ? p.imageSrcset : null,
     images: Array.isArray(p.images) ? p.images : [],
+    // Fase final — srcset por URL para la galería, el carrito y el
+    // checkout (solo pares URL → texto; cualquier otra cosa se descarta).
+    srcsetByUrl: Object.fromEntries(
+      Object.entries(p.srcsetByUrl && typeof p.srcsetByUrl === "object" ? p.srcsetByUrl : {}).filter(([k, v]) => typeof k === "string" && typeof v === "string" && v)
+    ),
     imageLabel: "VIBE",
     // Fase 28 — faltaba en Fase 26: catalog_metadata.brand ya se
     // seleccionaba y devolvía en la API (ver api/catalog/_lib/merge.js)

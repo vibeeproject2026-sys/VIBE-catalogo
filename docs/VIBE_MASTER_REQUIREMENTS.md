@@ -56,7 +56,7 @@ Si algo no se pudo recuperar, figura como **información faltante**; no se compl
 | POS-02 | No inventar precios, existencias, variantes, imágenes ni información. | VERIFICADO | Opciones solo desde la ficha; sin precio ni stock por opción |
 | ED-01 | No crear ni publicar fichas automáticamente. Lo no publicado o sin ficha es una decisión editorial, no una tarea pendiente. | Regla vigente | Memoria del proyecto; ningún cambio de datos en Fase 57 |
 | ED-02 | Clasificaciones protegidas: #99 Tratamiento›Cremas faciales; #109 y #110 Labios›Kits de labios; #102 Herramientas de aplicación›Rizadores de pestañas; #106 Labios›Kits de labios (decisión de la propietaria); #122 Rostro›Rubor. | VERIFICADO (sin escrituras) | Fase 57 no escribe datos |
-| ED-03 | #56 (posible discrepancia entre imagen y texto), #59 y #103 (estado de ficha), #119 (clasificación). | BLOQUEADO POR DECISIÓN | Pendiente de la propietaria (§11) |
+| ED-03 | #56 (posible discrepancia entre imagen y texto), #59 y #103 (estado de ficha), #119 (clasificación). | BLOQUEADO POR DECISIÓN (hallazgos concretos en §14.3; #56 = foto de #110) | Pendiente de la propietaria (§11) |
 
 ## 2. Identidad visual y marca
 
@@ -144,7 +144,7 @@ Si algo no se pudo recuperar, figura como **información faltante**; no se compl
 | IMG-05 | Medición real del peso por visita (≈14,7 MB estimados antes). | VERIFICADO (Fase 58, medido en local) | Imágenes de la portada: **15,57 MB hoy** → ≈3,67 MB en mobile y ≈4,00 MB en escritorio con WebP. Se hará efectivo cuando se suban las versiones (pendiente de autorización) |
 | IMG-07 | Fase 58: leer los originales de producción y optimizarlos en local, sin subir nada, con inventario y revisión de calidad. | VERIFICADO (local) | Ver «Detalle de IMG-07» debajo de esta tabla |
 | IMG-08 | Fase 58: comparar las copias del Hero de informes anteriores con los originales reales de Storage. | VERIFICADO | Las 3 son idénticas por sha256 (`fase57-optimizacion-imagenes.md` §5.1) |
-| IMG-09 | Subir las versiones optimizadas y el manifiesto a producción. | BLOQUEADO POR AUTORIZACIÓN | Explícitamente no autorizado en Fase 58 |
+| IMG-09 | Subir las versiones optimizadas y el manifiesto a producción. | AUTORIZADO Y EJECUTADO en la fase final (§14.1) | Explícitamente no autorizado en Fase 58 |
 
 **Detalle de IMG-07:**
 - **Leídas:** 22 de 22, sin bloqueos.
@@ -152,7 +152,7 @@ Si algo no se pudo recuperar, figura como **información faltante**; no se compl
 - **Excepciones:** 2, con alternativa sin pérdida idéntica píxel a píxel.
 - **Peso:** 29,26 MB → 4,86 MB (−83,4 %), o 3,92 MB (−86,6 %) si se usa la alternativa sin pérdida.
 - **Inventario por imagen:** `fase57-optimizacion-imagenes.md` §5.2.
-| IMG-06 | Galería de la ficha con versiones optimizadas. | PENDIENTE | Hoy usa el original; requiere adaptar el cambio de foto |
+| IMG-06 | Galería de la ficha con versiones optimizadas. | IMPLEMENTADO Y VERIFICADO (§14.1) | Hoy usa el original; requiere adaptar el cambio de foto |
 
 **Detalle de IMG-03:**
 - **Logos:** WebP sin pérdida, verificado.
@@ -556,6 +556,120 @@ Son **66 rutas**: los 38 archivos modificados más los 28 sin seguimiento (27 qu
    - Sin 0005 no hay idempotencia de servidor. Es igual que hoy.
    - Sin 0004 no se guarda el estado de los avisos internos.
    - SEC-03 y SEO-02 solo se pueden validar después de desplegar.
+
+## 14. Fase final integral de cierre (2026-10-28)
+
+**Autorización de esta fase:**
+- **Autorizado:** publicar en el Storage existente las imágenes optimizadas aprobadas y actualizar las referencias; publicar el código (commit y push a `main`); corregir errores editoriales objetivos.
+- **No autorizado:** migraciones, envíos reales, cambios en el POS ni contenido editorial sin aprobación.
+
+### 14.1 Imágenes (IMG-03, IMG-06, IMG-09)
+
+| ID | Estado | Evidencia |
+|---|---|---|
+| IMG-09 | **WebP publicados en Storage:** 66 archivos (22 originales × 3 anchos) en `optimized/{products,hero}/…`. El manifiesto se publica tras desplegar el código (14.6) | Ver «Detalle de IMG-09» debajo de esta tabla |
+| Excepciones (`products/122/main`, `hero/hero-muirbum2-nw5onl`) | Se publicaron sus versiones **sin pérdida**, idénticas píxel a píxel al original reducido: superan el criterio de calidad sin margen de error | La propietaria pidió conservar el original solo si no se supera el criterio; el WebP con pérdida queda descartado |
+| IMG-06 | **IMPLEMENTADO Y VERIFICADO (local, con los WebP reales)** | Ver «Detalle de IMG-06» debajo de esta tabla |
+| Corrección encontrada | El hover de la tarjeta cambiaba solo `src`; con `srcset` (al publicar el manifiesto) habría dejado de cambiar de foto | `swapImage` cambia `srcset` y `src` |
+| Peso medido (navegador real, portada completa con scroll) | **Originales: 15,59 MB → WebP: 2,71 MB en mobile (−83 %) y 2,22 MB en escritorio (−86 %)** | `imgfinal.js` |
+
+**Detalle de IMG-09:**
+- **Antes de subir:**
+  - se volvió a descargar cada original y su sha256 coincidió con el procesado en Fase 58, así que la correspondencia es exacta;
+  - cada WebP se validó (formato, ancho y proporción).
+- **Subida:** con `x-upsert:false`, sin sobrescribir.
+- **Después de subir:** cada URL pública se verificó byte a byte.
+- **Originales:** intactos (mismo tamaño servido).
+
+**Detalle de IMG-06:**
+- **Ámbito:** la API entrega `srcsetByUrl`, el `srcset` de cada foto del producto, y la ficha, las miniaturas, el carrito y el checkout lo usan.
+- **Cambio de foto:** al cambiar de foto (miniatura, flecha o hover de la tarjeta) se reemplazan `srcset` **y** `src` (`swapImage`), porque con `srcset` cambiar solo `src` no tiene efecto.
+- **Vuelta al original:** si un WebP falla, la imagen vuelve al original (comprobado con 404 simulados).
+- **Verificación en navegador real:** `imgfinal.js`, 17/17, a 390 y 1440.
+
+### 14.2 Variantes (VAR-11)
+
+- **Implementación:** la gestión de tonos y presentaciones existente se conserva **sin cambios**. Re-verificada en esta fase con el código nuevo:
+  - Admin: `admin57.js`, 16/16 (crear, renombrar, ordenar, activar, desactivar y quitar con confirmación);
+  - tienda: `store57.js`, 21/21 en 3 de 3 corridas con pausa humana;
+  - tienda: `store56b.js`, 25/25.
+- **Datos:** no se asignó ninguna variante. VAR-11 sigue en manos de la propietaria.
+- **Carrera de la prueba `store57.js` (preexistente, Fase 28):**
+  - **Qué pasa:** al cerrar la ficha tras agregar, el sitio llama a `history.back()`, que es asíncrono. Si en los milisegundos siguientes se abre otra ficha, el `popstate` tardío la cierra.
+  - **Por qué no afecta a una persona:** tras agregar, el carrito cubre la pantalla y hay que cerrarlo primero.
+  - **Qué falla:** solo la prueba automática, que hace clic al instante. Con una pausa de 300 ms pasa 3 de 3.
+  - **Cambios:** no se modificó el sitio.
+
+**Cómo configurar las variantes reales (Admin › Productos › ficha del producto):**
+1. **Tonos:** «Agregar tono», con nombre y color (selector o código `#RRGGBB`). Un tono sin color no se muestra en la tienda.
+2. **Presentaciones:** «Agregar presentación», con la etiqueta real (por ejemplo «15 ml»).
+3. **Orden y activación:** con ↑/↓ y el interruptor «Activo». Una opción inactiva se ve tachada y no se puede elegir. Quitar una opción pide confirmación.
+4. **Cómo lo ve la clienta:**
+   - una sola opción activa en una dimensión se aplica sola, sin selector;
+   - con varias, la clienta debe elegir;
+   - sin opciones, no aparece selector.
+5. **Precio y stock:** siempre los del producto en el POS. Activar una opción no crea inventario.
+
+### 14.3 Productos #56, #59, #103 y #119 (ED-03)
+
+| # | POS (nombre, categoría) | Ficha VIBE | Hallazgo |
+|---|---|---|---|
+| 56 | Makeup Brush Set · «Otro» | Existe, **no publicada**; textos de set de brochas | **Error objetivo:** su foto `products/56/main.png` es **idéntica byte a byte** (sha256) a la de #110 «VIBE Lip Duo» (delineador y labial Kevin&Coco), no a un set de brochas. Corrección preparada: quitar esa foto de la ficha sin borrar el archivo. **No se aplicó:** el sistema de permisos bloqueó la escritura en producción |
+| 59 | Suprliner · «Labios» | **Sin ficha** | Sin foto ni texto. Pendiente desde Fase 20: ¿delineador de ojos (Ojos › Delineado) o labios? |
+| 103 | VIBE Love-Blend Kit · «Otro» | **Sin ficha** | Sin foto ni texto. Pendiente desde Fase 20: grupo y categoría desconocidos |
+| 119 | Polvo Ácido Hialurónico · «Labios» | **Sin ficha** | Sin foto ni texto. La propuesta de Fase 20 lo ubica en Rostro › Polvo y fijador (es un polvo, no un producto de labios), pero falta confirmarlo |
+
+No se creó ni publicó ninguna ficha (ED-01).
+
+### 14.4 Información legal y comercial
+
+- **Estructura implementada:** `js/legal.js` concentra la identificación del negocio y cinco políticas: datos personales, envíos, pagos, cambios/devoluciones/retracto y garantía.
+- **Comportamiento:**
+  - todos los campos están en `null`, así que la columna «Legal» del pie **no se muestra**;
+  - al completar un campo con texto real, aparece solo ese dato, escapado y en un `<details>` accesible;
+  - en escritorio, el pie pasa a 4 columnas.
+- **Pruebas:** `test-legal-structure.mjs` (4/4) exige que la configuración publicada esté vacía.
+- **Datos reales que ya están publicados y se conservan:**
+  - WhatsApp/teléfono 314 349 0825;
+  - el correo `vibeeproject2026@gmail.com`;
+  - Instagram `@beautyvibe.col`;
+  - «envío y pago se acuerdan por WhatsApp» (FAQ);
+  - el consentimiento de contacto por WhatsApp en el checkout.
+
+### 14.5 Correos transaccionales (NOT-03 y NOT-04)
+
+**Revisión del código, coherente:**
+- sin `RESEND_API_KEY` o `EMAIL_FROM_ADDRESS` → `EMAIL_PROVIDER_NOT_CONFIGURED`, y el pedido no falla;
+- el aviso interno va solo a `ORDERS_NOTIFICATION_EMAIL`; si falta → `ORDERS_NOTIFICATION_EMAIL_NOT_CONFIGURED`;
+- `Idempotency-Key` va por pedido y por destinatario;
+- los errores se registran como códigos, sin datos personales.
+
+**Evidencia de producción, sin enviar nada** (lectura agregada de `email_sent` y `whatsapp_notified`, sin datos personales):
+- hay 1 pedido registrado el 2026-10-28, que no creó esta fase;
+- `email_sent = true` → `RESEND_API_KEY` y `EMAIL_FROM_ADDRESS` **están configuradas** y Resend **aceptó** el correo a la clienta. «Aceptado» no garantiza entrega.
+- `whatsapp_notified = false`.
+- El aviso interno no se puede comprobar hasta aplicar 0004, porque no hay columna de estado.
+
+### 14.6 Imagen para compartir (SEO-03)
+
+- **Recomendación: A (tipográfica).** Centrada, se lee completa en la vista horizontal **y** en el recorte cuadrado de WhatsApp. Pesa 28 KB en JPG y usa solo el logo oficial, el lema y el dominio.
+- **B (fotográfica):** más atractiva, pero en el recorte cuadrado corta el logo y el lema, y depende de autorizar el uso de la foto del Hero.
+- **Estado:** no publicada y `og:image` sin cambios. Los archivos están en `Catalogo VIBE/entregables-fase58/imagen-compartir/`.
+
+### 14.7 Migraciones 0004 y 0005
+
+**Qué depende de cada una:**
+- **0005 (`idempotency_key`):** la idempotencia de servidor.
+  - **Riesgo hoy:** un reintento del mismo pedido (por ejemplo, tras un corte de red justo después de guardarlo) crea un **pedido duplicado** y **duplica los avisos**.
+  - **Mitigación parcial:** el botón bloqueado mientras se envía y el límite de 3 pedidos por teléfono en 10 minutos.
+- **0004 (`internal_notification_*`):** guarda si el aviso interno a VIBE se aceptó o falló, el contador del Admin y el reintento manual.
+  - **Riesgo hoy:** si el aviso falla, nadie lo ve en el Admin y no se puede reintentar.
+
+**Recomendación:** autorizar **ambas**.
+- **Qué hacen:** solo agregan columnas que admiten vacío, y 0005 crea además un índice único parcial sobre valores no nulos (hoy todos nulos).
+- **Lo que no hacen:** no reescriben datos ni cambian columnas existentes, y no afectan los pedidos actuales.
+- **Cómo se aplican:** son idempotentes (`if not exists`). Están en `supabase/manual/`, para ejecutar en el SQL Editor de Supabase.
+- **Después de aplicarlas:** el código las usa automáticamente, sin desplegar nada.
 
 ## Historial
 

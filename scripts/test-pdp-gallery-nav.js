@@ -52,11 +52,15 @@ test("con una sola imagen no arranca ninguna animación (images.length < 2 -> re
 });
 
 test("al salir del hover, siempre vuelve a la imagen principal (images[0]), nunca queda en otra", () => {
-  assert.ok(/s\.img\.src = s\.images\[0\]/.test(appSrc), "stopCardHover no restaura images[0]");
+  // Fase final — swapImage reemplaza srcset y src (con versiones optimizadas, cambiar solo src no tendría efecto).
+  assert.ok(/swapImage\(s\.img, s\.product, s\.images\[0\], SIZES_CARD\)/.test(appSrc), "stopCardHover no restaura images[0]");
 });
 
 test("precarga las imágenes adicionales solo al iniciar el hover, no en el render inicial del grid", () => {
-  assert.ok(/images\.slice\(1\)\.forEach\(src => \{ new Image\(\)\.src = src; \}\)/.test(appSrc));
+  // Fase final — la precarga pide la misma versión (srcset) que se mostrará; sigue ocurriendo solo dentro de startCardHover.
+  const hover = appSrc.slice(appSrc.indexOf("function startCardHover"), appSrc.indexOf("cardHoverState.set(card, state_);"));
+  assert.ok(/images\.slice\(1\)\.forEach\(\(src\) => \{\s*const pre = new Image\(\);[\s\S]*?pre\.src = src;/.test(hover));
+  assert.equal((appSrc.match(/new Image\(\)/g) || []).length, 1, "ninguna otra precarga (p. ej. al pintar el grid)");
 });
 
 console.log("\nPDP — navegación manual con flechas (Fase 35.1, sección 4)");

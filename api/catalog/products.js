@@ -87,7 +87,17 @@ module.exports = async function handler(req, res) {
     let items = joined.map(({ product, metadata }) => shapeProduct(product, metadata, resolveCategoryGroup));
     items = applyFilters(items, { category, subcategory, featured, search });
     items = sortCatalog(items);
-    items = items.map((p) => ({ ...p, imageSrcset: srcsetFor(imageVariants, p.image) }));
+    // Fase final — también la galería (images): srcsetByUrl lleva el
+    // srcset de CADA foto que tenga versiones; las que no, no figuran y
+    // se usan tal cual.
+    items = items.map((p) => {
+      const srcsetByUrl = {};
+      for (const url of [p.image, ...(Array.isArray(p.images) ? p.images : [])]) {
+        const set = srcsetFor(imageVariants, url);
+        if (set) srcsetByUrl[url] = set;
+      }
+      return { ...p, imageSrcset: srcsetFor(imageVariants, p.image), srcsetByUrl };
+    });
 
     // Fase 56 — /sitemap.xml (rewrite en vercel.json): portada + fichas
     // publicadas (las mismas que devuelve esta API; nunca productos sin

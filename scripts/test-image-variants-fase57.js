@@ -159,9 +159,42 @@ async function withFetch(fetchImpl, fn) {
     assert.deepEqual(r.body.slides.map((s) => [s.imageSrcset, s.mobileImageSrcset]), [[null, null], [null, null]]);
   });
 
+  await test("Fase final — galería: srcsetByUrl incluye cada foto listada (principal y secundarias); las no listadas no figuran", async () => {
+    const SEC = PUB + "products/56/01.png", SEC2 = PUB + "products/56/02.png";
+    const meta = META.map((m) => (m.product_id === 56 ? { ...m, images: [SEC, SEC2] } : m));
+    const manifest = { ...MANIFEST, images: { ...MANIFEST.images, [SEC]: [{ url: PUB + "optimized/products/56/01-480w.webp", width: 480 }] } };
+    const fetchImpl = async (url) => (String(url).includes("/rest/v1/catalog_metadata") ? res(200, JSON.stringify(meta)) : catalogFetch(() => res(200, JSON.stringify(manifest)))(url));
+    const r = await call("../api/catalog/products", fetchImpl);
+    const p56 = r.body.products.find((p) => p.id === 56);
+    assert.deepEqual(Object.keys(p56.srcsetByUrl).sort(), [ORIG, SEC].sort());
+    assert.equal(p56.srcsetByUrl[SEC], `${PUB}optimized/products/56/01-480w.webp 480w`);
+    assert.equal(p56.srcsetByUrl[ORIG], p56.imageSrcset);
+    assert.deepEqual(p56.images, [SEC, SEC2]); // las URL originales no cambian
+    const r0 = await call("../api/catalog/products", catalogFetch(() => res(404, "")));
+    assert.ok(r0.body.products.every((p) => Object.keys(p.srcsetByUrl).length === 0));
+  });
+
   console.log("Frontend (estático)");
   const app = read("js/app.js");
   const hero = read("js/hero-carousel.js");
+  await test("Fase final — ficha, miniaturas, carrito y checkout usan la versión optimizada de cada foto, con vuelta al original", () => {
+    assert.match(app, /id="pdpMainImage" class="detail-photo" src="\$\{esc\(images\[0\]\)\}"\$\{optimizedAttrs\(p, images\[0\], SIZES_PDP\)\}/);
+    assert.match(app, /<img src="\$\{esc\(img\)\}"\$\{optimizedAttrs\(p, img, SIZES_THUMB\)\}/);
+    assert.match(app, /optimizedAttrs\(productById\(i\.productId\), i\.image, SIZES_THUMB\)/);
+    assert.match(app, /optimizedAttrs\(productById\(l\.productId\), l\.image, SIZES_THUMB\)/);
+    assert.match(app, /return set \? ` srcset="\$\{esc\(set\)\}" sizes="\$\{sizes\}" data-fallback-src="\$\{esc\(url\)\}"` : "";/);
+  });
+  await test("Fase final — cambiar de foto (galería y hover de tarjeta) reemplaza srcset Y src; nunca solo src", () => {
+    assert.match(app, /if \(main && images\[idx\]\) swapImage\(main, state\.product, images\[idx\], SIZES_PDP\);/);
+    assert.match(app, /swapImage\(img, p, images\[state_\.currentIndex\], SIZES_CARD\);/);
+    assert.match(app, /swapImage\(s\.img, s\.product, s\.images\[0\], SIZES_CARD\);/);
+    assert.doesNotMatch(app, /main\.src = images\[idx\]|s\.img\.src = s\.images\[0\]|img\.src = images\[state_\.currentIndex\]/);
+  });
+  await test("Fase final — data-source conserva solo pares URL → srcset de texto", async () => {
+    const ds = read("js/data-source.js");
+    assert.match(ds, /srcsetByUrl: Object\.fromEntries\(/);
+    assert.match(ds, /typeof k === "string" && typeof v === "string" && v/);
+  });
   await test("tarjeta: srcset solo si llega imageSrcset, con data-fallback-src al original", () => {
     assert.match(app, /const optimized = p\.image && p\.imageSrcset \? ` srcset="\$\{esc\(p\.imageSrcset\)\}" sizes="[^"]+" data-fallback-src="\$\{esc\(p\.image\)\}"` : "";/);
   });
