@@ -824,7 +824,7 @@ En este bloque no se cambiaron productos, datos de producción, Storage, el POS 
 
 ### 16.0 Pendientes (lista final)
 
-Ninguno se ha realizado. Todos esperan a la propietaria.
+Ninguno se ha realizado. Todos esperan a la propietaria. *(El 2026-10-28 la propietaria decidió todos los puntos; el estado actual de cada uno está en la §17.)*
 
 | # | Pendiente | Tipo | Detalle |
 |---|---|---|---|
@@ -894,6 +894,52 @@ Ningún valor secreto se escribe en este registro ni en el repositorio.
 
 Precio y stock siguen siendo los del POS.
 
+## 17. Decisiones de la propietaria y su ejecución (2026-10-28)
+
+Reemplaza a la §16.0 como lista vigente; esa tabla se conserva como historia.
+
+| # | Decisión de la propietaria | Estado real | Evidencia / qué falta |
+|---|---|---|---|
+| 1 | #56: retirar la foto incorrecta (es la de #110) | **PENDIENTE: acción de la propietaria** | Desde Admin › ficha #56 › «Quitar imagen», sin borrar el archivo. No se tocó |
+| 2 | #59 Suprliner → Ojos › Delineado | **DECIDIDO; NO APLICADO (bloqueo)** | Ver «Detalle de los puntos 2 a 4» debajo de esta tabla |
+| 3 | #103 VIBE Love-Blend Kit → Accesorios › Esponjas | **DECIDIDO; NO APLICADO (bloqueo)** | En la taxonomía vigente, «Esponjas» existe solo en Accesorios › **Herramientas de aplicación** › Esponjas (sin ambigüedad) |
+| 4 | #119 Polvo Ácido Hialurónico → Rostro › Polvo y fijador | **DECIDIDO; NO APLICADO (bloqueo)** | Igual que el 2 |
+| 5 | #106 Set Perfect Lips: despublicado intencionalmente | **CERRADO** | Sigue `published=false` (comprobado el 2026-10-28). No se restauró nada |
+| 6 | Imagen para compartir, propuesta A: aprobada | **PUBLICADA EN EL CÓDIGO** | Ver «Detalle del punto 6» debajo de esta tabla |
+| 7 | Migraciones 0004 y 0005: aplicación manual autorizada | **AUTORIZADAS; NO APLICADAS (bloqueo)** | Ver «Detalle del punto 7» debajo de esta tabla |
+| 8 | Verificar `ORDERS_NOTIFICATION_EMAIL` en Vercel Production | **NO VERIFICABLE desde esta sesión** | Ver «Detalle del punto 8» debajo de esta tabla |
+| 9 | WhatsApp | **APLAZADO** por la propietaria (sin acceso a Meta Business) | Variables `WHATSAPP_*` sin cambios; pasos en §16.3. No se considera operativo |
+| 10 | Tonos y presentaciones | **APLAZADO**: la propietaria los cargará desde el Admin | Guía en §14.2 y §16.4 |
+| 11 | Información legal y comercial | **PENDIENTE: datos de la propietaria** | Lista en §16.2. La columna «Legal» sigue oculta |
+
+**Detalle de los puntos 2 a 4 (clasificaciones de #59, #103 y #119):**
+- **Mecanismo:** el del Admin, `PATCH /api/admin/catalog-metadata`, que valida contra la taxonomía y solo escribe `category`/`subcategory`. Si falta la fila, la crea con `published=false`.
+- **Bloqueo:** el sitio publicado respondió **401** con el `ADMIN_API_TOKEN` local, que no es el de producción. No se escribió por otra vía.
+- **Comprobaciones previas:**
+  - identidad en el POS: 59 = Suprliner, 103 = VIBE Love-Blend Kit, 119 = Polvo Ácido Hialuronico;
+  - los tres sin ficha;
+  - los destinos existen en la taxonomía vigente.
+- **Qué falta:** la propietaria lo hace desde Admin › Productos › ficha › Clasificación.
+
+**Detalle del punto 6 (imagen para compartir):**
+- **Archivo:** `assets/brand/social/vibe-og-1200x630.png`, igual sha256 que el aprobado (`9387cd69…`), PNG de 1200×630.
+- **Etiquetas:** `og:image`, `og:image:type`, `og:image:width` y `og:image:height` (1200×630), `og:image:alt`, `twitter:card=summary_large_image`, `twitter:image` y `twitter:image:alt`.
+- **Prueba:** nueva prueba en `test-storefront-fase56.mjs` (22/22), que comprueba que las dimensiones declaradas coinciden con el archivo.
+- **Verificación en producción:** se informa tras el despliegue.
+
+**Detalle del punto 7 (migraciones 0004 y 0005):**
+- **Estado confirmado:** sin aplicar en el proyecto de producción (el mismo que usa el sitio publicado). Las columnas responden `42703`.
+- **Bloqueo:** no hay un mecanismo SQL autorizado disponible en esta sesión.
+  - el token de gestión de Supabase responde 401;
+  - no hay cadena de conexión a la base;
+  - no hay `psql` ni CLI de Supabase.
+- **Qué falta:** aplicarlas a mano en el SQL Editor siguiendo la §15.3, en orden 0004 → 0005, con la consulta de verificación. Los riesgos de §15.3 siguen vigentes mientras no se apliquen.
+
+**Detalle del punto 8 (`ORDERS_NOTIFICATION_EMAIL`):**
+- **Por qué no se pudo verificar:** no hay CLI de Vercel ni token de su API para listar variables, y `.env.local` no la contiene.
+- **Qué falta:** la propietaria confirma en Vercel › `vibe-catalog` › Settings › Environment Variables › Production que exista.
+- No se cambió ningún destinatario.
+
 ## Historial
 
 - **2026-10-28 (Fase 57):**
@@ -937,3 +983,8 @@ Precio y stock siguen siendo los del POS.
   - **Encabezado:** el registro decía que nada estaba en producción; se corrigió, dejando el texto anterior tachado.
   - **§16:** estado publicado tras `c610ef6`, datos legales y comerciales faltantes, pasos de notificaciones y comprobación de variantes en la tienda y el carrito.
   - **Sin cambios:** productos, datos, Storage, configuración y migraciones.
+- **2026-10-28 (decisiones de la propietaria):**
+  - **Imagen para compartir:** publicada en el código.
+  - **#106:** cerrado (despublicado intencionalmente).
+  - **Bloqueados por credenciales:** clasificaciones de #59, #103 y #119 (Admin de producción: 401), migraciones 0004 y 0005 (sin mecanismo SQL) y verificación de `ORDERS_NOTIFICATION_EMAIL` (sin acceso a Vercel).
+  - **Aplazados:** WhatsApp y variantes.

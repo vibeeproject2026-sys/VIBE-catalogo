@@ -178,6 +178,18 @@ async function main() {
     assert.ok(img && fs.existsSync(path.join(root, img[1])), "la imagen OG debe existir en el repo");
     assert.doesNotMatch(html, /vercel\.app/);
   });
+  await test("cierre — imagen para compartir aprobada (1200×630): dimensiones declaradas = reales, tarjeta grande en Twitter/X", () => {
+    const url = "https://www.vibebeautycol.com/assets/brand/social/vibe-og-1200x630.png";
+    assert.match(html, new RegExp(`<meta property="og:image" content="${url.replace(/[.\/]/g, "\\$&")}">`));
+    assert.match(html, new RegExp(`<meta name="twitter:image" content="${url.replace(/[.\/]/g, "\\$&")}">`));
+    assert.match(html, /<meta property="og:image:type" content="image\/png">/);
+    assert.match(html, /<meta name="twitter:card" content="summary_large_image">/);
+    const png = fs.readFileSync(path.join(root, "assets/brand/social/vibe-og-1200x630.png"));
+    assert.equal(png.toString("ascii", 12, 16), "IHDR");
+    const [w, h] = [png.readUInt32BE(16), png.readUInt32BE(20)];
+    assert.deepEqual([w, h], [1200, 630]);
+    assert.match(html, new RegExp(`<meta property="og:image:width" content="${w}">\\s*<meta property="og:image:height" content="${h}">`));
+  });
   await test("robots.txt: permite el sitio, excluye /admin/ y /api/, declara el sitemap oficial", () => {
     const robots = read("robots.txt");
     assert.match(robots, /User-agent: \*\nAllow: \/\nDisallow: \/admin\/\nDisallow: \/api\//);
