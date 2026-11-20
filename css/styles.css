@@ -916,25 +916,19 @@ footer .wrap.footer-grid{display:grid;grid-template-columns:1.1fr 1fr 1.3fr;gap:
   .empty-actions .button{width:100%}
 }
 
-/* Fase 47/48 — franja editorial animada (Hero → Descubre tu VIBE). Fase
-   48: más presencia (64px mobile / 76px desktop), cada mensaje con un
-   icono lineal en un círculo blanco translúcido y trazo rosa VIBE;
-   texto negro firme, "VIBE." en rosa, separador vertical sutil.
-   Desplazamiento continuo con CSS: las dos listas son idénticas y cada
-   ítem lleva su propio espacio final, así -50% coincide exactamente con
-   el inicio de la copia (sin salto al reiniciar). overflow:hidden evita
-   scroll horizontal. Con prefers-reduced-motion: estática y en varias
-   líneas, sin la copia. */
-.vibe-ticker{position:relative;overflow:hidden;height:76px;display:flex;align-items:center;background:#FFB8D0;color:#111;border-top:1px solid #ff9cc0;border-bottom:1px solid #ff9cc0}
-.vibe-ticker-track{display:flex;width:max-content;animation:vibe-ticker 42s linear infinite}
-.vibe-ticker:hover .vibe-ticker-track{animation-play-state:paused}
-.vibe-ticker-group{display:flex;flex-shrink:0;margin:0;padding:0;list-style:none}
-.vibe-ticker-group li{display:flex;align-items:center;gap:12px;padding-right:44px;white-space:nowrap}
-.vibe-ticker-group li::after{content:"";width:1px;height:26px;margin-left:32px;background:#ff007a59}
-.ticker-icon{display:grid;place-items:center;width:40px;height:40px;flex-shrink:0;border-radius:50%;background:#ffffff8c;color:var(--pink);box-shadow:inset 0 0 0 1px #ff007a33}
-.ticker-text{font-size:17px;font-weight:800;letter-spacing:-.01em}
-.ticker-accent{color:var(--pink)}
-@keyframes vibe-ticker{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+/* Label superior (Hero → Descubre tu VIBE): pieza gráfica aprobada por la
+   propietaria (assets/brand/label/), usada completa, sin reconstruirla con
+   HTML/CSS. Escritorio y tablet: a todo el ancho, con su proporción
+   (2172×354), estática. Mobile: a todo el ancho no se leería, así que la
+   composición COMPLETA se muestra a una altura legible y se desplaza como
+   una sola pieza (dos copias idénticas: -50% coincide con el inicio de la
+   copia, sin salto). El fondo es el mismo tono del fondo de la imagen. */
+.vibe-label{overflow:hidden;background:#fdfdfe;line-height:0}
+.vibe-label-track{display:flex;width:100%}
+.vibe-label-piece{display:block;flex:0 0 100%}
+.vibe-label-piece img{display:block;width:100%;height:auto}
+.vibe-label-copy{display:none}
+@keyframes vibe-label-scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 /* (versión estática con prefers-reduced-motion: al final del archivo,
    para que gane también sobre las alturas responsive) */
 
@@ -981,12 +975,11 @@ footer .wrap.footer-grid{display:grid;grid-template-columns:1.1fr 1fr 1.3fr;gap:
 @media(prefers-reduced-motion:reduce){.cart-item-inner,.cart-item .remove{transition:none}}
 
 @media(max-width:640px){
-  .vibe-ticker{height:64px}
-  .ticker-icon{width:34px;height:34px}
-  .ticker-icon svg{width:18px;height:18px}
-  .ticker-text{font-size:15px}
-  .vibe-ticker-group li{gap:10px;padding-right:30px}
-  .vibe-ticker-group li::after{height:22px;margin-left:20px}
+  .vibe-label-track{width:max-content;animation:vibe-label-scroll 40s linear infinite}
+  .vibe-label:hover .vibe-label-track{animation-play-state:paused}
+  .vibe-label-piece{flex:0 0 auto}
+  .vibe-label-piece img{width:auto;height:150px}
+  .vibe-label-copy{display:block}
   /* Fase 48 — Descubre tu VIBE más compacto en mobile para que el Hero
      domine la primera impresión (mismas tarjetas). */
   .discover-vibe-visual{padding:20px 0 26px}
@@ -1010,20 +1003,12 @@ footer .wrap.footer-grid{display:grid;grid-template-columns:1.1fr 1fr 1.3fr;gap:
   .catalog-lead{font-size:16px}
   .catalog-brand-title{font-size:18px}
 }
-/* Fase 48 — franja estática con prefers-reduced-motion: sin animación ni
-   copia, y en varias líneas a todo el ancho para que se lean todos los
-   mensajes (alto automático, por eso va al final y gana sobre las
-   alturas fijas de cada breakpoint). */
+/* Label con prefers-reduced-motion: quieto y sin la copia; en mobile se
+   recorre a mano (desplazamiento horizontal) a la misma altura legible. */
 @media(prefers-reduced-motion:reduce){
-  .vibe-ticker{height:auto;padding:12px 16px;justify-content:center}
-  .vibe-ticker-track{animation:none;width:100%;justify-content:center}
-  .vibe-ticker-group{flex-shrink:1;width:100%;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px 14px;max-width:1180px}
-  .vibe-ticker-group[aria-hidden="true"]{display:none}
-  .vibe-ticker-group li{gap:8px;padding:0;white-space:normal;line-height:1.2}
-  .vibe-ticker-group li::after{content:none}
-  .ticker-icon{width:28px;height:28px}
-  .ticker-icon svg{width:16px;height:16px}
-  .ticker-text{font-size:14px}
+  .vibe-label{overflow-x:auto}
+  .vibe-label-track{animation:none}
+  .vibe-label-copy{display:none}
 }
 /* Fase 48 — en tablet hay ancho para mantener las dos zonas del
    encabezado del Catálogo en fila (apiladas quedaba demasiado alto). */

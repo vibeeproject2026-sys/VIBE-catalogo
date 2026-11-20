@@ -1061,6 +1061,42 @@ Ver el historial y el informe de esta fase: commit, despliegue en Vercel y verif
 - validar con un abogado o contador la figura y la redacción final antes de considerar completa esta sección;
 - mientras tanto, el sitio publica solo lo confirmado y no presenta VIBE como sociedad ni afirma cumplimiento integral.
 
+## 20. Label superior: pieza gráfica aprobada (2026-11-20)
+
+**Decisión de la propietaria:** la imagen panorámica que entregó es el diseño final del label entre el Hero y «Descubre tu VIBE». Se usa completa, tal cual, sin reconstruirla con HTML ni CSS. **Reemplaza** a la franja de texto de las Fases 47/48 (CAT y franja editorial).
+
+| ID | Qué | Estado |
+|---|---|---|
+| LBL-01 | Recorte solo de los márgenes blancos superior e inferior (filas 244–598 del original de 2172×724) a ancho completo. Se conservan los bordes laterales, los bloques, el conejito, las hojas, las burbujas (incluida la que sobresale por debajo), todas las palabras y el brillo inferior hasta fundirse con el fondo | IMPLEMENTADO Y VERIFICADO |
+| LBL-02 | Recursos en `assets/brand/label/` | IMPLEMENTADO Y VERIFICADO; ver «Detalle de LBL-02» |
+| LBL-03 | Comportamiento por tamaño | IMPLEMENTADO Y VERIFICADO; ver «Detalle de LBL-03» |
+| LBL-04 | Sin texto ni elementos encima de la imagen | IMPLEMENTADO Y VERIFICADO; ver «Detalle de LBL-04» |
+| LBL-05 | Afirmaciones «Cruelty free» y «Vegan beauty» | **CONFIRMADAS POR LA PROPIETARIA**; ver «Detalle de LBL-05» |
+
+**Detalle de LBL-02 (recursos):**
+- **Imagen principal:** `vibe-label.avif` (AVIF 4:4:4 q80, 80 KB; SSIM 0,9946 y ΔE medio 1,0 frente al recorte).
+- **Respaldo:** `vibe-label.webp` (q94, 143 KB; SSIM 0,9916).
+- **Original intacto:** `original/vibe-label-aprobado-original.png` (sha256 `eb9608b6…`).
+
+**Detalle de LBL-03 (comportamiento por tamaño):**
+- **Escritorio y tablet (≥ 641 px):** a todo el ancho, con la proporción original (6,136) y estática.
+- **Mobile:** la composición completa a 150 px de alto (a todo el ancho sería ilegible), desplazándose como una sola pieza (40 s por vuelta, sin separar paneles). Se pausa al pasar el cursor o tocar.
+- **`prefers-reduced-motion`:** quieta y recorrible a mano.
+
+**Detalle de LBL-04 (accesibilidad):** el texto alternativo reproduce los mensajes de la imagen, y la copia del bucle es `aria-hidden`.
+
+**Detalle de LBL-05 (afirmaciones del label):**
+- **Antecedente:** la franja de las Fases 47/48 evitaba certificaciones a nivel de marca por falta de evidencia verificable; había una prueba que lo exigía.
+- **Confirmación:** el 2026-11-20 la propietaria confirmó expresamente que **los fabricantes de los productos específicos incluidos en el catálogo VIBE declaran que esos productos son Cruelty Free y Vegan**, y autorizó conservar ambas afirmaciones.
+- **Consecuencias:**
+  - la prueba se reemplazó por una que exige usar la pieza aprobada sin agregar nada;
+  - la vigencia de las afirmaciones depende de que **cada producto que se incorpore al catálogo** cuente con esa misma declaración de su fabricante;
+  - **se recomienda conservar los soportes** (fichas o declaraciones de los fabricantes) por si la SIC o un consumidor los solicitan.
+
+**Pruebas:** `test-fase47-markup.js`, con 5 pruebas nuevas del label, y la suite completa, con 976 aprobadas y 0 fallidas, en local.
+
+**Corrección asociada:** `test-hero-mobile-frame.js` fallaba desde `8f10f79`. Tomaba el primer bloque `@media(min-width:901px)`, que pasó a ser una regla de una línea del pie. Ahora busca el bloque del Hero; la comprobación no se debilita.
+
 ## Historial
 
 - **2026-10-28 (Fase 57):**
@@ -1116,3 +1152,6 @@ Ver el historial y el informe de esta fase: commit, despliegue en Vercel y verif
   - **Publicado:** `legal.html` (envíos, pagos, garantía/retracto/reversión y datos personales), columna «Legal» y horario/ubicación en el pie, FAQ de envíos y pagos actualizada, y casilla del checkout con autorización de tratamiento de datos.
   - **Privacidad:** los datos reservados de la propietaria no se publican.
   - **Pendientes (§19.3):** requisitos de identificación (art. 50 de la Ley 1480 y Decreto 1377) y período de vigencia de la base.
+- **2026-11-20 (label aprobado):**
+  - **Label:** la pieza gráfica de la propietaria reemplaza a la franja de texto (AVIF, WebP y original conservado).
+  - **Afirmaciones:** «Cruelty free» y «Vegan beauty» se conservan por confirmación expresa de la propietaria; las declaran los fabricantes de los productos del catálogo (§20).

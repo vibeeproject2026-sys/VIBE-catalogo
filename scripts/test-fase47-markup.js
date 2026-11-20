@@ -29,43 +29,64 @@ function test(name, fn) {
   }
 }
 
-console.log("Franja editorial");
-const ticker = html.match(/<div class="vibe-ticker"[\s\S]*?<\/div>\s*<\/div>/);
-test("existe entre el Hero y Descubre tu VIBE", () => {
-  assert.ok(ticker);
+console.log("Label superior (pieza gráfica aprobada)");
+// Sustituye a la franja de texto de las Fases 47/48: la propietaria aprobó
+// una composición gráfica exacta que se usa completa, tal cual.
+const label = html.match(/<div class="vibe-label"[\s\S]*?<\/div>\s*<\/div>/);
+const APPROVED_ALT = "VIBE. Cruelty free. Vegan beauty. Beauty finds, handpicked. Own your glow. Tu ritual. Tu VIBE.";
+test("existe entre el Hero y Descubre tu VIBE (misma ubicación que la franja anterior)", () => {
+  assert.ok(label);
   const iHero = html.indexOf('<section id="inicio"');
-  const iTicker = html.indexOf('class="vibe-ticker"');
+  const iLabel = html.indexOf('class="vibe-label"');
   const iDiscover = html.indexOf('<section id="discoverVibe"');
-  assert.ok(iHero < iTicker && iTicker < iDiscover);
+  assert.ok(iHero < iLabel && iLabel < iDiscover);
+  assert.doesNotMatch(html, /vibe-ticker/);
 });
-test("Fase 48 — 5 mensajes de marca, cada uno con icono; copia aria-hidden para el bucle", () => {
-  const groups = [...ticker[0].matchAll(/<ul class="vibe-ticker-group"([^>]*)>([\s\S]*?)<\/ul>/g)];
-  assert.equal(groups.length, 2);
-  assert.equal(groups[0][1].trim(), "");
-  assert.match(groups[1][1], /aria-hidden="true"/);
-  const items = (g) => [...g.matchAll(/<li>([\s\S]*?)<\/li>/g)].map((m) => m[1]);
-  const text = (li) => li.replace(/<svg[\s\S]*?<\/svg>/g, "").replace(/<[^>]+>/g, "").trim();
-  const first = items(groups[0][2]);
-  assert.deepEqual(first.map(text), ["Tu ritual. Tu VIBE.", "Beauty for your VIBE.", "Encuentra tu próximo favorito.", "Explora. Combina. Exprésate.", "Belleza a tu manera."]);
-  for (const li of first) assert.match(li, /<span class="ticker-icon"><svg[^>]*aria-hidden="true"/);
-  assert.deepEqual(items(groups[1][2]), first);
+test("usa la pieza aprobada completa (AVIF + WebP), sin texto ni HTML encima; copia aria-hidden para el bucle", () => {
+  const pieces = [...label[0].matchAll(/<picture class="vibe-label-piece( vibe-label-copy)?"([^>]*)>([\s\S]*?)<\/picture>/g)];
+  assert.equal(pieces.length, 2);
+  for (const p of pieces) {
+    assert.ok(p[3].startsWith('<source type="image/avif" srcset="assets/brand/label/vibe-label.avif"><img src="assets/brand/label/vibe-label.webp" width="2172" height="354" '));
+  }
+  assert.equal(pieces[0][1], undefined);
+  assert.ok(pieces[0][3].includes(`alt="${APPROVED_ALT}"`));
+  assert.equal(pieces[1][1], " vibe-label-copy");
+  assert.match(pieces[1][2], /aria-hidden="true"/);
+  assert.match(pieces[1][3], /alt=""/);
+  // Nada más dentro del label: ni textos, ni iconos, ni listas.
+  const rest = label[0].replace(/<picture[\s\S]*?<\/picture>/g, "").replace(/<[^>]+>/g, "").trim();
+  assert.equal(rest, "");
 });
-test("sin afirmaciones comerciales ni certificaciones sin evidencia", () => {
-  assert.doesNotMatch(ticker[0], /%|gratis|envío|descuento|\$|oferta|cruelty|vegan|sostenib|certific|dermatol|hipoalerg/i);
+test("recursos: versiones optimizadas con las dimensiones declaradas y original conservado", () => {
+  const dir = path.join(root, "assets/brand/label");
+  const webp = fs.readFileSync(path.join(dir, "vibe-label.webp"));
+  assert.equal(webp.toString("ascii", 0, 4), "RIFF");
+  assert.equal(webp.toString("ascii", 8, 12), "WEBP");
+  // Dimensiones según el tipo de bloque: VP8 (con pérdida) o VP8X (extendido).
+  const kind = webp.toString("ascii", 12, 16);
+  const dims = kind === "VP8 " ? [webp.readUInt16LE(26) & 0x3fff, webp.readUInt16LE(28) & 0x3fff] : kind === "VP8X" ? [1 + webp.readUIntLE(24, 3), 1 + webp.readUIntLE(27, 3)] : null;
+  assert.deepEqual(dims, [2172, 354]);
+  const avif = fs.readFileSync(path.join(dir, "vibe-label.avif"));
+  assert.equal(avif.toString("ascii", 4, 12), "ftypavif");
+  assert.ok(fs.existsSync(path.join(dir, "original/vibe-label-aprobado-original.png")));
 });
-test("rosa claro, animación CSS, sin scroll horizontal y con prefers-reduced-motion", () => {
-  assert.match(css, /\.vibe-ticker\{[^}]*overflow:hidden[^}]*background:#FFB8D0/);
-  assert.match(css, /@keyframes vibe-ticker/);
-  const rm = css.match(/@media\(prefers-reduced-motion:reduce\)\{\s*\.vibe-ticker\{[\s\S]*?\n\}/);
-  assert.ok(rm, "bloque reduced-motion del ticker");
-  assert.match(rm[0], /\.vibe-ticker-track\{animation:none/);
-  assert.match(rm[0], /\.vibe-ticker-group\[aria-hidden="true"\]\{display:none\}/);
+test("escritorio/tablet: a todo el ancho y con su proporción; mobile: la composición completa se desplaza como una sola pieza", () => {
+  assert.ok(css.includes(".vibe-label{overflow:hidden;background:#fdfdfe;line-height:0}"));
+  assert.ok(css.includes(".vibe-label-piece img{display:block;width:100%;height:auto}"));
+  assert.ok(css.includes(".vibe-label-copy{display:none}"));
+  assert.ok(css.includes("@keyframes vibe-label-scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}"));
+  const mobile = css.match(/@media\(max-width:640px\)\{[\s\S]*?\n\}/g).find((b) => b.includes(".vibe-label"));
+  assert.ok(mobile, "bloque mobile del label");
+  assert.match(mobile, /\.vibe-label-track\{width:max-content;animation:vibe-label-scroll \d+s linear infinite\}/);
+  assert.match(mobile, /\.vibe-label-piece img\{width:auto;height:1\d\dpx\}/);
+  assert.match(mobile, /\.vibe-label-copy\{display:block\}/);
 });
-test("Fase 48 — altura: 64–76px en mobile y 68–84px en tablet/escritorio", () => {
-  const mobile = css.match(/\.vibe-ticker\{height:(\d+)px\}/);
-  const base = css.match(/\.vibe-ticker\{position:relative;overflow:hidden;height:(\d+)px/);
-  assert.ok(mobile && Number(mobile[1]) >= 64 && Number(mobile[1]) <= 76, mobile && mobile[1]);
-  assert.ok(base && Number(base[1]) >= 68 && Number(base[1]) <= 84, base && base[1]);
+test("prefers-reduced-motion: quieto, sin la copia y recorrible a mano", () => {
+  const rm = css.match(/@media\(prefers-reduced-motion:reduce\)\{\s*\.vibe-label\{[\s\S]*?\n\}/);
+  assert.ok(rm, "bloque reduced-motion del label");
+  assert.match(rm[0], /\.vibe-label\{overflow-x:auto\}/);
+  assert.match(rm[0], /\.vibe-label-track\{animation:none\}/);
+  assert.match(rm[0], /\.vibe-label-copy\{display:none\}/);
 });
 
 console.log("Encabezados");

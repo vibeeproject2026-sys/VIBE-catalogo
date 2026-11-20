@@ -72,7 +72,9 @@ test("Fase 50 — tablet/desktop conservan las flechas centradas en vertical", (
   assert.match(css, /\.hero-arrow\{position:absolute;top:50%;transform:translateY\(-50%\);z-index:2;width:38px;height:38px;/);
 });
 test("Fase 53 — escritorio: el carrusel ocupa 2/3 del Hero; tablet no cambia", () => {
-  const desk = (css.match(/@media\(min-width:901px\)\{([\s\S]*?)\n\}/) || [])[1] || "";
+  // El bloque de escritorio que contiene la regla del Hero (hay otros
+  // @media(min-width:901px) de una línea, p. ej. el del pie).
+  const desk = css.split("@media(min-width:901px){").slice(1).filter((b) => b.startsWith("\n")).map((b) => b.split("\n}")[0]).find((b) => b.includes(".hero-grid{")) || "";
   assert.match(desk, /\.hero-grid\{grid-template-columns:1fr 2fr;/);
   assert.match(css, /\.hero-grid\{display:grid;grid-template-columns:2fr 3fr;/);
   assert.match(css, /@media\(max-width:900px\)\{[\s\S]*?\.hero-grid\{grid-template-columns:1fr\}/);
