@@ -957,7 +957,7 @@ footer .wrap.footer-grid{display:grid;grid-template-columns:1.1fr 1fr 1.3fr;gap:
    huecos ni saltos. El ancho de cada pieza es un número ENTERO de píxeles
    (con decimales, cada copia se redondea por separado y el reinicio salta
    ~1px) y el alto sale de la proporción original (2172×354): nunca se
-   deforma. Ancho y duración por tamaño (alto ≈112/96/128px; velocidad
+   deforma. Ancho y duración por tamaño (alto ≈112/96/101px; velocidad
    tranquila y parecida: ~22–26 px/s). El fondo es el tono del de la imagen. */
 .vibe-label{--label-w:687px;overflow:hidden;background:#fdfdfe;line-height:0}
 .vibe-label-track{display:flex;width:max-content;animation:vibe-label-scroll 26s linear infinite}
@@ -1015,8 +1015,8 @@ footer .wrap.footer-grid{display:grid;grid-template-columns:1.1fr 1fr 1.3fr;gap:
 @media(prefers-reduced-motion:reduce){.cart-item-inner,.cart-item .remove{transition:none}}
 
 @media(max-width:640px){
-  .vibe-label{--label-w:785px}
-  .vibe-label-track{animation-duration:36s}
+  .vibe-label{--label-w:620px}
+  .vibe-label-track{animation-duration:28s}
   /* Fase 48 — Descubre tu VIBE más compacto en mobile para que el Hero
      domine la primera impresión (mismas tarjetas). */
   .discover-vibe-visual{padding:20px 0 26px}

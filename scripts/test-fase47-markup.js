@@ -83,8 +83,8 @@ test("franja compacta en movimiento continuo en todos los tamaños; ancho entero
   assert.match(css, /@media\(min-width:641px\) and \(max-width:900px\)\{\s*\.vibe-label\{--label-w:589px\}\s*\.vibe-label-track\{animation-duration:24s\}\s*\}/);
   const mobile = css.match(/@media\(max-width:640px\)\{[\s\S]*?\n\}/g).find((b) => b.includes(".vibe-label"));
   assert.ok(mobile, "bloque mobile del label");
-  assert.match(mobile, /\.vibe-label\{--label-w:785px\}/);
-  assert.match(mobile, /\.vibe-label-track\{animation-duration:36s\}/);
+  assert.match(mobile, /\.vibe-label\{--label-w:620px\}/);
+  assert.match(mobile, /\.vibe-label-track\{animation-duration:28s\}/);
   // Con decimales cada copia se redondea por separado y el reinicio salta ~1px.
   for (const m of css.matchAll(/--label-w:([^;}]+)/g)) assert.match(m[1], /^\d+px$/, "ancho entero: " + m[1]);
 });
