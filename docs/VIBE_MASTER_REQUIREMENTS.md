@@ -1087,7 +1087,7 @@ Ver el historial y el informe de esta fase: commit, despliegue en Vercel y verif
 
 | ID | Qué | Estado |
 |---|---|---|
-| LBL-06 | Franja compacta con desplazamiento continuo de derecha a izquierda en **todos** los tamaños; imagen, recorte y diseño sin cambios | IMPLEMENTADO Y VERIFICADO (local; sin commit ni despliegue, a pedido de la propietaria) |
+| LBL-06 | Franja compacta con desplazamiento continuo de derecha a izquierda en **todos** los tamaños; imagen, recorte y diseño sin cambios | ~~IMPLEMENTADO Y VERIFICADO (local; sin commit ni despliegue, a pedido de la propietaria)~~ → **PUBLICADO Y VERIFICADO EN PRODUCCIÓN** (`fce3af7`, 2026-11-20): alto 112/96/128 px y 26,5/24,6/21,8 px/s medidos en www.vibebeautycol.com; continuidad, pausa y movimiento reducido comprobados |
 
 **Detalle de LBL-06:**
 - **Técnica:**
@@ -1149,6 +1149,46 @@ Ver el historial y el informe de esta fase: commit, despliegue en Vercel y verif
 
 **Corrección asociada:** `test-hero-mobile-frame.js` fallaba desde `8f10f79`. Tomaba el primer bloque `@media(min-width:901px)`, que pasó a ser una regla de una línea del pie. Ahora busca el bloque del Hero; la comprobación no se debilita.
 
+## 21. Redes sociales: Instagram y TikTok (2026-11-20)
+
+**Decisión de la propietaria:** dos botones gráficos independientes, Instagram y TikTok, en el lugar del botón anterior «Seguir en Instagram →». Diseño revisado y aprobado en local. Se agrega también TikTok en el pie, junto a Instagram.
+
+**Perfiles oficiales confirmados por la propietaria** (no se inventaron ni se modificaron):
+- Instagram: `https://www.instagram.com/beautyvibe.col/`
+- TikTok: `https://www.tiktok.com/@beautyvibe.col?is_from_webapp=1&sender_device=pc`
+
+| ID | Qué | Estado |
+|---|---|---|
+| RED-01 | Bloque «VIBE EN REDES» (`#instagram`): se conservan el título y `@beautyvibe.col`, con dos tarjetas | IMPLEMENTADO Y VERIFICADO; ver «Detalle de RED-01» |
+| RED-02 | Comportamiento: elevación y brillo al pasar el cursor, foco visible y responsive | IMPLEMENTADO Y VERIFICADO; ver «Detalle de RED-02» |
+| RED-03 | Pie, columna «Explora»: se conserva Instagram y se agrega TikTok a continuación | IMPLEMENTADO Y VERIFICADO; ver «Detalle de RED-03» |
+| RED-04 | Publicación | Ver historial e informe: commit, despliegue y verificación en producción |
+
+**Detalle de RED-01 (las dos tarjetas):**
+- **Instagram:** logo SVG sobre el degradado oficial, «SÍGUENOS» en fucsia VIBE y «Instagram».
+- **TikTok:** logo SVG en negro con acentos turquesa y rosa, «SÍGUENOS» en turquesa y «TikTok».
+- **Enlaces:** cada uno abre una pestaña nueva con `rel="noopener noreferrer"` y tiene una etiqueta accesible («Seguir a VIBE en … (se abre en una pestaña nueva)»).
+- **Logos:** `aria-hidden`, sin emojis ni imágenes externas.
+
+**Detalle de RED-02 (comportamiento):**
+- **Hover:** elevación de 3 px y brillo en el color de cada red. Sin transición ni elevación con `prefers-reduced-motion`.
+- **Foco:** contorno fucsia de 2 px.
+- **Escritorio y tablet:** 236×74 px cada tarjeta.
+- **Mobile:** lado a lado, 176×64 px, sin flecha.
+
+**Detalle de RED-03 (pie de página):**
+- Los dos enlaces llevan un icono monocromo de 16 px, del color del enlace. El de TikTok reutiliza el trazo `#tiktokGlyph`.
+- El texto y el destino de Instagram no cambian, y tampoco el resto del pie.
+
+**Pruebas:**
+- `scripts/test-social-buttons.js` (7). Cubre destinos exactos, pestaña nueva, protección, etiquetas, SVG, estilos, el mobile, movimiento reducido y el pie.
+- **Navegador local** (`socialcheck.js`) a 1440, 768 y 390:
+  - visibilidad sin desbordes ni scroll horizontal;
+  - logos 1:1;
+  - clic o toque real que abre la pestaña nueva en el destino exacto, sin `window.opener`;
+  - hover y foco de teclado, también en el pie.
+- **Perfiles reales:** ambos responden 200.
+
 ## Historial
 
 - **2026-10-28 (Fase 57):**
@@ -1209,3 +1249,4 @@ Ver el historial y el informe de esta fase: commit, despliegue en Vercel y verif
   - **Afirmaciones:** «Cruelty free» y «Vegan beauty» se conservan por confirmación expresa de la propietaria; las declaran los fabricantes de los productos del catálogo (§20).
 - **2026-11-20 (label compacto, LBL-06):** franja más baja y en movimiento continuo en escritorio, tablet y mobile, con la misma imagen; pendiente de publicación.
 - **2026-11-20 (diagnóstico del label):** la propietaria veía la versión publicada (`2b7a4c6`, estática en escritorio). LBL-06 funciona en local, verificado con la animación real, y sigue pendiente de publicar.
+- **2026-11-20 (redes sociales, §21):** botones gráficos de Instagram y TikTok en «VIBE EN REDES» y TikTok en el pie, con los perfiles oficiales. LBL-06 pasa a publicado y verificado en producción (`fce3af7`).

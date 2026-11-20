@@ -281,6 +281,29 @@ header.scrolled .logo-image{width:128px}
 .instagram-vibe-inner{position:relative;z-index:1;text-align:center;max-width:560px;margin:0 auto}
 .instagram-handle{margin:16px 0 0;font-size:12px;font-weight:700;letter-spacing:.14em;color:#ffffff99}
 .instagram-vibe-inner h2{font-size:clamp(30px,4vw,44px);line-height:1.05;letter-spacing:-.02em;color:#fff;margin:14px 0 26px}
+/* Redes — dos botones independientes (Instagram y TikTok) en el lugar del
+   botón anterior: tarjeta oscura con el logo reconocible de cada red en
+   su color (degradado oficial de Instagram; TikTok en negro con sus
+   acentos turquesa y rosa), «Síguenos» + nombre. Hover: leve elevación y
+   brillo del color de cada red. */
+.social-buttons{display:flex;justify-content:center;gap:16px;flex-wrap:wrap}
+.social-button{display:flex;align-items:center;gap:14px;min-width:236px;min-height:72px;padding:12px 20px 12px 12px;border:1px solid #ffffff26;border-radius:18px;background:linear-gradient(180deg,#1b1b1b,#101010);color:#fff;text-align:left;transition:transform .25s ease,box-shadow .25s ease,border-color .25s ease}
+.social-icon{display:grid;place-items:center;flex-shrink:0;width:48px;height:48px;border-radius:14px}
+.social-icon svg{display:block}
+.social-instagram .social-icon{background:radial-gradient(circle at 30% 107%,#fdf497 0%,#fdf497 5%,#fd5949 45%,#d6249f 60%,#285aeb 90%)}
+.social-tiktok .social-icon{background:#000;box-shadow:inset 0 0 0 1px #ffffff26}
+.social-text{display:flex;flex-direction:column;flex:1;line-height:1.15}
+.social-kicker{font-size:10px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:var(--pink)}
+.social-tiktok .social-kicker{color:#25f4ee}
+.social-name{font-size:18px;font-weight:800;letter-spacing:-.01em}
+.social-arrow{font-size:18px;color:#ffffff80;transition:transform .25s ease,color .25s ease}
+.social-button:hover{transform:translateY(-3px)}
+.social-instagram:hover{border-color:#d6249f;box-shadow:0 14px 34px -14px #d6249fb3}
+.social-tiktok:hover{border-color:#25f4ee80;box-shadow:-8px 12px 30px -16px #25f4eeb3,8px 14px 30px -16px #fe2c55b3}
+.social-button:hover .social-arrow{transform:translateX(3px);color:#fff}
+.social-button:focus{outline:none}
+.social-button:focus-visible{outline:2px solid var(--pink);outline-offset:4px}
+@media(prefers-reduced-motion:reduce){.social-button,.social-arrow{transition:none}.social-button:hover{transform:none}.social-button:hover .social-arrow{transform:none}}
 .button.outline.light{color:#fff;border-color:#ffffff77}
 .button.outline.light:hover{background:#fff;color:#111}
 
@@ -642,6 +665,8 @@ footer .wrap.footer-grid{display:grid;grid-template-columns:1.1fr 1fr 1.3fr;gap:
 .footer-links{list-style:none;margin:0;padding:0;display:grid;gap:2px}
 .footer-links a{display:inline-flex;align-items:center;min-height:44px;color:#aaa;font-size:13px;transition:color .2s ease}
 .footer-links a:hover{color:#fff}
+/* Redes en el pie: icono monocromo (color del enlace) junto al nombre. */
+.footer-social-icon{flex-shrink:0;margin-right:8px}
 .footer-links a:focus{outline:none}
 .footer-links a:focus-visible{outline:2px solid var(--pink);outline-offset:3px;border-radius:4px}
 .footer-contact a{flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;min-height:52px}
@@ -690,6 +715,13 @@ footer .wrap.footer-grid{display:grid;grid-template-columns:1.1fr 1fr 1.3fr;gap:
 
 @media(max-width:640px){
   .wrap{width:calc(100% - 28px)}
+  /* Redes en mobile: los dos botones lado a lado, repartiendo el ancho. */
+  .social-buttons{flex-wrap:nowrap;gap:10px}
+  .social-button{flex:1 1 0;min-width:0;min-height:64px;gap:10px;padding:10px 12px 10px 10px;border-radius:16px}
+  .social-icon{width:42px;height:42px;border-radius:12px}
+  .social-icon svg{width:23px;height:23px}
+  .social-name{font-size:16px}
+  .social-arrow{display:none}
   .nav{height:78px}
   /* Fase 42.3 — bug real encontrado: header.scrolled .nav ya achicaba
      la barra (78→64px), pero header.scrolled .logo-image seguía
