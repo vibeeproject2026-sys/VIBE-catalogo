@@ -831,16 +831,14 @@ footer .wrap.footer-grid{display:grid;grid-template-columns:1.1fr 1fr 1.3fr;gap:
   .hero-arrow-prev{left:2px}
   .hero-arrow-next{right:2px}
   /* Fase 42.7 — mobile: tile angosta lo suficiente para que la
-     siguiente se asome (~85px visibles de la tile #2 dentro del ancho
-     de .wrap en 390px) — esa asomada es la señal de "hay más
+     siguiente se asome — esa asomada es la señal de "hay más
      categorías", pedida explícitamente en vez de dejar la scrollbar
      visible. Sigue siendo scroll horizontal nativo, nunca grid. */
   .discover-vibe-visual{padding:40px 0}
   .discover-tile-grid{gap:12px}
-  /* Fase 53 — tarjetas algo más contenidas (antes 265×350, más grandes
-     que la propia pieza del Hero): mismas imágenes y encuadres, la
-     siguiente sigue asomando. */
-  .discover-tile{width:248px;height:310px}
+  /* Las imágenes de categoría se reducen ligeramente en mobile para
+     darles una escala más equilibrada con el resto de la página. */
+  .discover-tile{width:224px;height:280px}
   .discover-tile-label{font-size:21px}
   /* Fase 42.8 — pedido explícito: flechas discretas en mobile, sin
      estorbar el swipe nativo (que sigue siendo la interacción

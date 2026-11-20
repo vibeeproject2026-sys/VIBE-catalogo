@@ -80,7 +80,7 @@ test("Fase 53 — escritorio: el carrusel ocupa 2/3 del Hero; tablet no cambia",
   assert.match(css, /@media\(max-width:900px\)\{[\s\S]*?\.hero-grid\{grid-template-columns:1fr\}/);
 });
 test("Fase 53 — tarjetas de Descubre en mobile más contenidas que la pieza del Hero", () => {
-  assert.match(css, /\.discover-tile\{width:248px;height:310px\}/);
+  assert.match(css, /\.discover-tile\{width:224px;height:280px\}/);
 });
 test("desktop conserva su marco (proporción medida, sin min-height nuevo)", () => {
   assert.match(css, /\.hero-carousel\{position:relative;aspect-ratio:var\(--hero-desktop-ratio, 16\/9\);height:auto;min-height:260px;/);
