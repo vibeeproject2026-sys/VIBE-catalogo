@@ -1079,9 +1079,61 @@ Ver el historial y el informe de esta fase: commit, despliegue en Vercel y verif
 - **Original intacto:** `original/vibe-label-aprobado-original.png` (sha256 `eb9608b6…`).
 
 **Detalle de LBL-03 (comportamiento por tamaño):**
-- **Escritorio y tablet (≥ 641 px):** a todo el ancho, con la proporción original (6,136) y estática.
-- **Mobile:** la composición completa a 150 px de alto (a todo el ancho sería ilegible), desplazándose como una sola pieza (40 s por vuelta, sin separar paneles). Se pausa al pasar el cursor o tocar.
-- **`prefers-reduced-motion`:** quieta y recorrible a mano.
+- ~~**Escritorio y tablet (≥ 641 px):** a todo el ancho, con la proporción original (6,136) y estática.~~
+- ~~**Mobile:** la composición completa a 150 px de alto (a todo el ancho sería ilegible), desplazándose como una sola pieza (40 s por vuelta, sin separar paneles). Se pausa al pasar el cursor o tocar.~~
+- ~~**`prefers-reduced-motion`:** quieta y recorrible a mano.~~
+
+*(Reemplazado el 2026-11-20 por LBL-06, a pedido de la propietaria: franja más compacta y en movimiento también en escritorio y tablet.)*
+
+| ID | Qué | Estado |
+|---|---|---|
+| LBL-06 | Franja compacta con desplazamiento continuo de derecha a izquierda en **todos** los tamaños; imagen, recorte y diseño sin cambios | IMPLEMENTADO Y VERIFICADO (local; sin commit ni despliegue, a pedido de la propietaria) |
+
+**Detalle de LBL-06:**
+- **Técnica:**
+  - el carril lleva la pieza 7 veces (la principal más 6 copias `aria-hidden`, con el mismo archivo y una sola descarga), lo que cubre pantallas de hasta ~4100 px;
+  - avanza exactamente el ancho de **una** pieza por ciclo, en bucle infinito;
+  - el ancho de la pieza es un número **entero** de píxeles y el alto sale de la proporción 2172×354, así que no se deforma y no hay medio píxel que salte al reiniciar.
+- **Medidas:**
+
+  | Tamaño | Ancho de pieza | Alto (antes) | Duración por pieza | Velocidad |
+  |---|---|---|---|---|
+  | Escritorio (> 900 px) | 687 px | ≈112 px, franja visible ≈77 px (antes 235 px, estática a 1440) | 26 s | ≈26 px/s |
+  | Tablet (641–900 px) | 589 px | ≈96 px (antes 125 px a 768, estática) | 24 s | ≈25 px/s |
+  | Mobile (≤ 640 px) | 785 px | ≈128 px (antes 150 px) | 36 s | ≈22 px/s (antes ≈23) |
+
+- **Pausa:** al pasar el cursor o tocar.
+- **`prefers-reduced-motion`:**
+  - quieta;
+  - en tablet y escritorio, la fila de repeticiones llena el ancho;
+  - en mobile se ve una sola pieza y se recorre a mano.
+- **Verificación en navegador local** (`labelshots2.js`) a 390, 768 y 1440, y también 390 y 1440 con movimiento reducido:
+  - alto esperado y proporción 6,136;
+  - repeticiones pegadas (0 px de hueco) y cobertura del ancho incluso al final del ciclo;
+  - avance por ciclo = ancho de una pieza (785, 589 y 687 px);
+  - inicio y final del ciclo iguales (diferencia media ≤ 0,69/255);
+  - una sola descarga de la imagen, sin desplazamiento horizontal de la página y sin errores.
+- **Capturas:** `Catalogo VIBE/entregables-label/ajuste-compacto/`.
+
+**Diagnóstico del 2026-11-20 («el label sigue igual»):**
+- **Causa:** LBL-06 está **solo en el repositorio local, sin commit ni despliegue** (por instrucción de la propietaria). www.vibebeautycol.com sigue en `2b7a4c6`.
+- **Medición en Chromium, sin manipular la animación, con la misma prueba contra el sitio publicado:**
+  - 1440: 234,7 px, sin animación, 0 px de desplazamiento;
+  - 768: 125,2 px, sin animación, 0 px;
+  - 390: 150 px, con movimiento.
+
+  Es exactamente lo que observó la propietaria.
+- **Misma medición en local:** el HTML y el CSS cargados son los nuevos (7 piezas y ninguna regla antigua activa), y la animación está `running`, sin movimiento reducido ni cursor encima.
+
+  | Tamaño | Alto real | Ancho de la imagen | Desplazamiento real en 4,1 s |
+  |---|---|---|---|
+  | 1440 | 111,97 px | 687 px | 108 px (26,5 px/s) |
+  | 768 | 95,98 px | 589 px | 100,6 px (24,6 px/s) |
+  | 390 | 127,94 px | 785 px | 88,7 px (21,8 px/s) |
+
+- **Equipo de trabajo:** los efectos de animación de Windows están activados, así que `prefers-reduced-motion` no detiene el label aquí. En un equipo con esos efectos desactivados, el label queda quieto por accesibilidad.
+- **Evidencia:** `Catalogo VIBE/entregables-label/diagnostico-local/` (dos instantes por tamaño, GIF con 12 capturas reales y `mediciones.json`) y `diagnostico-produccion/`.
+- **Código:** sin cambios en este diagnóstico.
 
 **Detalle de LBL-04 (accesibilidad):** el texto alternativo reproduce los mensajes de la imagen, y la copia del bucle es `aria-hidden`.
 
@@ -1155,3 +1207,5 @@ Ver el historial y el informe de esta fase: commit, despliegue en Vercel y verif
 - **2026-11-20 (label aprobado):**
   - **Label:** la pieza gráfica de la propietaria reemplaza a la franja de texto (AVIF, WebP y original conservado).
   - **Afirmaciones:** «Cruelty free» y «Vegan beauty» se conservan por confirmación expresa de la propietaria; las declaran los fabricantes de los productos del catálogo (§20).
+- **2026-11-20 (label compacto, LBL-06):** franja más baja y en movimiento continuo en escritorio, tablet y mobile, con la misma imagen; pendiente de publicación.
+- **2026-11-20 (diagnóstico del label):** la propietaria veía la versión publicada (`2b7a4c6`, estática en escritorio). LBL-06 funciona en local, verificado con la animación real, y sigue pendiente de publicar.

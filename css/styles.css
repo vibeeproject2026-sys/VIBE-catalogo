@@ -918,17 +918,25 @@ footer .wrap.footer-grid{display:grid;grid-template-columns:1.1fr 1fr 1.3fr;gap:
 
 /* Label superior (Hero → Descubre tu VIBE): pieza gráfica aprobada por la
    propietaria (assets/brand/label/), usada completa, sin reconstruirla con
-   HTML/CSS. Escritorio y tablet: a todo el ancho, con su proporción
-   (2172×354), estática. Mobile: a todo el ancho no se leería, así que la
-   composición COMPLETA se muestra a una altura legible y se desplaza como
-   una sola pieza (dos copias idénticas: -50% coincide con el inicio de la
-   copia, sin salto). El fondo es el mismo tono del fondo de la imagen. */
-.vibe-label{overflow:hidden;background:#fdfdfe;line-height:0}
-.vibe-label-track{display:flex;width:100%}
-.vibe-label-piece{display:block;flex:0 0 100%}
-.vibe-label-piece img{display:block;width:100%;height:auto}
-.vibe-label-copy{display:none}
-@keyframes vibe-label-scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+   HTML/CSS. En todos los tamaños es una franja compacta que se desplaza
+   de derecha a izquierda en bucle continuo: el carril lleva la pieza 7
+   veces seguidas (cubre pantallas de hasta ~4100 px) y avanza exactamente
+   el ancho de UNA pieza, así el reinicio cae en un punto idéntico, sin
+   huecos ni saltos. El ancho de cada pieza es un número ENTERO de píxeles
+   (con decimales, cada copia se redondea por separado y el reinicio salta
+   ~1px) y el alto sale de la proporción original (2172×354): nunca se
+   deforma. Ancho y duración por tamaño (alto ≈112/96/128px; velocidad
+   tranquila y parecida: ~22–26 px/s). El fondo es el tono del de la imagen. */
+.vibe-label{--label-w:687px;overflow:hidden;background:#fdfdfe;line-height:0}
+.vibe-label-track{display:flex;width:max-content;animation:vibe-label-scroll 26s linear infinite}
+.vibe-label:hover .vibe-label-track{animation-play-state:paused}
+.vibe-label-piece{display:block;flex:0 0 auto}
+.vibe-label-piece img{display:block;width:var(--label-w);height:auto}
+@keyframes vibe-label-scroll{from{transform:translateX(0)}to{transform:translateX(calc(-1 * var(--label-w)))}}
+@media(min-width:641px) and (max-width:900px){
+  .vibe-label{--label-w:589px}
+  .vibe-label-track{animation-duration:24s}
+}
 /* (versión estática con prefers-reduced-motion: al final del archivo,
    para que gane también sobre las alturas responsive) */
 
@@ -975,11 +983,8 @@ footer .wrap.footer-grid{display:grid;grid-template-columns:1.1fr 1fr 1.3fr;gap:
 @media(prefers-reduced-motion:reduce){.cart-item-inner,.cart-item .remove{transition:none}}
 
 @media(max-width:640px){
-  .vibe-label-track{width:max-content;animation:vibe-label-scroll 40s linear infinite}
-  .vibe-label:hover .vibe-label-track{animation-play-state:paused}
-  .vibe-label-piece{flex:0 0 auto}
-  .vibe-label-piece img{width:auto;height:150px}
-  .vibe-label-copy{display:block}
+  .vibe-label{--label-w:785px}
+  .vibe-label-track{animation-duration:36s}
   /* Fase 48 — Descubre tu VIBE más compacto en mobile para que el Hero
      domine la primera impresión (mismas tarjetas). */
   .discover-vibe-visual{padding:20px 0 26px}
@@ -1003,11 +1008,14 @@ footer .wrap.footer-grid{display:grid;grid-template-columns:1.1fr 1fr 1.3fr;gap:
   .catalog-lead{font-size:16px}
   .catalog-brand-title{font-size:18px}
 }
-/* Label con prefers-reduced-motion: quieto y sin la copia; en mobile se
-   recorre a mano (desplazamiento horizontal) a la misma altura legible. */
+/* Label con prefers-reduced-motion: quieto. En tablet/escritorio las
+   repeticiones llenan el ancho como una fila fija; en mobile se ve una
+   sola pieza y se recorre a mano (desplazamiento horizontal). */
 @media(prefers-reduced-motion:reduce){
-  .vibe-label{overflow-x:auto}
   .vibe-label-track{animation:none}
+}
+@media(prefers-reduced-motion:reduce) and (max-width:640px){
+  .vibe-label{overflow-x:auto}
   .vibe-label-copy{display:none}
 }
 /* Fase 48 — en tablet hay ancho para mantener las dos zonas del

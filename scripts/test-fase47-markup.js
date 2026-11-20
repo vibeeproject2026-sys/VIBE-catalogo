@@ -31,7 +31,8 @@ function test(name, fn) {
 
 console.log("Label superior (pieza gráfica aprobada)");
 // Sustituye a la franja de texto de las Fases 47/48: la propietaria aprobó
-// una composición gráfica exacta que se usa completa, tal cual.
+// una composición gráfica exacta que se usa completa, tal cual. Ajuste
+// posterior: franja compacta con desplazamiento continuo en todos los tamaños.
 const label = html.match(/<div class="vibe-label"[\s\S]*?<\/div>\s*<\/div>/);
 const APPROVED_ALT = "VIBE. Cruelty free. Vegan beauty. Beauty finds, handpicked. Own your glow. Tu ritual. Tu VIBE.";
 test("existe entre el Hero y Descubre tu VIBE (misma ubicación que la franja anterior)", () => {
@@ -42,17 +43,20 @@ test("existe entre el Hero y Descubre tu VIBE (misma ubicación que la franja an
   assert.ok(iHero < iLabel && iLabel < iDiscover);
   assert.doesNotMatch(html, /vibe-ticker/);
 });
-test("usa la pieza aprobada completa (AVIF + WebP), sin texto ni HTML encima; copia aria-hidden para el bucle", () => {
+test("usa la pieza aprobada completa (AVIF + WebP), sin texto ni HTML encima; 6 copias aria-hidden para el bucle", () => {
   const pieces = [...label[0].matchAll(/<picture class="vibe-label-piece( vibe-label-copy)?"([^>]*)>([\s\S]*?)<\/picture>/g)];
-  assert.equal(pieces.length, 2);
+  assert.equal(pieces.length, 7);
   for (const p of pieces) {
     assert.ok(p[3].startsWith('<source type="image/avif" srcset="assets/brand/label/vibe-label.avif"><img src="assets/brand/label/vibe-label.webp" width="2172" height="354" '));
   }
   assert.equal(pieces[0][1], undefined);
   assert.ok(pieces[0][3].includes(`alt="${APPROVED_ALT}"`));
-  assert.equal(pieces[1][1], " vibe-label-copy");
-  assert.match(pieces[1][2], /aria-hidden="true"/);
-  assert.match(pieces[1][3], /alt=""/);
+  for (const p of pieces.slice(1)) {
+    assert.equal(p[1], " vibe-label-copy");
+    assert.match(p[2], /aria-hidden="true"/);
+    assert.match(p[3], /alt=""/);
+    assert.doesNotMatch(p[3], /loading="lazy"/); // misma imagen ya cargada: sin espera al entrar
+  }
   // Nada más dentro del label: ni textos, ni iconos, ni listas.
   const rest = label[0].replace(/<picture[\s\S]*?<\/picture>/g, "").replace(/<[^>]+>/g, "").trim();
   assert.equal(rest, "");
@@ -70,23 +74,23 @@ test("recursos: versiones optimizadas con las dimensiones declaradas y original 
   assert.equal(avif.toString("ascii", 4, 12), "ftypavif");
   assert.ok(fs.existsSync(path.join(dir, "original/vibe-label-aprobado-original.png")));
 });
-test("escritorio/tablet: a todo el ancho y con su proporción; mobile: la composición completa se desplaza como una sola pieza", () => {
-  assert.ok(css.includes(".vibe-label{overflow:hidden;background:#fdfdfe;line-height:0}"));
-  assert.ok(css.includes(".vibe-label-piece img{display:block;width:100%;height:auto}"));
-  assert.ok(css.includes(".vibe-label-copy{display:none}"));
-  assert.ok(css.includes("@keyframes vibe-label-scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}"));
+test("franja compacta en movimiento continuo en todos los tamaños; ancho entero en px y alto por proporción; avance de exactamente una pieza", () => {
+  assert.ok(css.includes(".vibe-label{--label-w:687px;overflow:hidden;background:#fdfdfe;line-height:0}"));
+  assert.ok(css.includes(".vibe-label-track{display:flex;width:max-content;animation:vibe-label-scroll 26s linear infinite}"));
+  assert.ok(css.includes(".vibe-label:hover .vibe-label-track{animation-play-state:paused}"));
+  assert.ok(css.includes(".vibe-label-piece img{display:block;width:var(--label-w);height:auto}"));
+  assert.ok(css.includes("@keyframes vibe-label-scroll{from{transform:translateX(0)}to{transform:translateX(calc(-1 * var(--label-w)))}}"));
+  assert.match(css, /@media\(min-width:641px\) and \(max-width:900px\)\{\s*\.vibe-label\{--label-w:589px\}\s*\.vibe-label-track\{animation-duration:24s\}\s*\}/);
   const mobile = css.match(/@media\(max-width:640px\)\{[\s\S]*?\n\}/g).find((b) => b.includes(".vibe-label"));
   assert.ok(mobile, "bloque mobile del label");
-  assert.match(mobile, /\.vibe-label-track\{width:max-content;animation:vibe-label-scroll \d+s linear infinite\}/);
-  assert.match(mobile, /\.vibe-label-piece img\{width:auto;height:1\d\dpx\}/);
-  assert.match(mobile, /\.vibe-label-copy\{display:block\}/);
+  assert.match(mobile, /\.vibe-label\{--label-w:785px\}/);
+  assert.match(mobile, /\.vibe-label-track\{animation-duration:36s\}/);
+  // Con decimales cada copia se redondea por separado y el reinicio salta ~1px.
+  for (const m of css.matchAll(/--label-w:([^;}]+)/g)) assert.match(m[1], /^\d+px$/, "ancho entero: " + m[1]);
 });
-test("prefers-reduced-motion: quieto, sin la copia y recorrible a mano", () => {
-  const rm = css.match(/@media\(prefers-reduced-motion:reduce\)\{\s*\.vibe-label\{[\s\S]*?\n\}/);
-  assert.ok(rm, "bloque reduced-motion del label");
-  assert.match(rm[0], /\.vibe-label\{overflow-x:auto\}/);
-  assert.match(rm[0], /\.vibe-label-track\{animation:none\}/);
-  assert.match(rm[0], /\.vibe-label-copy\{display:none\}/);
+test("prefers-reduced-motion: quieto; en mobile una sola pieza recorrible a mano", () => {
+  assert.match(css, /@media\(prefers-reduced-motion:reduce\)\{\s*\.vibe-label-track\{animation:none\}\s*\}/);
+  assert.match(css, /@media\(prefers-reduced-motion:reduce\) and \(max-width:640px\)\{\s*\.vibe-label\{overflow-x:auto\}\s*\.vibe-label-copy\{display:none\}\s*\}/);
 });
 
 console.log("Encabezados");
