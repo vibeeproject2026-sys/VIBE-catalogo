@@ -117,7 +117,12 @@ module.exports = async function handler(req, res) {
       return res.end(xml);
     }
 
-    res.setHeader("Cache-Control", "public, max-age=60, s-maxage=300, stale-while-revalidate=600");
+    // Fichas sin demora: con s-maxage=300/swr=600 (+60 s en el navegador)
+    // un cambio guardado en Admin (descripción, presentaciones, precios)
+    // tardaba hasta ~16 min en verse en el catálogo, y la tienda podía
+    // mostrar una ficha a medio cargar (p. ej. solo las imágenes, guardadas
+    // antes). Mismo criterio que el Hero en la Fase 36: 30 s en la CDN.
+    res.setHeader("Cache-Control", "public, max-age=15, s-maxage=30, stale-while-revalidate=60");
     return sendJson(res, 200, { products: items });
   } catch (e) {
     if (e.code === "TABLE_MISSING") {

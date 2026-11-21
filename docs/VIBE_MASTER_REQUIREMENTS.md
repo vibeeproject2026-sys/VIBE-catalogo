@@ -1532,6 +1532,50 @@ Cada línea de `orders.items` guarda, calculado por el servidor:
 
 **Estado:** ~~implementado y verificado en local. Sin commit, push ni despliegue (pendiente de aprobación).~~ Publicado el 2026-11-21 con autorización expresa de la propietaria (commit «feat: add catalog pagination, VIBE social icons, top-of-page start and per-slide carousel durations»). Verificación en producción: ver Historial. Sin migración.
 
+## 25. Fichas de producto completas: caso Acne Patch (2026-11-21)
+
+| ID | Qué | Estado |
+|---|---|---|
+| FICHA-01 | La ficha muestra siempre la información vigente (descripción, presentaciones, precios) poco después de guardarla en Admin | CORREGIDO; ver Estado |
+| FICHA-02 | La búsqueda encuentra productos sin importar tildes ni mayúsculas («acne» → «Acné Patch») | IMPLEMENTADO; ver Estado |
+
+**Reporte:** la propietaria cargó Acne Patch y en el catálogo solo veía las imágenes, sin descripción, presentaciones ni demás datos.
+
+**Diagnóstico, cadena completa (solo lectura, datos reales):**
+1. **Datos y API:** la API pública entrega Acne Patch completo (nombre, descripción, imagen principal y 3 adicionales, tipo de producto, 4 presentaciones: «40 colores» a $13.000 y «36 te verde» a $18.000 con precio propio; «72 Cat» y «72 Elephant» con el general de $15.000). No se pierde nada al guardar ni en la API.
+2. **Transformación y ficha:** en un navegador real, con los datos frescos, la ficha muestra todo a 1440, 768 y 390, sin errores de consola. Los nombres de campos coinciden entre API y frontend.
+3. **Causa raíz: caché de la API pública** (`api/catalog/products.js`): `max-age=60, s-maxage=300, stale-while-revalidate=600`. Tras guardar en Admin, el catálogo podía mostrar la versión anterior hasta unos 16 minutos.
+   - **Evidencia 1, tiempos de creación** (codificados en los nombres de archivo e ids): las imágenes se subieron entre las 3:13 y las 3:16 p. m.; las presentaciones se crearon entre las 3:28 y las 3:34 p. m., en un guardado posterior. Cualquier consulta en ese intervalo, o hasta unos 15 minutos después, recibía la versión con solo las imágenes.
+   - **Evidencia 2, en vivo:** la respuesta en caché («STALE», 339 s) difería de la fresca justo en Acne Patch, que la propietaria estaba editando.
+   - **Precedente:** el carrusel tuvo el mismo problema y se corrigió igual en la Fase 36.
+4. **Hallazgo secundario:** buscar «acne» no encontraba «Acné Patch» porque la búsqueda distinguía tildes.
+
+**Solución:**
+- **Caché de la API de productos:** `public, max-age=15, s-maxage=30, stale-while-revalidate=60`, el mismo criterio que el carrusel. Lo guardado en Admin se ve en el catálogo en segundos, como mucho en torno a un minuto.
+- **Búsqueda sin tildes ni mayúsculas** (`filterProducts`, `js/taxonomy.js`).
+- **Sin cambios en:** datos, POS, precios ni la lógica de variantes y promociones.
+
+**Archivos:** `api/catalog/products.js`, `js/taxonomy.js` y `scripts/test-product-sheet.mjs` (nuevo, 6 pruebas).
+
+**Diseño vigente, no es un error:** las secciones de información de la ficha («Qué es», «Descripción», «Características», «Beneficios», «Cómo usar»…) se muestran como acordeón: la primera abierta y las demás plegadas, con su contenido completo.
+
+**Pruebas:**
+- **Navegador real con el catálogo real** (65 productos, servido en local, pedidos interceptados), a 1440, 768 y 390:
+  - Acne Patch: se encuentra buscando «acne»; nombre, descripción, 4 imágenes y 4 presentaciones con su precio; «Desde $13.000»;
+  - «72 Cat» a $15.000 (general) y «40 colores» a $13.000 (propio);
+  - el carrito guarda la presentación y $13.000; el checkout envía la presentación sin precio por línea (lo calcula el servidor);
+  - al volver al catálogo y reabrir la ficha, la información sigue completa.
+- **Barrido de las 65 fichas** (51 con descripción, 25 con tonos, 1 con presentaciones): nombre, descripción, imagen, opciones y precio presentes; sin errores de página.
+- **Suite completa:** 50 scripts, **1040 aprobadas y 0 fallidas**.
+- **Regresión en navegador:** precios por variante con y sin promoción, checkout (§23) y las cuatro mejoras de §24: ALL OK.
+- **Capturas:** `Catalogo VIBE/entregables-fichas/`.
+
+**Pendientes y hallazgos, documentados sin corregir (fuera de alcance):**
+- **Búsqueda por palabra clave:** `searchKeywords` llega en la API, pero el normalizador del frontend (`js/data-source.js`) no lo conserva. La búsqueda por palabras clave editoriales que describía la Fase 36 no funciona en la tienda.
+- **Imágenes nuevas sin optimizar:** las imágenes subidas después de la optimización de la Fase 57 no tienen versiones WebP. Por ejemplo, la principal de Acne Patch es un PNG de 1,5 MB y la galería queda negra unos segundos en conexiones lentas. Optimizarlas implica escribir en Storage de producción y requiere autorización aparte.
+
+**Estado:** corregido y verificado en local; publicación automática autorizada. Verificación en producción: ver Historial.
+
 ## Historial
 
 - **2026-10-28 (Fase 57):**
@@ -1600,3 +1644,4 @@ Cada línea de `orders.items` guarda, calculado por el servidor:
 - **2026-11-20 (publicación del checkout, §23):** commit `181cbd5` en `main`, desplegado en Production (Vercel, estado success); `js/app.js` de producción idéntico al commit. Verificado en `www.vibebeautycol.com` a 1440 y 390 con navegador real y pedidos interceptados: escenarios 1–5, agotados, respuesta tardía, validación, 409 y doble envío (ALL OK), y con el catálogo real, llenando el formulario sin esperar a que termine la consulta: los datos se conservan. Sin pedidos reales ni cambios de datos.
 - **2026-11-21 (navegación, §24):** paginación de 10 productos, iconos propios de Instagram y TikTok, inicio de página al abrir o recargar (causa: ancla #catalogo en la URL y restauración de scroll) y duración individual del carrusel (campo opcional en el manifiesto, sin migración). Verificado en local; suite 1034/0. Sin publicar.
 - **2026-11-21 (publicación de §24):** commit `ba91d2c` en `main`, desplegado en Production (Vercel, estado success); `js/app.js`, `js/hero-carousel.js`, `index.html`, `css/styles.css` y `admin/admin.js` de producción idénticos al commit. Verificado en `www.vibebeautycol.com` a 1440, 768 y 390 con datos controlados en el navegador (paginación, búsqueda, iconos y enlaces, inicio arriba, carrusel de 2, 3 y 5 s, temporizador único, movimiento reducido y Admin con API simulada): ALL OK. Con datos reales: 64 productos en 7 páginas, sin repetir ni omitir; inicio arriba; las 3 piezas reales del carrusel (sin duración propia, `duration: null`) siguen en 5 s. Sin pedidos, sin escrituras en producción y sin migraciones.
+- **2026-11-21 (fichas de producto, §25):** caso Acne Patch. Causa: la API pública del catálogo tenía caché de 5 min en la CDN, más 10 min de contenido viejo durante la revalidación y 60 s en el navegador; la ficha mostraba una versión intermedia (solo imágenes) mientras la propietaria completaba los datos. Se baja a 30 s y la búsqueda ignora tildes. Ver §25.

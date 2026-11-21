@@ -190,8 +190,11 @@ export function getSubcategories(products, group, category) {
 // aquí). Cada uno es estrictamente opuesto por defecto (ausente/false no
 // filtra nada) — mismo comportamiento de siempre para cualquier llamada
 // que no los use.
+// Búsqueda sin distinguir tildes ni mayúsculas: «acne» encuentra «Acné Patch».
+const searchFold = (s) => String(s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+
 export function filterProducts(products, { group, category, subcategory, search, available, promo, featuredOnly, newOnly, brand } = {}) {
-  const q = (search || "").toLowerCase().trim();
+  const q = searchFold(search || "").trim();
   return products.filter((p) => {
     if (group && group !== "Todos" && groupOf(p) !== group) return false;
     if (category && category !== "Todos" && categoryOf(p) !== category) return false;
@@ -210,9 +213,8 @@ export function filterProducts(products, { group, category, subcategory, search,
       // editorial, no solo por nombre/categoría/descripción corta.
       const haystack = [p.name, categoryOf(p), p.subcategory, p.shortDescription, p.brand, ...(p.searchKeywords || [])]
         .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      if (!haystack.includes(q)) return false;
+        .join(" ");
+      if (!searchFold(haystack).includes(q)) return false;
     }
     return true;
   });
