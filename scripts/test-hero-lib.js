@@ -102,7 +102,7 @@ test("no incluye createdAt/updatedAt/active", () => {
   const s = shapePublicSlide({ id: "x", image: "i.jpg", active: true, createdAt: "2026-01-01", updatedAt: "2026-01-02" });
   assert.deepEqual(
     Object.keys(s).sort(),
-    ["alt", "ctaHref", "ctaText", "eyebrow", "id", "image", "linkTarget", "linkType", "mobileImage", "order", "subtitle", "title"]
+    ["alt", "ctaHref", "ctaText", "duration", "eyebrow", "id", "image", "linkTarget", "linkType", "mobileImage", "order", "subtitle", "title"]
   );
 });
 test("campos ausentes caen a null, nunca undefined", () => {

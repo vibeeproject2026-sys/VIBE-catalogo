@@ -24,7 +24,16 @@ const FALLBACK_HERO_SLIDES = [
   { image: "assets/hero/slide-4.svg", alt: "VIBE — Tu ritual, tu VIBE", ctaHref: "#catalogo", order: 4, active: true },
 ];
 
+// Duración predeterminada de cada pieza (la de siempre). Una pieza con
+// duración propia (`duration`, segundos enteros 2–30, configurada en Admin)
+// usa la suya; sin ella, esta. Ver api/_lib/heroSlides.js.
 const AUTOPLAY_MS = 5000;
+const DURATION_MIN_S = 2;
+const DURATION_MAX_S = 30;
+export function slideDurationMs(slide) {
+  const d = slide && slide.duration;
+  return Number.isInteger(d) && d >= DURATION_MIN_S && d <= DURATION_MAX_S ? d * 1000 : AUTOPLAY_MS;
+}
 
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
@@ -177,16 +186,23 @@ async function initHeroCarousel() {
     goTo(current - 1);
   }
 
+  // Un único temporizador a la vez, programado para la pieza visible con
+  // SU duración: al vencer avanza y programa la siguiente con la suya.
+  // Antes de programar siempre se limpia el anterior (nunca hay dos).
   function stopAutoplay() {
     if (timer) {
-      window.clearInterval(timer);
+      window.clearTimeout(timer);
       timer = null;
     }
   }
   function startAutoplay() {
     if (reduceMotion) return; // prefers-reduced-motion: sin avance automático
     stopAutoplay();
-    timer = window.setInterval(next, AUTOPLAY_MS);
+    timer = window.setTimeout(() => {
+      timer = null;
+      next();
+      startAutoplay();
+    }, slideDurationMs(slides[current]));
   }
   function restartAutoplay() {
     // Toda interacción manual reinicia el temporizador del autoplay.

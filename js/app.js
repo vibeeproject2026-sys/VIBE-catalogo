@@ -45,8 +45,29 @@ const DEFAULT_FILTERS = {
 };
 // Fase 57 — shadeId/presentationId: opciones elegidas en la ficha abierta
 // (dos dimensiones independientes, ver js/variants.js).
-const state = { ...DEFAULT_FILTERS, product: null, variant: null, shadeId: null, presentationId: null, products: [] };
+const state = { ...DEFAULT_FILTERS, product: null, variant: null, shadeId: null, presentationId: null, products: [], page: 1 };
+// Paginación del catálogo: 10 productos por página, sobre el resultado YA
+// filtrado y ordenado. La página vive en memoria (no en la URL): cualquier
+// cambio de filtro, categoría, búsqueda u orden vuelve a la página 1.
+const PAGE_SIZE = 10;
 const $ = s => document.querySelector(s);
+
+// Inicio de página en cada carga nueva (apertura, enlace externo, URL
+// escrita, recarga, pestaña nueva). Causa raíz de que a veces abriera a
+// mitad de página: (1) toda URL que escribe el catálogo termina en
+// #catalogo o #discover (buildUrl), así que al recargar o compartir el
+// navegador saltaba a esa ancla; (2) la restauración automática de scroll
+// del navegador devolvía la posición anterior al recargar. Se hace UNA
+// sola vez, al cargar: se quita solo el fragmento (los parámetros de
+// búsqueda y filtros se conservan) y se pide restauración manual. La
+// navegación interna (filtros, páginas, ficha, carrito) no pasa por aquí.
+try {
+  if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+  if (window.location.hash) history.replaceState(history.state, "", window.location.pathname + window.location.search);
+  window.scrollTo(0, 0);
+} catch {
+  // APIs de historial no disponibles: no es fatal.
+}
 const money = n => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(n);
 const esc = s => String(s ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 
@@ -302,10 +323,49 @@ function updateFilterSortButton() {
   $("#openFilterSort").textContent = count ? `Filtrar + Ordenar (${count})` : "Filtrar + Ordenar";
 }
 
+// Números visibles: todos si son pocos; si no, primera, última y las
+// vecinas de la actual, con «…» entre medio.
+function pageWindow(page, pages) {
+  if (pages <= 7) return Array.from({ length: pages }, (_, i) => i + 1);
+  const set = new Set([1, pages, page - 1, page, page + 1].filter((n) => n >= 1 && n <= pages));
+  const sorted = [...set].sort((a, b) => a - b);
+  const out = [];
+  sorted.forEach((n, i) => {
+    if (i && n - sorted[i - 1] > 1) out.push(null);
+    out.push(n);
+  });
+  return out;
+}
+
+function renderPagination(pages) {
+  const nav = $("#catalogPagination");
+  if (!nav) return;
+  nav.classList.toggle("hidden", pages <= 1);
+  if (pages <= 1) {
+    nav.innerHTML = "";
+    return;
+  }
+  const p = state.page;
+  const numbers = pageWindow(p, pages)
+    .map((n) => (n === null ? `<li class="page-gap" aria-hidden="true">…</li>` : `<li><button type="button" class="page-number${n === p ? " active" : ""}" data-page="${n}" ${n === p ? 'aria-current="page"' : ""} aria-label="Página ${n}">${n}</button></li>`))
+    .join("");
+  nav.innerHTML = `<button type="button" class="page-nav" data-page="${p - 1}" ${p === 1 ? "disabled" : ""} aria-label="Página anterior"><span aria-hidden="true">‹</span><span class="page-nav-label">Anterior</span></button>
+    <ol class="page-numbers">${numbers}</ol>
+    <span class="page-status" aria-hidden="true">${p} / ${pages}</span>
+    <button type="button" class="page-nav" data-page="${p + 1}" ${p === pages ? "disabled" : ""} aria-label="Página siguiente"><span class="page-nav-label">Siguiente</span><span aria-hidden="true">›</span></button>`;
+}
+
 function renderProducts() {
   let list = filterProducts(state.products, state);
   list = sortProducts(list, state.sort);
-  $("#productGrid").innerHTML = list.map(productCard).join("");
+  // Paginación sobre el resultado completo (filtrado + ordenado).
+  const total = list.length;
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  state.page = Math.min(Math.max(1, Number(state.page) || 1), pages);
+  const start = (state.page - 1) * PAGE_SIZE;
+  const pageList = list.slice(start, start + PAGE_SIZE);
+  $("#productGrid").innerHTML = pageList.map(productCard).join("");
+  renderPagination(pages);
   updateFilterSortButton();
 
   const isEmpty = list.length === 0;
@@ -326,7 +386,9 @@ function renderProducts() {
   const allSoldOut = !isEmpty && list.every((p) => p.available === false);
   $("#allSoldOutNotice").classList.toggle("hidden", !allSoldOut);
 
-  $("#resultCount").textContent = list.length === 1 ? "1 producto" : `${list.length} productos`;
+  $("#resultCount").textContent = pages > 1
+    ? `Mostrando ${start + 1}–${start + pageList.length} de ${total} productos`
+    : list.length === 1 ? "1 producto" : `${list.length} productos`;
 
   renderActiveFilters();
   renderCatalogHeading();
@@ -336,6 +398,7 @@ function renderProducts() {
 // re-renderiza navegación + grid (que a su vez actualiza heading,
 // breadcrumb, chips y contador) y sincroniza la URL.
 function applyFiltersAndRender() {
+  state.page = 1; // nuevo filtro, categoría, búsqueda u orden → página 1
   renderNav();
   renderProducts();
   syncUrl();
@@ -1262,6 +1325,24 @@ $("#activeFilters").addEventListener("click", (e) => {
 });
 
 bindProductGrid("#productGrid");
+
+// Paginación: cambiar de página conserva filtros y búsqueda y lleva a la
+// clienta al inicio de la sección de productos (no al inicio del sitio).
+// El foco va al contador («Mostrando…») para que el lector de pantalla
+// anuncie la página nueva.
+$("#catalogPagination").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-page]");
+  if (!b || b.disabled) return;
+  const target = Number(b.dataset.page);
+  if (!Number.isInteger(target) || target === state.page) return;
+  state.page = target;
+  renderProducts();
+  const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  $("#catalogo").scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+  const count = $("#resultCount");
+  count.setAttribute("tabindex", "-1");
+  count.focus({ preventScroll: true });
+});
 bindProductGrid("#ofertasGrid");
 
 $("#cartButton").onclick = openCart;

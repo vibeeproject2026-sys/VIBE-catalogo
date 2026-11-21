@@ -28,7 +28,18 @@ const MANIFEST_PATH = "hero/slides.json";
 // mantendría un acoplamiento con products/categories que este módulo
 // deliberadamente no tiene); esa corrección referencial vive enteramente
 // en Admin, que solo ofrece valores reales en sus selects.
-const SLIDE_FIELDS = ["image", "mobileImage", "eyebrow", "title", "subtitle", "ctaText", "ctaHref", "alt", "order", "active", "linkType", "linkTarget"];
+const SLIDE_FIELDS = ["image", "mobileImage", "eyebrow", "title", "subtitle", "ctaText", "ctaHref", "alt", "order", "active", "linkType", "linkTarget", "duration"];
+
+// Duración propia del slide en el carrusel, en segundos enteros (opcional).
+// Sin valor (null/ausente) el slide usa la duración predeterminada del
+// carrusel (5 s, js/hero-carousel.js), como hasta ahora. Rango 2–30 s:
+// menos de 2 s no deja leer la pieza; más de 30 s detiene en la práctica
+// el carrusel.
+const DURATION_MIN = 2;
+const DURATION_MAX = 30;
+function isValidDuration(v) {
+  return v === null || v === undefined || (Number.isInteger(v) && v >= DURATION_MIN && v <= DURATION_MAX);
+}
 
 const LINK_TYPES = ["none", "category", "subcategory", "product", "section", "internal_route"];
 const MAX_LINK_TARGET_LENGTH = 200;
@@ -168,6 +179,7 @@ function shapePublicSlide(s) {
     order: typeof s.order === "number" ? s.order : null,
     linkType: s.linkType ?? null,
     linkTarget: s.linkTarget ?? null,
+    duration: Number.isInteger(s.duration) && isValidDuration(s.duration) ? s.duration : null,
   };
 }
 
@@ -197,6 +209,9 @@ module.exports = {
   isSafeCtaHref,
   isValidLinkType,
   isValidLinkTarget,
+  DURATION_MIN,
+  DURATION_MAX,
+  isValidDuration,
   loadSlides,
   loadSlidesUntilFound,
   saveSlides,

@@ -1,4 +1,4 @@
-# VIBE — Registro maestro de requisitos (acumulativo)
+PUBLICADO; ver §24.5 e Historial |PUBLICADO; ver §24.5 e Historial |PUBLICADO; ver §24.5 e Historial |# VIBE — Registro maestro de requisitos (acumulativo)
 
 **Qué es:** el registro permanente de lo que pidió la propietaria, en qué estado está **comprobado** y con qué evidencia. Cada solicitud nueva se agrega aquí. Una decisión anterior solo se reemplaza si la propietaria lo ordena expresamente; si ocurre, la entrada vieja queda tachada con la fecha.
 
@@ -1429,6 +1429,109 @@ Cada línea de `orders.items` guarda, calculado por el servidor:
 
 **Estado:** ~~corregido y verificado en local. Sin commit, push ni despliegue (pendiente de aprobación).~~ Publicado el 2026-11-20 con aprobación expresa de la propietaria, en un commit independiente («fix: preserve checkout form state during availability updates»). Antes de publicar se agregó una prueba de doble envío: la consulta de disponibilidad termina mientras se envía el pedido, el botón sigue en «Enviando...» y, pese a 3 clics, sale un solo pedido (interceptado). Resultado: ALL OK a 1440 y 390. Verificación en producción: ver Historial.
 
+## 24. Navegación, paginación, iconos sociales y duración del carrusel (2026-11-21)
+
+| ID | Qué | Estado |
+|---|---|---|
+| NAV-PAG-01 | Paginación del catálogo: 10 productos por página | IMPLEMENTADO Y VERIFICADO (local). Sin publicar |
+| NAV-SOC-01 | Iconos propios de VIBE para Instagram y TikTok | IMPLEMENTADO Y VERIFICADO (local). Sin publicar |
+| NAV-SCR-01 | El sitio siempre empieza arriba al abrirse o recargarse | CORREGIDO Y PUBLICADO; ver §24.5 e Historial |
+| HERO-DUR-01 | Duración individual de cada imagen del carrusel principal | IMPLEMENTADO Y VERIFICADO (local). Sin publicar |
+
+### 24.1 Paginación del catálogo (NAV-PAG-01)
+
+**Reglas:**
+- **Orden:** se filtra (categoría, subcategoría, búsqueda y filtros), se ordena y recién entonces se divide en páginas de 10. Nunca se pagina antes de filtrar.
+- **Volver a la página 1:** pasa con cualquier cambio de filtro, categoría, búsqueda u orden, porque todos pasan por el mismo punto (`applyFiltersAndRender`).
+- **Cambiar de página:** conserva filtros y búsqueda, lleva al inicio de la sección de productos (no al inicio del sitio) y mueve el foco al contador, para que el lector de pantalla anuncie la página nueva.
+- **Contador:** «Mostrando 11–20 de 23 productos». Con una sola página no hay controles y el contador sigue como antes («N productos»).
+- **Controles:** «Anterior» y «Siguiente» se deshabilitan en los extremos; la página activa se marca con `aria-current`. Con más de 7 páginas se muestran la primera, la última y las vecinas de la actual, con «…».
+- **Móvil (≤ 640 px):** en lugar de los números se ve «2 / 3» entre «Anterior» y «Siguiente».
+- **Dónde se guarda la página:** en memoria, no en la URL. Al volver de una ficha se conserva; al recargar se vuelve a la página 1, coherente con §24.3.
+- **Sin cambios en:** tarjetas, la sección «Ofertas» (se muestra completa como antes), datos de productos, variantes, precios y promociones.
+
+**Archivos:** `js/app.js` (`renderProducts`, `renderPagination`, `pageWindow`), `index.html` (`#catalogPagination`) y `css/styles.css`.
+
+### 24.2 Iconos de Instagram y TikTok (NAV-SOC-01)
+
+**Diseño:**
+- **Instagram:** marco crema de trazo fino, lente rosa VIBE (`#FF007A`) y punto rosa claro.
+- **TikTok:** nota musical geométrica de trazo crema, con desplazamientos discretos en turquesa y rosa.
+- **Baldosa:** negra con un brillo de marca (rosa en Instagram, turquesa en TikTok) en lugar del degradado genérico de Instagram. El brillo al pasar el cursor de Instagram pasa a rosa VIBE.
+
+**Implementación:**
+- **SVG propio:** un único sprite (`<symbol id="vibeIgGlyph">` y `<symbol id="vibeTtGlyph">`), oculto para lectores de pantalla.
+- **Mismos glifos en los dos lugares:** bloque «VIBE EN REDES» a 26 px (23 px en móvil) y pie («Explora») a 16 px.
+- **Sin cambios en:** textos, enlaces oficiales, apertura en pestaña nueva con `noopener noreferrer`, etiquetas accesibles, foco de teclado y distribución.
+- Sin emojis ni imágenes externas.
+
+**Archivos:** `index.html`, `css/styles.css` y `scripts/test-social-buttons.js` (actualizado al nuevo diseño).
+
+### 24.3 Inicio de página al abrir o recargar (NAV-SCR-01)
+
+**Causa raíz:**
+1. Toda URL que escribe el catálogo termina en `#catalogo` o `#discover` (`buildUrl`, desde la Fase 8, para compartir enlaces filtrados). Al abrir un enlace así, o al recargar después de usar filtros o abrir una ficha, el navegador saltaba a esa ancla, a mitad de página.
+2. La restauración automática de scroll del navegador devolvía la posición anterior al recargar.
+
+**Reproducido con el código anterior:** un enlace `?q=Rubor#catalogo` abría en scrollY 2029 (1440) y 1119 (390). Recargar estando en el pie volvía a mitad de página.
+
+**Solución (`js/app.js`, una sola vez al cargar, no en cada render):**
+- `history.scrollRestoration = "manual"`;
+- se quita solo el fragmento de la URL, conservando búsqueda y filtros;
+- `scrollTo(0, 0)`.
+
+**Navegación interna sin cambios:** filtros, búsqueda (sin saltos), ficha, carrito y cambio de página. Ningún otro sitio enlaza a secciones de `index.html`, así que no se pierde ningún destino.
+
+**Limitación:** la ancla de los enlaces compartidos ya no desplaza hasta el catálogo; los filtros sí se aplican. Es lo pedido: siempre empezar arriba.
+
+### 24.4 Duración individual del carrusel (HERO-DUR-01)
+
+**Persistencia (sin migración):**
+- Campo opcional `duration`, en segundos enteros, dentro del manifiesto JSON existente del carrusel (`hero/slides.json` en Storage). Es el mismo mecanismo de siempre; no hay tabla SQL.
+- Rango válido: **2 a 30 s**.
+- Vacío (`null`) usa la predeterminada de **5 s**, la que ya tenía el carrusel.
+- Las imágenes existentes no tienen `duration`: siguen con 5 s. No se asignó ninguna duración.
+
+**Validación:**
+- **Servidor:** 400 en POST y PATCH, sin escribir.
+- **Admin:** mensaje propio, sin enviar.
+- **Público:** un valor corrupto se ignora y se usa la predeterminada.
+
+**Carrusel:**
+- Un único `setTimeout` a la vez, programado con la duración de la pieza visible; siempre se limpia antes de programar otro.
+- Al vencer avanza; después de la última vuelve a la primera.
+- La interacción manual (flechas, puntos, deslizar) reinicia el temporizador con la duración de la pieza visible.
+- Con `prefers-reduced-motion`, sin avance automático, como antes.
+- La transición visual no cambió.
+- El carrusel no tiene pausa manual (no existía antes) y vive mientras la página esté abierta, así que no hay desmontaje que limpiar.
+
+**Admin:**
+- Campo «Duración en el carrusel (segundos)» en el formulario de cada imagen.
+- La tabla muestra «Duración: 8 s» o «Duración: Predeterminada (5 s)».
+- Cambiar una imagen solo afecta a esa imagen.
+
+**Archivos:** `api/_lib/heroSlides.js`, `api/admin/hero-slides.js`, `js/hero-carousel.js`, `admin/admin.js` y `scripts/test-hero-lib.js` (lista de campos públicos).
+
+### 24.5 Pruebas
+
+- **Prueba nueva `scripts/test-hero-duration.mjs` (9):**
+  - validación;
+  - forma pública y slides existentes;
+  - persistencia con el handler real del Admin y Storage simulado (guardar, recargar, volver a vacío, rechazo sin escritura, slide nuevo);
+  - regla del carrusel y temporizador único;
+  - validación real del formulario del Admin.
+- **Suite completa:** 49 scripts, **1034 aprobadas y 0 fallidas**.
+- **Navegador real, con API simulada y sin pedidos (ALL OK):**
+  - **Paginación**, a 1440, 768 y 390: página 1, siguiente, última, anterior, controles deshabilitados, página activa, indicador móvil, búsqueda que vuelve a la página 1 y se conserva al paginar, una sola página sin controles, ficha con precio propio y promoción en la página 2 y página conservada al cerrar la ficha.
+  - **Iconos** en el bloque y el pie, con sus enlaces.
+  - **Inicio de página**, a 1440 y 390: enlace con ancla, recarga desde el pie, pestaña nueva y búsqueda sin saltos.
+  - **Carrusel:** 2 s, 3 s y 5 s medidos (2007, 3002 y 5011 ms) y vuelta a la primera; 4 clics manuales dejan un solo avance automático; con movimiento reducido no avanza.
+  - **Admin**, a 1440 y 390: tabla con la duración de cada imagen, campo vacío con la predeterminada, 45 s rechazado, 12 s guardado solo en esa imagen y lista actualizada.
+- **Regresión en navegador:** tienda con y sin promoción (precios por variante) y checkout (§23): ALL OK.
+- **Capturas:** `Catalogo VIBE/entregables-navegacion/`.
+
+**Estado:** ~~implementado y verificado en local. Sin commit, push ni despliegue (pendiente de aprobación).~~ Publicado el 2026-11-21 con autorización expresa de la propietaria (commit «feat: add catalog pagination, VIBE social icons, top-of-page start and per-slide carousel durations»). Verificación en producción: ver Historial. Sin migración.
+
 ## Historial
 
 - **2026-10-28 (Fase 57):**
@@ -1495,3 +1598,4 @@ Cada línea de `orders.items` guarda, calculado por el servidor:
 - **2026-11-20 (publicación del precio por variante, §22.3):** commit `3ee2f47` en `main`, desplegado en Production y verificado en `www.vibebeautycol.com` a 1440 y 390, sin crear pedidos ni modificar datos.
 - **2026-11-20 (checkout, §23):** corregida la pérdida de datos del formulario al terminar la consulta de disponibilidad (desde `b6ce13d`) y la respuesta tardía de consultas anteriores. Verificado en local a 1440 y 390; suite 1025/0. Sin publicar.
 - **2026-11-20 (publicación del checkout, §23):** commit `181cbd5` en `main`, desplegado en Production (Vercel, estado success); `js/app.js` de producción idéntico al commit. Verificado en `www.vibebeautycol.com` a 1440 y 390 con navegador real y pedidos interceptados: escenarios 1–5, agotados, respuesta tardía, validación, 409 y doble envío (ALL OK), y con el catálogo real, llenando el formulario sin esperar a que termine la consulta: los datos se conservan. Sin pedidos reales ni cambios de datos.
+- **2026-11-21 (navegación, §24):** paginación de 10 productos, iconos propios de Instagram y TikTok, inicio de página al abrir o recargar (causa: ancla #catalogo en la URL y restauración de scroll) y duración individual del carrusel (campo opcional en el manifiesto, sin migración). Verificado en local; suite 1034/0. Sin publicar.

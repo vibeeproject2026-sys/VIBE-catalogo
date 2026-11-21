@@ -1743,6 +1743,19 @@ async function loadHeroSlides() {
   renderHeroTable();
 }
 
+// Duración por imagen del carrusel (mismo rango que el servidor,
+// api/_lib/heroSlides.js; predeterminada = la del carrusel, 5 s).
+const HERO_DURATION_MIN = 2;
+const HERO_DURATION_MAX = 30;
+const HERO_DEFAULT_DURATION = 5;
+const parseHeroDuration = (raw) => {
+  const t = String(raw ?? "").trim();
+  if (!t) return { value: null, invalid: false };
+  const n = /^\d+$/.test(t) ? Number(t) : NaN;
+  return Number.isInteger(n) && n >= HERO_DURATION_MIN && n <= HERO_DURATION_MAX ? { value: n, invalid: false } : { value: null, invalid: true };
+};
+const heroDurationLabel = (s) => (Number.isInteger(s.duration) ? `${s.duration} s` : `Predeterminada (${HERO_DEFAULT_DURATION} s)`);
+
 function heroContentSummary(s) {
   const parts = [s.title, s.eyebrow, s.subtitle].filter(Boolean);
   return parts.length ? esc(parts[0]) : `<span class="section-hint">Sin texto (solo imagen)</span>`;
@@ -1758,6 +1771,7 @@ function renderHeroTable() {
         <td class="hero-content-cell">
           <span class="prod-name">${heroContentSummary(s)}</span>
           ${s.ctaText ? `<span class="section-hint">CTA: ${esc(s.ctaText)} → ${esc(s.ctaHref || "#catalogo")}</span>` : ""}
+          <span class="section-hint hero-duration" data-hero-duration="${esc(s.id)}">Duración: ${heroDurationLabel(s)}</span>
         </td>
         <td>
           <div class="reorder-btns">
@@ -2090,7 +2104,7 @@ function openHeroEdit(slide) {
         <p id="heroMobileStatus" class="image-status"></p>
       </div>
     </div>
-    <form id="heroEditForm" class="edit-form">
+    <form id="heroEditForm" class="edit-form" novalidate>
       <h2>Contenido (todo opcional — un slide puede ser solo imagen)</h2>
       <label>Eyebrow<input name="eyebrow" value="${esc(s.eyebrow || "")}" placeholder="Ej. NUEVA COLECCIÓN"></label>
       <label>Título<input name="title" value="${esc(s.title || "")}" placeholder="Déjalo vacío si el slide es solo imagen."></label>
@@ -2101,6 +2115,10 @@ function openHeroEdit(slide) {
       </div>
       ${heroLinkFieldsetHtml(s)}
       <label>Texto alternativo (accesibilidad)<input name="alt" value="${esc(s.alt || "")}" placeholder="Describe la imagen para lectores de pantalla."></label>
+      <label>Duración en el carrusel (segundos)
+        <input name="duration" type="number" inputmode="numeric" min="${HERO_DURATION_MIN}" max="${HERO_DURATION_MAX}" step="1" value="${Number.isInteger(s.duration) ? s.duration : ""}" placeholder="${HERO_DEFAULT_DURATION} (predeterminada)" aria-describedby="heroDurationHelp">
+      </label>
+      <p class="section-hint" id="heroDurationHelp">De ${HERO_DURATION_MIN} a ${HERO_DURATION_MAX} segundos. Vacío = usa la duración predeterminada del carrusel (${HERO_DEFAULT_DURATION} s). Cambiarla solo afecta a esta imagen.</p>
       <label class="checkbox-field"><input type="checkbox" name="active" ${s.active ? "checked" : ""}> Activo (visible en Home)</label>
       <div class="save-row">
         <span id="heroSaveStatus" class="save-status"></span>
@@ -2112,13 +2130,23 @@ function openHeroEdit(slide) {
 
   $("#heroEditForm").addEventListener("input", updateHeroPreview);
   $("#heroEditForm").addEventListener("input", updateHeroLinkVisibility);
+  // Al corregir la duración, el aviso de error anterior deja de mostrarse.
+  $("#heroEditForm").addEventListener("input", (e) => {
+    if (e.target.name === "duration" && /^No se guardó/.test($("#heroSaveStatus").textContent)) $("#heroSaveStatus").textContent = "";
+  });
   updateHeroLinkVisibility();
 
   $("#heroEditForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     const { linkType, linkTarget } = parseHeroLinkFromForm(fd);
+    const duration = parseHeroDuration(fd.get("duration"));
+    if (duration.invalid) {
+      $("#heroSaveStatus").textContent = `No se guardó: la duración debe ser un número entero de ${HERO_DURATION_MIN} a ${HERO_DURATION_MAX} segundos, o quedar vacía.`;
+      return;
+    }
     const fields = {
+      duration: duration.value,
       eyebrow: fd.get("eyebrow") || null,
       title: fd.get("title") || null,
       subtitle: fd.get("subtitle") || null,

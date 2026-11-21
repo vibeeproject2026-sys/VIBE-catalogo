@@ -31,6 +31,9 @@ const {
   isSafeCtaHref,
   isValidLinkType,
   isValidLinkTarget,
+  isValidDuration,
+  DURATION_MIN,
+  DURATION_MAX,
   makeSlideId,
   nextOrder,
   pickSlideFields,
@@ -52,6 +55,10 @@ function validateLinkFields(fields) {
   }
   return null;
 }
+
+// Duración propia del slide: segundos enteros entre DURATION_MIN y
+// DURATION_MAX, o null para usar la predeterminada del carrusel.
+const DURATION_ERROR = `Duración no válida. Usa un número entero de ${DURATION_MIN} a ${DURATION_MAX} segundos, o déjala vacía para usar la predeterminada.`;
 
 module.exports = async function handler(req, res) {
   if (!["GET", "POST", "PATCH", "DELETE"].includes(req.method)) {
@@ -87,6 +94,7 @@ module.exports = async function handler(req, res) {
     }
     const linkError = validateLinkFields(fields);
     if (linkError) return sendError(res, 400, linkError);
+    if (!isValidDuration(fields.duration)) return sendError(res, 400, DURATION_ERROR);
     try {
       const slides = await loadSlides(env);
       const now = new Date().toISOString();
@@ -109,6 +117,7 @@ module.exports = async function handler(req, res) {
         // en su primer guardado, aunque SLIDE_FIELDS ya lo permita.
         linkType: fields.linkType ?? null,
         linkTarget: fields.linkTarget ?? null,
+        duration: fields.duration ?? null,
         createdAt: now,
         updatedAt: now,
       };
@@ -187,6 +196,7 @@ module.exports = async function handler(req, res) {
     }
     const linkError = validateLinkFields(fields);
     if (linkError) return sendError(res, 400, linkError);
+    if ("duration" in fields && !isValidDuration(fields.duration)) return sendError(res, 400, DURATION_ERROR);
     const updated = { ...slides[index], ...fields, updatedAt: new Date().toISOString() };
     const next = [...slides];
     next[index] = updated;

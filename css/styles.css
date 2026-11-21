@@ -290,15 +290,18 @@ header.scrolled .logo-image{width:128px}
 .social-button{display:flex;align-items:center;gap:14px;min-width:236px;min-height:72px;padding:12px 20px 12px 12px;border:1px solid #ffffff26;border-radius:18px;background:linear-gradient(180deg,#1b1b1b,#101010);color:#fff;text-align:left;transition:transform .25s ease,box-shadow .25s ease,border-color .25s ease}
 .social-icon{display:grid;place-items:center;flex-shrink:0;width:48px;height:48px;border-radius:14px}
 .social-icon svg{display:block}
-.social-instagram .social-icon{background:radial-gradient(circle at 30% 107%,#fdf497 0%,#fdf497 5%,#fd5949 45%,#d6249f 60%,#285aeb 90%)}
-.social-tiktok .social-icon{background:#000;box-shadow:inset 0 0 0 1px #ffffff26}
+/* Iconos propios de VIBE (glifos en el sprite #vibeIgGlyph/#vibeTtGlyph):
+   baldosa negra con un brillo de marca, sin el degradado genérico de la red. */
+.svg-sprite{position:absolute;width:0;height:0;overflow:hidden}
+.social-instagram .social-icon{background:radial-gradient(circle at 28% 22%,#ff007a3d,#0b0b0b 68%);box-shadow:inset 0 0 0 1px #ff007a59}
+.social-tiktok .social-icon{background:radial-gradient(circle at 72% 80%,#25f4ee29,#0b0b0b 66%);box-shadow:inset 0 0 0 1px #ffffff26}
 .social-text{display:flex;flex-direction:column;flex:1;line-height:1.15}
 .social-kicker{font-size:10px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:var(--pink)}
 .social-tiktok .social-kicker{color:#25f4ee}
 .social-name{font-size:18px;font-weight:800;letter-spacing:-.01em}
 .social-arrow{font-size:18px;color:#ffffff80;transition:transform .25s ease,color .25s ease}
 .social-button:hover{transform:translateY(-3px)}
-.social-instagram:hover{border-color:#d6249f;box-shadow:0 14px 34px -14px #d6249fb3}
+.social-instagram:hover{border-color:var(--pink);box-shadow:0 14px 34px -14px #ff007ab3}
 .social-tiktok:hover{border-color:#25f4ee80;box-shadow:-8px 12px 30px -16px #25f4eeb3,8px 14px 30px -16px #fe2c55b3}
 .social-button:hover .social-arrow{transform:translateX(3px);color:#fff}
 .social-button:focus{outline:none}
@@ -359,6 +362,19 @@ header.scrolled .logo-image{width:128px}
    fila) — mobile se mantiene en 2 columnas (@media max-width:900px,
    sin cambios). */
 .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:24px}
+/* Paginación del catálogo (10 por página): mismo lenguaje que las pestañas. */
+.pagination{display:flex;align-items:center;justify-content:center;gap:10px;margin:40px 0 8px}
+.page-numbers{display:flex;align-items:center;gap:6px;list-style:none;margin:0;padding:0}
+.page-number,.page-nav{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-width:44px;min-height:44px;padding:0 14px;border:1px solid #ddd;border-radius:999px;background:#fff;color:#111;font:inherit;font-size:13px;font-weight:700;cursor:pointer;transition:border-color .2s ease,background .2s ease,color .2s ease}
+.page-number{padding:0}
+.page-number:hover,.page-nav:not(:disabled):hover{border-color:var(--pink);color:var(--pink)}
+.page-number.active{background:var(--pink);border-color:var(--pink);color:#fff;cursor:default}
+.page-nav:disabled{opacity:.35;cursor:not-allowed}
+.page-number:focus-visible,.page-nav:focus-visible{outline:2px solid var(--pink);outline-offset:3px}
+.page-gap{min-width:20px;text-align:center;color:#999}
+.page-status{display:none;font-size:13px;font-weight:700;color:#555;min-width:56px;text-align:center}
+@media(max-width:640px){.pagination{gap:12px;margin-top:28px}.page-numbers{display:none}.page-status{display:inline-block}}
+@media(prefers-reduced-motion:reduce){.page-number,.page-nav{transition:none}}
 .card{min-width:0}
 /* Fase 36 — la card ganó una elevación sutil en hover (foto completa
    levantándose con una sombra suave), el mismo lenguaje que ya usaba

@@ -64,8 +64,16 @@ test("logos en SVG propio (decorativos para lectores de pantalla), sin emojis ni
     assert.doesNotMatch(b.body, /<img|https?:\/\/[^"]*\.(png|jpe?g|webp|svg)/);
     assert.doesNotMatch(b.body, /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u);
   }
-  assert.match(buttons[1].body, /<path id="tiktokGlyph" d="M12\.525\.02c/);
-  assert.match(buttons[1].body, /fill="#25F4EE"[\s\S]*fill="#FE2C55"[\s\S]*fill="#fff"/);
+  // Iconos propios de VIBE: un sprite con los dos glifos, usados por <use>.
+  assert.match(buttons[0].body, /<use href="#vibeIgGlyph"\/>/);
+  assert.match(buttons[1].body, /<use href="#vibeTtGlyph"\/>/);
+  const sprite = html.match(/<svg class="svg-sprite"[^>]*aria-hidden="true"[^>]*>[\s\S]*?<\/svg>/);
+  assert.ok(sprite, "sprite de iconos oculto para lectores de pantalla");
+  // Instagram: marco crema, lente rosa VIBE. TikTok: nota con acentos turquesa y rosa, trazo crema.
+  assert.match(sprite[0], /<symbol id="vibeIgGlyph"[\s\S]*stroke="#F5E6D8"[\s\S]*stroke="#FF007A"[\s\S]*<\/symbol>/);
+  assert.match(sprite[0], /<symbol id="vibeTtGlyph"[\s\S]*stroke="#25F4EE"[\s\S]*stroke="#FF007A"[\s\S]*stroke="#F5E6D8"[\s\S]*<\/symbol>/);
+  assert.doesNotMatch(sprite[0], /<img|https?:\/\/[^"]*\.(png|jpe?g|webp|svg)|<script/);
+  assert.match(css, /\.svg-sprite\{position:absolute;width:0;height:0;overflow:hidden\}/);
 });
 test("textos visibles: «Síguenos» + nombre de la red", () => {
   assert.match(buttons[0].body, /<span class="social-kicker">Síguenos<\/span><span class="social-name">Instagram<\/span>/);
@@ -96,9 +104,9 @@ test("Explora conserva Instagram y agrega TikTok a continuación, con sus destin
     assert.match(i.attrs, /target="_blank" rel="noopener noreferrer"/);
     assert.match(i.body, /^<svg class="footer-social-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"/);
   }
-  // El icono de TikTok del pie reutiliza el mismo trazo del botón principal.
-  assert.match(items[4].body, /<use href="#tiktokGlyph"\/>/);
-  assert.match(html, /<path id="tiktokGlyph" d="/);
+  // Los iconos del pie son los mismos glifos del bloque principal, en tamaño reducido.
+  assert.match(items[3].body, /<use href="#vibeIgGlyph"\/>/);
+  assert.match(items[4].body, /<use href="#vibeTtGlyph"\/>/);
   assert.match(css, /\.footer-social-icon\{flex-shrink:0;margin-right:8px\}/);
 });
 
