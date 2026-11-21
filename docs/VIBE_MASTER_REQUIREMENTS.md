@@ -1580,10 +1580,10 @@ Cada línea de `orders.items` guarda, calculado por el servidor:
 
 | ID | Qué | Estado |
 |---|---|---|
-| IMG-OPT-01 | Optimización automática de toda imagen subida desde Admin (producto y carrusel) | IMPLEMENTADO; ver Estado |
-| IMG-OPT-02 | Optimización controlada de las imágenes ya publicadas | Ver §26.2 e Historial |
-| SRCH-KW-01 | Las palabras clave de Admin sirven para buscar en la tienda | CORREGIDO; ver Estado |
-| GRID-01 | Cada página del catálogo muestra sus 10 productos en filas completas | CORREGIDO; ver Estado |
+| IMG-OPT-01 | Optimización automática de toda imagen subida desde Admin (producto y carrusel) | PUBLICADO (`a9720fe`); ver Historial |
+| IMG-OPT-02 | Optimización controlada de las imágenes ya publicadas | COMPLETADO EN PRODUCCIÓN; ver Historial |
+| SRCH-KW-01 | Las palabras clave de Admin sirven para buscar en la tienda | PUBLICADO (`a9720fe`); ver Historial |
+| GRID-01 | Cada página del catálogo muestra sus 10 productos en filas completas | PUBLICADO (`a9720fe`); ver Historial |
 
 ### 26.1 Optimización automática al subir (IMG-OPT-01)
 
@@ -1746,3 +1746,14 @@ Resultados: ver Historial.
 - **2026-11-21 (publicación de §24):** commit `ba91d2c` en `main`, desplegado en Production (Vercel, estado success); `js/app.js`, `js/hero-carousel.js`, `index.html`, `css/styles.css` y `admin/admin.js` de producción idénticos al commit. Verificado en `www.vibebeautycol.com` a 1440, 768 y 390 con datos controlados en el navegador (paginación, búsqueda, iconos y enlaces, inicio arriba, carrusel de 2, 3 y 5 s, temporizador único, movimiento reducido y Admin con API simulada): ALL OK. Con datos reales: 64 productos en 7 páginas, sin repetir ni omitir; inicio arriba; las 3 piezas reales del carrusel (sin duración propia, `duration: null`) siguen en 5 s. Sin pedidos, sin escrituras en producción y sin migraciones.
 - **2026-11-21 (fichas de producto, §25):** caso Acne Patch. Causa: la API pública del catálogo tenía caché de 5 min en la CDN, más 10 min de contenido viejo durante la revalidación y 60 s en el navegador; la ficha mostraba una versión intermedia (solo imágenes) mientras la propietaria completaba los datos. Se baja a 30 s y la búsqueda ignora tildes. Ver §25.
 - **2026-11-21 (publicación de §25):** commit `5f7c50f` en `main`, desplegado en Production (Vercel, estado success); `js/taxonomy.js` de producción idéntico al commit. La API de productos responde con caché de 30 s como máximo (antes, entre 293 y 339 s). Verificado en `www.vibebeautycol.com` con datos reales a 1440, 768 y 390: Acne Patch completo (búsqueda «acne», descripción, 4 imágenes, 4 presentaciones con su precio, carrito y checkout interceptado) y barrido de las 65 fichas completas, sin errores de consola. Sin pedidos ni escrituras en producción.
+- **2026-11-21 (publicación de §26):**
+  - **Publicación:** commit `a9720fe` en `main`, desplegado en Production (Vercel, success); `admin/admin.js`, `js/data-source.js`, `js/taxonomy.js`, `js/app.js` y `css/styles.css` de producción idénticos al commit.
+  - **Verificación en `www.vibebeautycol.com`, datos reales, a 1440, 1024, 768 y 390:** 10 productos en filas completas; las 7 páginas recorren los 69 productos sin repetir ni ocultar; «Set de Brochas» encuentra Makeup Brush Set (antes, 0 resultados); sin errores de consola.
+  - **Imágenes existentes, primera pasada:** 168 imágenes, 432 versiones WebP subidas a `optimized/…` y verificadas (233,1 MB de originales → 14,2 MB en la versión mayor, −94 %; PSNR ≥ 36 dB); originales intactos (sha256 igual antes y después).
+  - **Segunda pasada** (productos agregados mientras tanto): 4 imágenes y 10 versiones.
+  - **Manifiesto:** 19 → 191 entradas, con las anteriores intactas.
+  - **Respaldos verificados:** `config/image-variants.backup-2026-11-21T22-18-49-989Z.json` y `config/image-variants.backup-2026-11-21T22-20-31-120Z.json`.
+  - **Resultado:** la API sirve versiones optimizadas para 183 de 188 imágenes. Medido con red 4G simulada, las imágenes visibles del catálogo pasan de 10,5 s y 13,3 MB (originales) a 1,1 s y 0,58 MB en escritorio, y de 10,1 s a 1,7 s en móvil.
+  - **Excepciones:** la imagen principal de 113 y las 4 adicionales de 135 tienen textura muy fina y ninguna versión alcanzó PSNR 36 dB; conservan el original.
+  - **Duplicados (no se borraron):** las 4 imágenes adicionales de 135 son el mismo archivo subido 4 veces (sha256 idéntico).
+  - Sin cambios en POS, base de datos, productos, precios ni pedidos; ningún original se modificó ni borró.
