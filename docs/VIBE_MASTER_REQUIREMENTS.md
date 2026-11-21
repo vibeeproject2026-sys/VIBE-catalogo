@@ -1433,10 +1433,10 @@ Cada línea de `orders.items` guarda, calculado por el servidor:
 
 | ID | Qué | Estado |
 |---|---|---|
-| NAV-PAG-01 | Paginación del catálogo: 10 productos por página | IMPLEMENTADO Y VERIFICADO (local). Sin publicar |
-| NAV-SOC-01 | Iconos propios de VIBE para Instagram y TikTok | IMPLEMENTADO Y VERIFICADO (local). Sin publicar |
+| NAV-PAG-01 | Paginación del catálogo: 10 productos por página | PUBLICADO; ver §24.5 e Historial |
+| NAV-SOC-01 | Iconos propios de VIBE para Instagram y TikTok | PUBLICADO; ver §24.5 e Historial |
 | NAV-SCR-01 | El sitio siempre empieza arriba al abrirse o recargarse | CORREGIDO Y PUBLICADO; ver §24.5 e Historial |
-| HERO-DUR-01 | Duración individual de cada imagen del carrusel principal | IMPLEMENTADO Y VERIFICADO (local). Sin publicar |
+| HERO-DUR-01 | Duración individual de cada imagen del carrusel principal | PUBLICADO; ver §24.5 e Historial |
 
 ### 24.1 Paginación del catálogo (NAV-PAG-01)
 
@@ -1599,3 +1599,4 @@ Cada línea de `orders.items` guarda, calculado por el servidor:
 - **2026-11-20 (checkout, §23):** corregida la pérdida de datos del formulario al terminar la consulta de disponibilidad (desde `b6ce13d`) y la respuesta tardía de consultas anteriores. Verificado en local a 1440 y 390; suite 1025/0. Sin publicar.
 - **2026-11-20 (publicación del checkout, §23):** commit `181cbd5` en `main`, desplegado en Production (Vercel, estado success); `js/app.js` de producción idéntico al commit. Verificado en `www.vibebeautycol.com` a 1440 y 390 con navegador real y pedidos interceptados: escenarios 1–5, agotados, respuesta tardía, validación, 409 y doble envío (ALL OK), y con el catálogo real, llenando el formulario sin esperar a que termine la consulta: los datos se conservan. Sin pedidos reales ni cambios de datos.
 - **2026-11-21 (navegación, §24):** paginación de 10 productos, iconos propios de Instagram y TikTok, inicio de página al abrir o recargar (causa: ancla #catalogo en la URL y restauración de scroll) y duración individual del carrusel (campo opcional en el manifiesto, sin migración). Verificado en local; suite 1034/0. Sin publicar.
+- **2026-11-21 (publicación de §24):** commit `ba91d2c` en `main`, desplegado en Production (Vercel, estado success); `js/app.js`, `js/hero-carousel.js`, `index.html`, `css/styles.css` y `admin/admin.js` de producción idénticos al commit. Verificado en `www.vibebeautycol.com` a 1440, 768 y 390 con datos controlados en el navegador (paginación, búsqueda, iconos y enlaces, inicio arriba, carrusel de 2, 3 y 5 s, temporizador único, movimiento reducido y Admin con API simulada): ALL OK. Con datos reales: 64 productos en 7 páginas, sin repetir ni omitir; inicio arriba; las 3 piezas reales del carrusel (sin duración propia, `duration: null`) siguen en 5 s. Sin pedidos, sin escrituras en producción y sin migraciones.
