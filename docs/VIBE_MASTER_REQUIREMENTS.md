@@ -1384,8 +1384,50 @@ Cada línea de `orders.items` guarda, calculado por el servidor:
 - **Admin de producción** (API simulada en el navegador): detalle de líneas con base, origen, promoción, descuento, unitario final, cantidad y subtotal; el pedido histórico se ve como antes.
 - **No verificado en producción, por diseño:** la escritura real de los campos de auditoría en `orders.items`. Exigiría registrar un pedido real. Está verificada con el handler real y la base simulada (P12, P15 y la prueba en navegador de §22.2).
 - **Sin cambios:** POS, precios, variantes, inventario, pedidos existentes, integraciones de pago, label y redes.
-- **Observación previa, no corregida (fuera de alcance):** al abrir el checkout, el formulario se vuelve a dibujar cuando termina la consulta de disponibilidad (`openCheckout`, desde `b6ce13d`). Lo escrito en ese intervalo, normalmente menos de un segundo, se pierde.
+- **Observación previa, ~~no corregida (fuera de alcance)~~ corregida en local el 2026-11-20 (ver §23):** al abrir el checkout, el formulario se vuelve a dibujar cuando termina la consulta de disponibilidad (`openCheckout`, desde `b6ce13d`). Lo escrito en ese intervalo, normalmente menos de un segundo, se pierde.
 - **Capturas:** `Catalogo VIBE/entregables-precio-variante/produccion/`.
+
+## 23. Checkout: los datos escritos no se pierden (CHK-KEEP, 2026-11-20)
+
+| ID | Qué | Estado |
+|---|---|---|
+| CHK-KEEP-01 | Lo que la clienta escribe en el checkout se conserva aunque terminen consultas de disponibilidad, se actualice el resumen, se quite una línea o el servidor responda 409 | CORREGIDO Y PUBLICADO; ver Estado e Historial |
+
+**Problema:** presente desde `b6ce13d`. Si la clienta empezaba a escribir antes de que terminara la consulta de disponibilidad del checkout, perdía todo lo escrito: campos, autorización y foco.
+
+**Causa raíz:**
+- **Dónde viven los datos:** solo en los campos del formulario. No hay otra copia; se leen con `FormData` al enviar.
+- **Qué los borraba:** `openCheckout` dibujaba el formulario, esperaba `refreshAvailability()` (consulta real al catálogo) y luego llamaba otra vez a `renderCheckoutForm()`, que reemplaza todo `#checkoutBody` (resumen y formulario) con HTML nuevo y vacío.
+- **Mismo efecto, por acción de la clienta:** quitar una línea desde el checkout.
+- **Problema relacionado, a nivel de datos:** si la clienta cerraba y reabría el checkout, la respuesta tardía de una consulta anterior podía pisar la disponibilidad más reciente. En la prueba, un producto disponible quedaba marcado como agotado sin que se viera.
+
+**Solución (`js/app.js`, solo el checkout):**
+- **El formulario no se reemplaza:** al terminar la consulta, y al quitar una línea, se actualizan solo el resumen y el estado del botón (`rerenderCheckoutSummary`), sin tocar el formulario. Valores, autorización, errores de validación y foco quedan intactos. El render completo se mantiene solo al abrir el checkout, con el carrito vacío o después de la confirmación, como antes.
+- **Solo vale la consulta más reciente:** `refreshAvailability` y cada apertura del checkout llevan un número de secuencia. Una respuesta más vieja se descarta y no pisa ni el estado ni la pantalla.
+- **Durante el envío del pedido** no se modifica el botón, para evitar un doble envío.
+- **Sin cambios en:**
+  - la consulta de disponibilidad: sigue igual, una por apertura, sin duplicados;
+  - la validación;
+  - el 409 `PRICE_CHANGED`;
+  - pagos, precios y promociones.
+- **No se guardan datos personales** en el navegador.
+
+**Pruebas:**
+- **Navegador real con API simulada** (consulta pendiente a voluntad, pedido interceptado), a **1440 y 390**: escenarios 1 a 5 y respuesta tardía. Resultado: **ALL OK**.
+  - escribir con la consulta pendiente, incluso cuando la respuesta llega a mitad de una palabra: el texto y el foco se conservan;
+  - todos los campos llenos antes de la respuesta;
+  - producto agotado tras la consulta: aparece el mensaje y el envío se bloquea, con los datos intactos; al quitar la línea se puede enviar;
+  - respuesta tardía de una apertura anterior;
+  - validación con correo vacío y luego corregido;
+  - 409 `PRICE_CHANGED`;
+  - envío completo (interceptado), con exactamente los datos escritos y el total mostrado.
+- **Mismo script con el código anterior:** falla. Reproduce la pérdida de datos y la respuesta tardía.
+- **Regresión:**
+  - suite completa: 48 scripts, **1025 aprobadas y 0 fallidas**;
+  - pruebas de navegador de tienda y checkout con y sin promoción (precios por variante): ALL OK.
+- **Capturas:** `Catalogo VIBE/entregables-checkout/`.
+
+**Estado:** ~~corregido y verificado en local. Sin commit, push ni despliegue (pendiente de aprobación).~~ Publicado el 2026-11-20 con aprobación expresa de la propietaria, en un commit independiente («fix: preserve checkout form state during availability updates»). Antes de publicar se agregó una prueba de doble envío: la consulta de disponibilidad termina mientras se envía el pedido, el botón sigue en «Enviando...» y, pese a 3 clics, sale un solo pedido (interceptado). Resultado: ALL OK a 1440 y 390. Verificación en producción: ver Historial.
 
 ## Historial
 
@@ -1451,3 +1493,4 @@ Cada línea de `orders.items` guarda, calculado por el servidor:
 - **2026-11-20 (precio por variante, §22):** precio propio opcional por tono o presentación, de extremo a extremo (Admin, ficha, carrito, checkout, pedido y detalle en el Admin), con el servidor como autoridad. Sin migración. Implementado y verificado en local, sin publicar.
 - **2026-11-20 (ajuste final del precio por variante, §22.1–22.2):** la promoción vigente del POS se aplica también sobre el precio propio, con la misma proporción, una sola vez y redondeada al peso (reemplaza la regla anterior, que queda tachada en VPR-02). Cada línea del pedido guarda base, origen, promoción, descuento, unitario final, cantidad y subtotal, y el Admin los muestra. Sin migración y sin cambios en el POS. Suite: 1025 aprobadas y 0 fallidas. Sin publicar.
 - **2026-11-20 (publicación del precio por variante, §22.3):** commit `3ee2f47` en `main`, desplegado en Production y verificado en `www.vibebeautycol.com` a 1440 y 390, sin crear pedidos ni modificar datos.
+- **2026-11-20 (checkout, §23):** corregida la pérdida de datos del formulario al terminar la consulta de disponibilidad (desde `b6ce13d`) y la respuesta tardía de consultas anteriores. Verificado en local a 1440 y 390; suite 1025/0. Sin publicar.

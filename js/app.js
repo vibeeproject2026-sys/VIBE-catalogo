@@ -1553,9 +1553,15 @@ function clearCheckoutAttempt() {
 // (availabilityStale) y se sigue con el último estado conocido; cerrar
 // por completo esa ventana requeriría una reserva/lock real del lado del
 // servidor, fuera de alcance de esta fase (regla 6/15).
+// Solo la consulta más reciente aplica su resultado: una respuesta que
+// llega después de otra más nueva se descarta (→ null), para que nunca
+// pise un estado más reciente.
+let availabilitySeq = 0;
 async function refreshAvailability() {
+  const seq = ++availabilitySeq;
   try {
     const fresh = await getProducts();
+    if (seq !== availabilitySeq) return null;
     // Fase 56 — se refresca el producto completo (precio, promoción, tonos
     // y disponibilidad), no solo "available"; un producto que ya no viene
     // en el catálogo queda fuera (su línea se marca no disponible).
@@ -1564,6 +1570,7 @@ async function refreshAvailability() {
     renderCart();
     return true;
   } catch (e) {
+    if (seq !== availabilitySeq) return null;
     console.error("[VIBE] No se pudo revalidar disponibilidad en tiempo real antes del checkout; se usa el último estado conocido.", e);
     return false;
   }
@@ -1680,27 +1687,39 @@ function renderCheckoutForm({ availabilityStale = false } = {}) {
   }
 }
 
-function rerenderCheckoutSummary() {
+// Checkout sin pérdida de datos (corrige el problema presente desde
+// b6ce13d): lo que la clienta escribe vive solo en los campos del
+// formulario, así que una actualización (fin de la consulta de
+// disponibilidad, quitar una línea, 409 de precios) cambia SOLO el resumen
+// y el estado del botón; el nodo del formulario nunca se reemplaza.
+// Mientras se envía el pedido, el botón no se toca (evita doble envío).
+let checkoutSubmitting = false;
+function rerenderCheckoutSummary(availabilityStale = false) {
   const el = document.querySelector("#checkoutBody .checkout-summary");
-  if (!el) return renderCheckoutForm();
-  el.outerHTML = checkoutSummaryHtml(false);
   const lines = cartLinesWithAvailability();
+  // Sin formulario (confirmación) o carrito vacío: render completo, como antes.
+  if (!el || !$("#checkoutForm") || !lines.length) return renderCheckoutForm({ availabilityStale });
+  el.outerHTML = checkoutSummaryHtml(availabilityStale);
   const hasUnavailable = lines.some((l) => l.unavailable);
   const submitBtn = $("#checkoutSubmit");
-  if (submitBtn) {
-    submitBtn.disabled = hasUnavailable || !lines.length;
+  if (submitBtn && !checkoutSubmitting) {
+    submitBtn.disabled = hasUnavailable;
     submitBtn.textContent = hasUnavailable ? (lines.some((l) => l.unavailableReason === "option") ? "Corrige las opciones no disponibles para continuar" : "Quita los productos agotados para continuar") : "ENVIAR PEDIDO";
   }
 }
 
+// Cada apertura numera su consulta: una respuesta de una apertura anterior
+// que llegue tarde no pisa el estado más reciente.
+let checkoutOpenSeq = 0;
 async function openCheckout() {
+  const seq = ++checkoutOpenSeq;
   pendingPriceNotice = [];
   renderCheckoutForm();
   $("#checkoutDialog").showModal();
   const ok = await refreshAvailability();
   // Si mientras esperábamos la red la clienta ya cerró el diálogo (o
   // vació el carrito desde la confirmación), no pisar lo que ya se ve.
-  if ($("#checkoutDialog").open) renderCheckoutForm({ availabilityStale: !ok });
+  if (ok !== null && seq === checkoutOpenSeq && $("#checkoutDialog").open) rerenderCheckoutSummary(!ok);
 }
 
 $("#checkoutDialog").addEventListener("click", (e) => {
@@ -1714,7 +1733,7 @@ $("#checkoutDialog").addEventListener("click", (e) => {
   if (removeBtn) {
     removeFromCart(removeBtn.dataset.p, removeBtn.dataset.v);
     renderCart();
-    renderCheckoutForm();
+    rerenderCheckoutSummary();
     return;
   }
   if (e.target.id === "checkoutKeepShopping") {
@@ -1770,6 +1789,7 @@ $("#checkoutDialog").addEventListener("submit", async (e) => {
   // entre el click y la respuesta del servidor.
   submitBtn.disabled = true;
   submitBtn.textContent = "Enviando...";
+  checkoutSubmitting = true;
 
   try {
     const res = await fetch("/api/orders/create", {
@@ -1795,6 +1815,7 @@ $("#checkoutDialog").addEventListener("submit", async (e) => {
       // Fase 56 — precios o tonos cambiaron: se actualiza el resumen (sin
       // borrar el formulario) y la clienta confirma de nuevo con el total real.
       await refreshAvailability();
+      checkoutSubmitting = false;
       rerenderCheckoutSummary();
       if (errorEl) errorEl.textContent = payload.error;
       if (!$("#checkoutSubmit").disabled) $("#checkoutSubmit").textContent = "ENVIAR PEDIDO";
@@ -1819,6 +1840,8 @@ $("#checkoutDialog").addEventListener("submit", async (e) => {
     if (errorEl) errorEl.textContent = "No se pudo enviar tu pedido. Revisa tu conexión e intenta de nuevo.";
     submitBtn.disabled = false;
     submitBtn.textContent = "ENVIAR PEDIDO";
+  } finally {
+    checkoutSubmitting = false;
   }
 });
 
