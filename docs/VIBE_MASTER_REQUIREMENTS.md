@@ -1205,8 +1205,8 @@ Se extiende el sistema de variantes existente (Fase 57, §4). No hay un segundo 
 | VPR-06 | Pedido | IMPLEMENTADO Y VERIFICADO (local); ver «Detalle de VPR-06» |
 | VPR-07 | Seguridad | IMPLEMENTADO Y VERIFICADO (local); ver «Detalle de VPR-07» |
 | VPR-08 | Compatibilidad | VERIFICADO (local); ver «Detalle de VPR-08» |
-| VPR-09 | Promoción del POS sobre el precio de la variante (ajuste final, 2026-11-20) | IMPLEMENTADO Y VERIFICADO (local); ver §22.1 |
-| VPR-10 | Datos de auditoría y conciliación por línea de pedido (ajuste final, 2026-11-20) | IMPLEMENTADO Y VERIFICADO (local); ver §22.2 |
+| VPR-09 | Promoción del POS sobre el precio de la variante (ajuste final, 2026-11-20) | PUBLICADO Y VERIFICADO EN PRODUCCIÓN (`3ee2f47`); ver §22.1 y §22.3 |
+| VPR-10 | Datos de auditoría y conciliación por línea de pedido (ajuste final, 2026-11-20) | PUBLICADO (`3ee2f47`); escritura real verificada solo con base simulada, ver §22.3 |
 
 **Detalle de VPR-02 (regla de precio):**
 - **Orden:** el precio propio de la **presentación** elegida; si no tiene, el del **tono**; si ninguno, el **precio general** del POS. Ese es el **precio base** de la línea. Es la misma regla en `js/variants.js` (`optionPriceInfo`) y en `api/_lib/variants.js` (`optionPrice` y `linePrice`).
@@ -1365,7 +1365,27 @@ Cada línea de `orders.items` guarda, calculado por el servidor:
   - Admin.
   - Capturas `*-promo-*` y `admin-detalle-pedido.png` en `Catalogo VIBE/entregables-precio-variante/`.
 
-**Estado:** implementado y verificado en local. **Sin commit, push ni despliegue** (pendiente de aprobación expresa).
+**Estado:** ~~implementado y verificado en local. Sin commit, push ni despliegue (pendiente de aprobación expresa).~~ **Publicado** el 2026-11-20 con aprobación expresa de la propietaria. Ver §22.3.
+
+### 22.3 Publicación y verificación en producción (2026-11-20)
+
+- **Commit:** `3ee2f47` en `main` (12 archivos, todos de esta función). Despliegue de Production en Vercel completado y asociado a ese commit; `www.vibebeautycol.com` sirve exactamente los archivos del commit.
+- **Antes de publicar:** suite completa con 48 scripts, **1025 aprobadas y 0 fallidas**. Diff revisado sin cambios ajenos, sin secretos y sin archivos del POS.
+- **Datos reales del catálogo, solo lectura, a 1440 y 390:**
+  - hoy ningún producto tiene precio propio ni promoción vigente, y no se agregó ninguno: los productos con tonos (p. ej. Princess Blush) mantienen el precio general en tarjeta, ficha, carrito y checkout;
+  - el envío del pedido se interceptó en el navegador, sin pedido real.
+- **Código de producción con datos de prueba controlados** (catálogo simulado solo en el navegador; envío interceptado), a 1440 y 390:
+  - «Desde» en tarjetas;
+  - precio por tono con promoción (34.200 / 33.300 / 31.500, base tachada, −10 %);
+  - precio por presentación sin promoción (32.000 / 45.000);
+  - carrito y checkout con el precio de cada variante;
+  - el navegador no envía precios por línea.
+- **Servidor de producción:** una solicitud con total y precio manipulados (`expectedTotal: 1`, `price: 1`) para un producto real respondió **409 `PRICE_CHANGED`**, con el precio calculado por el servidor (18.200 × 2 = 36.400). El 409 ocurre antes de guardar: no se registró ningún pedido ni se envió aviso.
+- **Admin de producción** (API simulada en el navegador): detalle de líneas con base, origen, promoción, descuento, unitario final, cantidad y subtotal; el pedido histórico se ve como antes.
+- **No verificado en producción, por diseño:** la escritura real de los campos de auditoría en `orders.items`. Exigiría registrar un pedido real. Está verificada con el handler real y la base simulada (P12, P15 y la prueba en navegador de §22.2).
+- **Sin cambios:** POS, precios, variantes, inventario, pedidos existentes, integraciones de pago, label y redes.
+- **Observación previa, no corregida (fuera de alcance):** al abrir el checkout, el formulario se vuelve a dibujar cuando termina la consulta de disponibilidad (`openCheckout`, desde `b6ce13d`). Lo escrito en ese intervalo, normalmente menos de un segundo, se pierde.
+- **Capturas:** `Catalogo VIBE/entregables-precio-variante/produccion/`.
 
 ## Historial
 
@@ -1430,3 +1450,4 @@ Cada línea de `orders.items` guarda, calculado por el servidor:
 - **2026-11-20 (redes sociales, §21):** botones gráficos de Instagram y TikTok en «VIBE EN REDES» y TikTok en el pie, con los perfiles oficiales. LBL-06 pasa a publicado y verificado en producción (`fce3af7`).
 - **2026-11-20 (precio por variante, §22):** precio propio opcional por tono o presentación, de extremo a extremo (Admin, ficha, carrito, checkout, pedido y detalle en el Admin), con el servidor como autoridad. Sin migración. Implementado y verificado en local, sin publicar.
 - **2026-11-20 (ajuste final del precio por variante, §22.1–22.2):** la promoción vigente del POS se aplica también sobre el precio propio, con la misma proporción, una sola vez y redondeada al peso (reemplaza la regla anterior, que queda tachada en VPR-02). Cada línea del pedido guarda base, origen, promoción, descuento, unitario final, cantidad y subtotal, y el Admin los muestra. Sin migración y sin cambios en el POS. Suite: 1025 aprobadas y 0 fallidas. Sin publicar.
+- **2026-11-20 (publicación del precio por variante, §22.3):** commit `3ee2f47` en `main`, desplegado en Production y verificado en `www.vibebeautycol.com` a 1440 y 390, sin crear pedidos ni modificar datos.
