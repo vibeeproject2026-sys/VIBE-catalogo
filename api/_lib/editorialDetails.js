@@ -81,6 +81,33 @@ const SHADE_FIELDS = ["shades"];
 const MAX_SHADES = 40;
 const SHADE_ID = /^[a-z0-9][a-z0-9_-]{0,39}$/;
 const HEX = /^#[0-9a-f]{6}$/i;
+
+// Precio propio de una opción (tono o presentación), en pesos: entero
+// mayor que cero. Vacío o ausente → la opción usa el precio general del
+// producto. Cero, negativos, decimales o texto nunca valen como precio
+// (en particular, nunca «gratis»): el Admin los rechaza antes de guardar
+// (invalidOptionPrices) y aquí se descartan.
+const MAX_OPTION_PRICE = 100000000;
+const isBlankPrice = (v) => v === undefined || v === null || (typeof v === "string" && v.trim() === "");
+function optionPrice(v) {
+  const n = typeof v === "string" ? (/^\d+$/.test(v.trim()) ? Number(v.trim()) : NaN) : v;
+  return Number.isInteger(n) && n > 0 && n <= MAX_OPTION_PRICE ? n : null;
+}
+const withPrice = (raw) => {
+  const price = optionPrice(raw && raw.price);
+  return price != null ? { price } : {};
+};
+// Nombres de las opciones con un precio escrito pero no válido.
+function invalidOptionPrices(details) {
+  const d = details && typeof details === "object" ? details : {};
+  const bad = [];
+  for (const list of [d.shades, d.presentations]) {
+    for (const o of Array.isArray(list) ? list : []) {
+      if (o && typeof o === "object" && !isBlankPrice(o.price) && optionPrice(o.price) == null) bad.push(String(o.name || o.id || "sin nombre"));
+    }
+  }
+  return bad;
+}
 function sanitizeShades(input) {
   if (!Array.isArray(input)) return [];
   const seen = new Set();
@@ -97,6 +124,7 @@ function sanitizeShades(input) {
       hex: typeof raw.hex === "string" && HEX.test(raw.hex.trim()) ? raw.hex.trim().toLowerCase() : null,
       active: raw.active === true,
       order: Number.isInteger(raw.order) ? raw.order : out.length,
+      ...withPrice(raw),
     });
     if (out.length >= MAX_SHADES) break;
   }
@@ -111,9 +139,11 @@ function publicShades(shades) {
 // Fase 57 — presentaciones del producto (ej. «15 ml», «30 ml»,
 // «Individual»): dimensión independiente de los tonos. Lista de objetos
 // { id, name, active, order } que define la propietaria; nunca se generan
-// solas. Mismo criterio que los tonos: sin precio ni inventario propio
-// (el POS no los tiene), una inactiva no se puede comprar. Nombres únicos
-// sin distinguir mayúsculas/acentos/espacios.
+// solas. Mismo criterio que los tonos: sin inventario propio (el POS no
+// lo tiene), una inactiva no se puede comprar. Nombres únicos sin
+// distinguir mayúsculas/acentos/espacios.
+// Precio por opción: tonos y presentaciones admiten un `price` propio
+// opcional (ver optionPrice); sin él, la opción usa el precio general.
 const PRESENTATION_FIELDS = ["presentations"];
 const MAX_PRESENTATIONS = 20;
 const nameKey = (s) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim().toLowerCase();
@@ -129,7 +159,7 @@ function sanitizePresentations(input) {
     if (!SHADE_ID.test(id) || !name || /[<>]/.test(name) || seenIds.has(id) || seenNames.has(nameKey(name))) continue;
     seenIds.add(id);
     seenNames.add(nameKey(name));
-    out.push({ id, name, active: raw.active === true, order: Number.isInteger(raw.order) ? raw.order : out.length });
+    out.push({ id, name, active: raw.active === true, order: Number.isInteger(raw.order) ? raw.order : out.length, ...withPrice(raw) });
     if (out.length >= MAX_PRESENTATIONS) break;
   }
   return out.sort((a, b) => a.order - b.order).map((pr, i) => ({ ...pr, order: i }));
@@ -217,6 +247,9 @@ module.exports = {
   PRESENTATION_FIELDS,
   MAX_PRESENTATIONS,
   sanitizePresentations,
+  MAX_OPTION_PRICE,
+  optionPrice,
+  invalidOptionPrices,
   STRING_FIELDS,
   ARRAY_FIELDS,
   ALL_FIELDS,

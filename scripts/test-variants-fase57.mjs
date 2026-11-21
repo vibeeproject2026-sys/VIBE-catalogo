@@ -209,7 +209,8 @@ await test("precio desde el POS: toda combinación usa el precio vigente del pro
 console.log("Servidor — resolveSelection (ficha, nunca el navegador)");
 const opts = (info, text = null) => server.productOptions(details.parseDetails(JSON.stringify(info)), text);
 await test("las cuatro configuraciones con selección válida", () => {
-  assert.deepEqual(server.resolveSelection(opts({}), {}), { ok: true, variantId: "default", variantName: null, shadeId: null, shadeName: null, presentationId: null, presentationName: null });
+  // Precio por variante: optionPrice null = sin precio propio (se usa el general).
+  assert.deepEqual(server.resolveSelection(opts({}), {}), { ok: true, variantId: "default", variantName: null, shadeId: null, shadeName: null, presentationId: null, presentationName: null, optionPrice: null, optionPriceSource: null });
   assert.equal(server.resolveSelection(opts({ shades: SH, presentations: [PR[1]] }), { shadeId: "nude", presentationId: "30ml" }).variantName, "Nude · 30 ml");
   assert.equal(server.resolveSelection(opts({ shades: [SH[0]], presentations: PR }), { shadeId: "rojo", presentationId: "15ml" }).variantId, "s:rojo|p:15ml");
   assert.equal(server.resolveSelection(opts({ shades: SH, presentations: PR }), { shadeId: "rojo", presentationId: "30ml" }).variantName, "Rojo pasión · 30 ml");

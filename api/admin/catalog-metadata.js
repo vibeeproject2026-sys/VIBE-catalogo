@@ -16,7 +16,7 @@ const { getEnv } = require("../catalog/_lib/env");
 const { pgrestSelect } = require("../catalog/_lib/supabaseRead");
 const { upsertCatalogMetadata } = require("./_lib/adminWrite");
 const { pickEditorialFields } = require("./_lib/editorialFields");
-const { parseDetails, serializeDetails } = require("../_lib/editorialDetails");
+const { parseDetails, serializeDetails, invalidOptionPrices } = require("../_lib/editorialDetails");
 const { requireAdmin } = require("./_lib/auth");
 const { sendJson, sendError, methodNotAllowed } = require("../catalog/_lib/http");
 const { resolveCategoryGroup } = require("../catalog/_lib/categoryGroups");
@@ -128,6 +128,13 @@ module.exports = async function handler(req, res) {
   // objeto sin ningún campo real completado se guarda como null (nunca
   // un JSON de puros vacíos).
   if ("additional_info" in fields) {
+    // Precio por variante: un precio escrito pero no válido (cero, negativo,
+    // decimal o texto) se rechaza en vez de descartarse en silencio. Vacío
+    // = la opción usa el precio general.
+    const badPrices = invalidOptionPrices(fields.additional_info);
+    if (badPrices.length) {
+      return sendError(res, 400, `Precio no válido en: ${badPrices.join(", ")}. Usa un número entero mayor que cero, o déjalo vacío para usar el precio general.`);
+    }
     fields.additional_info = serializeDetails(fields.additional_info);
   }
 

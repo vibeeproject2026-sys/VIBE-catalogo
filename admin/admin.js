@@ -896,7 +896,8 @@ async function openEdit(productId) {
     <details class="admin-accordion" open>
       <summary>Tonos y presentaciones</summary>
       <div class="admin-accordion-body">
-        <p class="section-hint">Dos opciones independientes: configura solo las que este producto realmente tenga. Con <b>varias</b> opciones activas la clienta debe elegir antes de agregar al carrito; con <b>una sola</b> se muestra sin selector; <b>vacío</b> = sin selector. El POS no maneja precio ni inventario por opción: todas usan el precio y el stock del producto. Desactiva una opción cuando no haya unidades de ella.</p>
+        <p class="section-hint">Dos opciones independientes: configura solo las que este producto realmente tenga. Con <b>varias</b> opciones activas la clienta debe elegir antes de agregar al carrito; con <b>una sola</b> se muestra sin selector; <b>vacío</b> = sin selector. El POS no maneja inventario por opción: todas usan el stock del producto. Desactiva una opción cuando no haya unidades de ella.</p>
+        <p class="section-hint"><b>Precio por opción (opcional):</b> escribe un precio propio solo en las opciones que cuesten distinto; si lo dejas vacío, la opción usa el <b>precio general</b> del producto (${money(product.price)} en el POS). Si el producto tiene una promoción vigente en el POS, se aplica también sobre los precios propios, con el mismo porcentaje de descuento. Si un tono y una presentación tienen ambos precio propio, se cobra el de la <b>presentación</b>.</p>
         <h4 class="option-block-title">Tonos</h4>
         <p class="section-hint">Muestras circulares en la ficha pública. Un tono sin color queda <b>pendiente</b> y no se muestra.</p>
         <div id="shadeRows" class="shade-rows"></div>
@@ -1102,6 +1103,36 @@ async function openEdit(productId) {
   $("textarea[name=manufacturer_info]").value = d.manufacturerInfo || "";
   $("textarea[name=search_keywords]").value = arrayFieldToText(m.search_keywords);
 
+  // Precio por variante — precio propio opcional de cada opción. El campo
+  // se edita como texto (priceText): vacío = usa el precio general; un
+  // número entero > 0 = precio propio; cualquier otra cosa impide guardar.
+  const parseOptionPrice = (text) => {
+    const t = String(text ?? "").trim();
+    if (!t) return { price: null, invalid: false };
+    const n = /^\d+$/.test(t) ? Number(t) : NaN;
+    return Number.isInteger(n) && n > 0 && n <= 100000000 ? { price: n, invalid: false } : { price: null, invalid: true };
+  };
+  const priceStateHtml = (o) => {
+    const { price, invalid } = parseOptionPrice(o.priceText);
+    if (invalid) return `<span class="pill pill-warn">Precio no válido</span>`;
+    return price != null ? `<span class="pill pill-pink">Precio propio: ${money(price)}</span>` : `<span class="pill pill-muted">Usa el precio general (${money(product.price)})</span>`;
+  };
+  function optionPriceField(dim, i, o) {
+    if (o.priceText === undefined) o.priceText = Number.isInteger(o.price) && o.price > 0 ? String(o.price) : "";
+    const attr = dim === "shade" ? "data-shade-price" : "data-presentation-price";
+    return `<label class="shade-price">Precio propio<input name="${dim}_price" inputmode="numeric" value="${esc(o.priceText)}" ${attr}="${i}" placeholder="Precio general" aria-label="Precio propio de ${esc(o.name || "la opción")} (vacío = precio general)"></label>
+          <span class="option-price-state" data-price-state>${priceStateHtml(o)}</span>`;
+  }
+  function updateOptionPrice(o, input) {
+    o.priceText = input.value;
+    input.closest(".shade-row").querySelector("[data-price-state]").innerHTML = priceStateHtml(o);
+    markDirty();
+  }
+  const pricePayload = (o) => {
+    const { price } = parseOptionPrice(o.priceText ?? (Number.isInteger(o.price) ? String(o.price) : ""));
+    return price != null ? { price } : {};
+  };
+
   // Fase 56 — tonos (variantes de color). Borrador local; se guarda con el
   // resto de la ficha (additional_info.shades). Nunca toca el POS.
   let shadesDraft = Array.isArray(d.shades) ? d.shades.map((sh) => ({ ...sh })) : [];
@@ -1117,6 +1148,7 @@ async function openEdit(productId) {
           <span class="shade-dot${sh.hex ? "" : " shade-dot-empty"}" style="--shade:${esc(sh.hex || "#ffffff")}" aria-hidden="true"></span>
           <label class="shade-color">Color<input type="color" name="shade_color" value="${esc(sh.hex || "#cccccc")}" data-shade-color="${i}" aria-label="Color del tono ${esc(sh.name || i + 1)}"></label>
           <label class="shade-name">Nombre<input name="shade_name" value="${esc(sh.name || "")}" maxlength="40" data-shade-name="${i}" placeholder="Ej. Rojo pasión"></label>
+          ${optionPriceField("shade", i, sh)}
           <label class="checkbox-field shade-active"><input type="checkbox" name="shade_active" data-shade-active="${i}" ${sh.active ? "checked" : ""}> Activo</label>
           ${sh.hex ? "" : `<span class="pill pill-warn">Pendiente: elige un color</span>`}
           <span class="shade-tools">
@@ -1140,6 +1172,7 @@ async function openEdit(productId) {
   $("#shadeRows").addEventListener("input", (e) => {
     const t = e.target;
     if (t.dataset.shadeName !== undefined) shadesDraft[Number(t.dataset.shadeName)].name = t.value;
+    if (t.dataset.shadePrice !== undefined) updateOptionPrice(shadesDraft[Number(t.dataset.shadePrice)], t);
     if (t.dataset.shadeColor !== undefined) {
       const sh = shadesDraft[Number(t.dataset.shadeColor)];
       const wasPending = !sh.hex;
@@ -1173,7 +1206,7 @@ async function openEdit(productId) {
     }
   });
   function shadesPayload() {
-    return shadesDraft.map((sh, i) => ({ id: sh.id, name: (sh.name || "").trim(), hex: sh.hex || null, active: sh.active === true && Boolean(sh.hex), order: i }));
+    return shadesDraft.map((sh, i) => ({ id: sh.id, name: (sh.name || "").trim(), hex: sh.hex || null, active: sh.active === true && Boolean(sh.hex), order: i, ...pricePayload(sh) }));
   }
 
   // Fase 57 — presentaciones (additional_info.presentations), dimensión
@@ -1186,6 +1219,7 @@ async function openEdit(productId) {
           .map(
             (pr, i) => `<div class="shade-row presentation-row" data-i="${i}">
           <label class="shade-name">Etiqueta<input name="presentation_name" value="${esc(pr.name || "")}" maxlength="40" data-presentation-name="${i}" placeholder="Ej. 30 ml"></label>
+          ${optionPriceField("presentation", i, pr)}
           <label class="checkbox-field shade-active"><input type="checkbox" name="presentation_active" data-presentation-active="${i}" ${pr.active ? "checked" : ""}> Activa</label>
           <span class="shade-tools">
             <button type="button" class="tax-act" data-presentation-move="${i}:-1" aria-label="Subir presentación ${esc(pr.name || i + 1)}" ${i === 0 ? "disabled" : ""}>↑</button>
@@ -1208,6 +1242,7 @@ async function openEdit(productId) {
   $("#presentationRows").addEventListener("input", (e) => {
     const t = e.target;
     if (t.dataset.presentationName !== undefined) presentationsDraft[Number(t.dataset.presentationName)].name = t.value;
+    if (t.dataset.presentationPrice !== undefined) updateOptionPrice(presentationsDraft[Number(t.dataset.presentationPrice)], t);
   });
   $("#presentationRows").addEventListener("change", (e) => {
     const t = e.target;
@@ -1234,7 +1269,7 @@ async function openEdit(productId) {
     }
   });
   function presentationsPayload() {
-    return presentationsDraft.map((pr, i) => ({ id: pr.id, name: (pr.name || "").trim(), active: pr.active === true, order: i }));
+    return presentationsDraft.map((pr, i) => ({ id: pr.id, name: (pr.name || "").trim(), active: pr.active === true, order: i, ...pricePayload(pr) }));
   }
   // Nombre repetido dentro de una dimensión (sin distinguir mayúsculas,
   // acentos ni espacios) → no se guarda.
@@ -1260,6 +1295,11 @@ async function openEdit(productId) {
     }
     if (presentationsDraft.some((pr) => !(pr.name || "").trim())) {
       setSaveStatus("No se guardó: cada presentación necesita su etiqueta (pestaña Identidad y clasificación › Tonos y presentaciones).", true);
+      return;
+    }
+    const badPrices = [...shadesDraft, ...presentationsDraft].filter((o) => parseOptionPrice(o.priceText).invalid);
+    if (badPrices.length) {
+      setSaveStatus(`No se guardó: precio no válido en ${badPrices.map((o) => `«${(o.name || "sin nombre").trim()}»`).join(", ")}. Escribe un número entero mayor que cero (sin puntos ni signos), o déjalo vacío para usar el precio general.`, true);
       return;
     }
     if (hasDuplicateNames(shadesDraft) || hasDuplicateNames(presentationsDraft)) {
@@ -2249,6 +2289,35 @@ function renderOrdersReview() {
   el.classList.toggle("is-warn", review > 0);
 }
 
+// Precio por variante — detalle de las líneas del pedido tal como se
+// guardaron (copia histórica, nunca se recalcula): producto, variante,
+// precio base y su origen, promoción y descuento, precio unitario final,
+// cantidad y subtotal. Los pedidos anteriores no traen precio base ni
+// promoción: se muestran como siempre (cantidad × unitario = subtotal).
+const PRICE_SOURCE_LABEL = { presentation: "precio de la presentación", shade: "precio del tono", product: "precio general", variant: "precio de la variante" };
+function orderLinesHtml(o) {
+  const items = Array.isArray(o.items) ? o.items : [];
+  if (!items.length) return "";
+  const lines = items
+    .map((l) => {
+      const variant = l.variantName && l.variantName !== "Único" && l.variantName !== "Default" ? ` — ${esc(l.variantName)}` : "";
+      const qtyLine = `${esc(l.quantity)} × ${money(Number(l.price))} = <b>${money(Number(l.lineSubtotal))}</b>`;
+      if (l.basePrice == null) {
+        const own = l.priceSource === "variant" ? ` <span class="pill pill-pink">precio de la variante</span>` : "";
+        return `<li>${esc(l.name)}${variant} · ${qtyLine}${own}</li>`;
+      }
+      const origin = PRICE_SOURCE_LABEL[l.priceSource] || "precio general";
+      const promo = l.promoApplied
+        ? `Promoción${l.promoText ? ` «${esc(l.promoText)}»` : ""}: <span class="nowrap">−${money(Number(l.discount) || 0)} c/u</span>`
+        : "Sin promoción";
+      return `<li><span class="order-line-name">${esc(l.name)}${variant}</span>
+        <span class="order-line-meta">Base ${money(Number(l.basePrice))} (${origin}) · ${promo} · Unitario final ${money(Number(l.price))}</span>
+        <span>${qtyLine}</span></li>`;
+    })
+    .join("");
+  return `<details class="order-lines"><summary>Ver productos (${items.length})</summary><ul>${lines}</ul></details>`;
+}
+
 function renderOrdersTable() {
   const list = ordersState.orders;
   $("#ordersCount").textContent = list.length === 1 ? "1 pedido" : `${list.length} pedidos`;
@@ -2263,7 +2332,7 @@ function renderOrdersTable() {
         <td>${esc(o.customer_phone)}</td>
         <td>${esc(o.customer_email)}</td>
         <td>${esc(o.customer_city)}</td>
-        <td>${money(Number(o.total))}</td>
+        <td>${money(Number(o.total))}${orderLinesHtml(o)}</td>
         <td>${esc(ORDER_STATUS_LABELS[o.status] || o.status)}</td>
         <td>${o.email_sent ? "Sí" : "No"}</td>
         <td class="notice-cell">${internalNoticeCell(o)}</td>

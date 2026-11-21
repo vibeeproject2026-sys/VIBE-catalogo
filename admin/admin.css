@@ -437,9 +437,20 @@ button.sub-chip.sub-edit:hover{outline:2px solid var(--blush-ink);outline-offset
 .shade-dot-empty{background:repeating-linear-gradient(45deg,#f2f2f2 0 4px,#fff 4px 8px)}
 .editor-section .shade-color input[type=color]{width:44px;height:34px;padding:2px}
 .shade-name{flex:1 1 180px}
+/* Precio por variante: campo opcional y estado (propio / precio general). */
+.shade-price{flex:0 1 150px}
+.option-price-state{flex:0 0 auto}
 .shade-tools{display:inline-flex;gap:6px;margin-left:auto}
 .shade-tools button:disabled{opacity:.4;cursor:default}
 /* Fase 57 — tonos y presentaciones como dos bloques del mismo panel. */
 .option-block-title{margin:18px 0 4px;font-size:13px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-2)}
 .option-block-title:first-of-type{margin-top:8px}
 #addShadeBtn,#addPresentationBtn{margin-top:10px}
+/* Precio por variante: detalle de líneas del pedido (copia histórica). */
+.order-lines{margin-top:4px;font-size:12px}
+.order-lines summary{cursor:pointer;color:var(--blush-ink,#b0005a);font-weight:700}
+.order-lines ul{margin:6px 0 0;padding-left:16px;display:grid;gap:4px;min-width:260px}
+.order-lines li>span{display:block}
+.order-lines .order-line-name{font-weight:700}
+.order-lines .order-line-meta{color:var(--muted,#6b6b6b)}
+.order-lines .nowrap{white-space:nowrap}

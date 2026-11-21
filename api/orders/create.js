@@ -24,7 +24,7 @@ const { sendJson, sendError, methodNotAllowed } = require("../catalog/_lib/http"
 const { validateOrderPayload } = require("./_lib/validate");
 const { insertOrder, markOrderNotifications, internalFromResult, findOrderByIdempotencyKey, countRecentOrdersByPhone } = require("./_lib/store");
 const { parseDetails } = require("../_lib/editorialDetails");
-const { productOptions, resolveSelection } = require("../_lib/variants");
+const { productOptions, resolveSelection, linePrice } = require("../_lib/variants");
 const { isHoneypotFilled, ipRateLimited, parseIdempotencyKey, PHONE_WINDOW_MS, PHONE_MAX_ORDERS } = require("./_lib/guard");
 const { sendOrderConfirmationEmail, sendInternalOrderNotificationEmail } = require("./_lib/email");
 const { sendWhatsAppNotification } = require("./_lib/whatsappNotify");
@@ -32,12 +32,9 @@ const { sendWhatsAppNotification } = require("./_lib/whatsappNotify");
 const PRODUCT_COLUMNS = "id,name,price,stock,category,promo_active,promo_price,promo_start,promo_end,promo_text";
 // Fase 43 — se necesita saber si la ficha está publicada. Fase 56 —
 // también sus tonos (additional_info.shades) para validar la variante
-// elegida; precio, nombre y stock siguen saliendo solo del POS.
+// elegida; nombre y stock siguen saliendo solo del POS, y el precio del POS
+// salvo que la opción elegida tenga precio propio en la ficha.
 const METADATA_COLUMNS = "product_id,published,additional_info,presentation";
-
-function effectivePrice(shaped) {
-  return shaped.promoActive === true && shaped.promoPrice != null ? shaped.promoPrice : shaped.price;
-}
 
 // Fase 55 — una línea por aviso: solo número de pedido, tipo, resultado y
 // un código saneado. Nunca destinatarios, teléfonos ni contenido.
@@ -204,7 +201,13 @@ module.exports = async function handler(req, res) {
       return null;
     }
     const { variantId, variantName, shadeId, shadeName, presentationId, presentationName } = sel;
-    const price = effectivePrice(real);
+    // Precio por variante: base = precio propio de la presentación, si no
+    // el del tono, si no el general del POS (de la ficha y del POS, nunca
+    // del navegador). La promoción vigente del POS se aplica una sola vez
+    // sobre esa base (ver linePrice). Todo se guarda en la línea como copia
+    // histórica para auditoría y conciliación con el POS.
+    const lp = linePrice(real, sel);
+    const price = lp.price;
     const quantity = it.quantity;
     return {
       productId: it.productId,
@@ -225,6 +228,13 @@ module.exports = async function handler(req, res) {
       image: real.image ?? null,
       sku: it.sku ?? null,
       quantity,
+      basePrice: lp.basePrice,
+      priceSource: lp.priceSource,
+      promoApplied: lp.promo != null,
+      promoText: lp.promo ? lp.promo.text : null,
+      promoProductPrice: lp.promo ? lp.promo.productPrice : null,
+      promoProductPromoPrice: lp.promo ? lp.promo.productPromoPrice : null,
+      discount: lp.discount,
       price,
       lineSubtotal: price * quantity,
     };

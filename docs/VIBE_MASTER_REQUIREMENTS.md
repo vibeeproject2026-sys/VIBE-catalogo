@@ -60,7 +60,7 @@ Si algo no se pudo recuperar, figura como **información faltante**; no se compl
 
 | ID | Instrucción | Estado | Evidencia / prueba |
 |---|---|---|---|
-| POS-01 | El POS es la fuente de verdad de precio, stock, disponibilidad y promociones; no se modifica ni su repo ni sus datos. | VERIFICADO | `test-variants-fase57.mjs`: crear pedidos nunca escribe en `products` ni en `catalog_metadata` |
+| POS-01 | El POS es la fuente de verdad de precio, stock, disponibilidad y promociones; no se modifica ni su repo ni sus datos. *(2026-11-20, decisión de la propietaria: una opción con **precio propio** en la ficha VIBE vende a ese precio en el catálogo, ver §22. El POS sigue siendo la fuente del precio general, el stock y las promociones, y no se modifica.)* | VERIFICADO | `test-variants-fase57.mjs`: crear pedidos nunca escribe en `products` ni en `catalog_metadata` |
 | POS-02 | No inventar precios, existencias, variantes, imágenes ni información. | VERIFICADO | Opciones solo desde la ficha; sin precio ni stock por opción |
 | ED-01 | No crear ni publicar fichas automáticamente. Lo no publicado o sin ficha es una decisión editorial, no una tarea pendiente. | Regla vigente | Memoria del proyecto; ningún cambio de datos en Fase 57 |
 | ED-02 | Clasificaciones protegidas: #99 Tratamiento›Cremas faciales; #109 y #110 Labios›Kits de labios; #102 Herramientas de aplicación›Rizadores de pestañas; #106 Labios›Kits de labios (decisión de la propietaria); #122 Rostro›Rubor. | VERIFICADO (sin escrituras) | Fase 57 no escribe datos |
@@ -128,7 +128,7 @@ Si algo no se pudo recuperar, figura como **información faltante**; no se compl
 | VAR-06 | Carrito: combinaciones distintas en líneas separadas; la misma combinación se agrupa; la selección se conserva al cambiar cantidades, en el carrito y en el checkout. | VERIFICADO (local) | `store57.js`; `test-variants-fase57.mjs` |
 | VAR-07 | El servidor valida cada opción (existe, pertenece a ese producto, está activa, es obligatoria si la dimensión existe) y toma nombres e ids de la ficha, nunca del navegador. | VERIFICADO (local) | `test-variants-fase57.mjs` (ids manipulados, de otro producto, inactivos) |
 | VAR-08 | Si una opción cambia después de agregarla, se avisa y se exige corregir antes de enviar. | VERIFICADO (local) | `store57.js` |
-| VAR-09 | Precio y stock vienen del producto base del POS; activar una opción no crea inventario. | VERIFICADO (local) | `test-variants-fase57.mjs` (promo, agotado, cambio de precio) |
+| VAR-09 | ~~Precio~~ y stock vienen del producto base del POS; activar una opción no crea inventario. *(2026-11-20: el **precio** puede ser propio de la opción, ver §22 VPR; el stock sigue siendo del POS.)* | VERIFICADO (local) | `test-variants-fase57.mjs` (promo, agotado, cambio de precio) |
 | VAR-10 | Pedidos históricos sin variantes se siguen mostrando igual; ningún pedido existente se altera. | VERIFICADO (local) | `test-variants-fase57.mjs`; `email.js` sin cambios de regla |
 | VAR-11 | Qué productos tienen tonos o presentaciones, con sus nombres y colores reales. | BLOQUEADO POR DECISIÓN | La propietaria lo carga desde el Admin, producto por producto (confirmado en Fase 58). No se cargó ni inventó ninguna variante |
 | VAR-12 | Fase 58: comprobar que el modelo está integrado de verdad y que convive con los datos reales. | VERIFICADO (local + lectura real) | Ver «Detalle de VAR-12» debajo de esta tabla |
@@ -1189,6 +1189,184 @@ Ver el historial y el informe de esta fase: commit, despliegue en Vercel y verif
   - hover y foco de teclado, también en el pie.
 - **Perfiles reales:** ambos responden 200.
 
+## 22. Precio independiente por variante (2026-11-20)
+
+**Decisión de la propietaria:** cada variante (tono o presentación) de un mismo producto puede tener un precio propio, sin crear productos separados. El precio general del producto sigue existiendo y es el predeterminado.
+
+Se extiende el sistema de variantes existente (Fase 57, §4). No hay un segundo sistema.
+
+| ID | Qué | Estado |
+|---|---|---|
+| VPR-01 | Precio propio **opcional** por opción. Vacío = usa el precio general. Cero, negativo, decimal o texto nunca valen como precio, en particular nunca «gratis» | IMPLEMENTADO Y VERIFICADO (local) |
+| VPR-02 | Regla de precio de una combinación | IMPLEMENTADO Y VERIFICADO (local); ver «Detalle de VPR-02» |
+| VPR-03 | Admin | IMPLEMENTADO Y VERIFICADO (local); ver «Detalle de VPR-03» |
+| VPR-04 | Catálogo | IMPLEMENTADO Y VERIFICADO (local); ver «Detalle de VPR-04» |
+| VPR-05 | Carrito y checkout | IMPLEMENTADO Y VERIFICADO (local); ver «Detalle de VPR-05» |
+| VPR-06 | Pedido | IMPLEMENTADO Y VERIFICADO (local); ver «Detalle de VPR-06» |
+| VPR-07 | Seguridad | IMPLEMENTADO Y VERIFICADO (local); ver «Detalle de VPR-07» |
+| VPR-08 | Compatibilidad | VERIFICADO (local); ver «Detalle de VPR-08» |
+| VPR-09 | Promoción del POS sobre el precio de la variante (ajuste final, 2026-11-20) | IMPLEMENTADO Y VERIFICADO (local); ver §22.1 |
+| VPR-10 | Datos de auditoría y conciliación por línea de pedido (ajuste final, 2026-11-20) | IMPLEMENTADO Y VERIFICADO (local); ver §22.2 |
+
+**Detalle de VPR-02 (regla de precio):**
+- **Orden:** el precio propio de la **presentación** elegida; si no tiene, el del **tono**; si ninguno, el **precio general** del POS. Ese es el **precio base** de la línea. Es la misma regla en `js/variants.js` (`optionPriceInfo`) y en `api/_lib/variants.js` (`optionPrice` y `linePrice`).
+- **Promociones:** ~~un precio propio no recibe la promoción del POS.~~ *(Reemplazado el 2026-11-20 por decisión de la propietaria: la promoción vigente del POS se aplica también sobre el precio propio. Ver §22.1.)*
+
+**Detalle de VPR-03 (Admin):**
+- **Campo:** «Precio propio» en cada tono y presentación.
+- **Estado visible:** «Precio propio: $X» o «Usa el precio general ($X)», actualizado al escribir.
+- **Edición:** cada opción se edita sin tocar las demás.
+- **Validación antes de guardar:** si un precio no es válido, el formulario no se envía y nombra la opción. El servidor también responde 400 (`invalidOptionPrices`).
+- **Pedidos:** detalle de líneas en la tabla de Pedidos («Ver productos») con variante, cantidad × precio unitario, subtotal y la marca «precio de la variante». *(Ampliado el 2026-11-20: ver §22.2.)*
+
+**Detalle de VPR-04 (catálogo):**
+- **Ficha:** muestra «Desde $mín» mientras falte elegir y los precios varíen. Al elegir una opción, el precio cambia **al instante**, sin recargar.
+- **Opciones:** las que tienen precio propio lo muestran en la etiqueta, el nombre accesible y el chip de presentación.
+- **Tarjeta:** «Desde $mín» si alguna opción activa tiene precio propio.
+- **Sin precios propios:** los productos se ven exactamente como antes.
+
+**Detalle de VPR-05 (carrito y checkout):**
+- **Carrito:** cada combinación es una línea con su precio unitario. Cambiar la cantidad no altera el unitario.
+- **Sincronización:** el carrito se actualiza al precio vigente de **esa** variante (`syncCartWithCatalog`).
+- **Checkout:** el resumen muestra el precio de cada variante, y el total esperado viaja al servidor.
+
+**Detalle de VPR-06 (pedido):** cada línea guarda una copia de:
+- `productId`, `name`, `variantName`, `shadeId` y `presentationId`;
+- `price` (el unitario aplicado) y `priceSource` (~~`variant` o `product`~~ desde el 2026-11-20: `presentation`, `shade` o `product`; ver §22.2);
+- `quantity` y `lineSubtotal`.
+
+Cambiar después un precio no altera los pedidos registrados.
+
+**Detalle de VPR-07 (seguridad):**
+- **El navegador no envía precios:** solo ids y cantidad.
+- **El servidor calcula el precio:** lo toma de la ficha publicada y del POS, e ignora cualquier precio, subtotal o nombre del request.
+- **Total desactualizado o manipulado:** si el total esperado no coincide, responde 409 `PRICE_CHANGED` con el precio real de cada variante, sin registrar nada.
+
+**Detalle de VPR-08 (compatibilidad):**
+- **Fichas sin precios:** se leen y se guardan igual, sin clave `price`.
+- **Pedidos y carritos anteriores:** siguen funcionando. Los pedidos históricos, sin `priceSource`, se muestran normalmente.
+
+**Base de datos:**
+- **Sin migración.** El precio propio se guarda como campo opcional `price` de cada opción, dentro del JSON de `catalog_metadata.additional_info`: la misma columna donde ya viven tonos y presentaciones.
+- **Pedidos:** `orders.items` ya guarda una copia por línea. Solo se agrega `priceSource` dentro de ese JSON.
+- **Producción:** no se modificó ningún dato. No se asignaron precios a variantes existentes.
+
+**Implicación para el POS (a conocer):**
+- **Qué guarda cada sistema:** el POS no tiene precio por variante. Una variante con precio propio se vende en el catálogo a ese precio, pero el POS solo conoce el precio general del producto.
+- **Qué cuidar:** una venta registrada directamente en el POS, o una conciliación contra el POS, debe tener en cuenta el precio de la variante.
+
+**Pruebas:**
+- `scripts/test-variant-prices.mjs` (25) cubre los 12 escenarios pedidos más la precedencia, la promoción, la validación del Admin (ejecutando su función real) y la compatibilidad.
+- `test-variants-fase57.mjs` se actualizó porque la validación del servidor ahora devuelve `optionPrice`.
+- **Suite completa:** 48 scripts, **1008 aprobadas, 0 fallidas**.
+- **Navegador real, en local con API simulada y pedido interceptado:**
+  - tienda a 1440 y 390 (tarjetas, ficha, cambio de tono y presentación, carrito, cantidades, checkout y pedido enviado);
+  - Admin (formulario, edición, precio no válido, guardado y detalle de pedidos).
+  - Capturas en `Catalogo VIBE/entregables-precio-variante/`.
+
+**Error encontrado y corregido durante la verificación:** la validación del formulario del Admin rechazaba todos los precios (expresión regular sin `\d`). La detectó la prueba en navegador, se corrigió y ahora la cubre una prueba que ejecuta la función real.
+
+**Estado:** implementado y verificado en local. **Sin commit, push ni despliegue** (a pedido de la propietaria).
+
+### 22.1 Promoción del POS sobre el precio de la variante (VPR-09, 2026-11-20)
+
+**Decisión de la propietaria:** si una variante tiene precio propio, la promoción vigente del producto se aplica sobre ese precio.
+
+**Cómo es la promoción en el POS (sin cambios):** un **precio promocional fijo por producto** (`promo_price`), activado con `promo_active` y limitado por `promo_start` y `promo_end`. La vigencia y la elegibilidad se siguen resolviendo con la función existente (`resolvePromoActive` en `api/catalog/_lib/merge.js`), sin cambios. No se creó un sistema de promociones paralelo y el POS no se tocó.
+
+**Regla, idéntica en navegador y servidor:**
+- **Base:** precio de la presentación → si no, precio del tono → si no, precio general (VPR-02).
+- **Sin precio propio:** se cobra el precio promocional del POS, exactamente como antes.
+- **Con precio propio:** se aplica la **misma proporción de descuento** del POS: `final = redondear(base × promo_price ÷ price)`.
+- **Redondeo:** al peso entero más cercano (0,5 sube). El POS no define un redondeo para precios derivados, porque no tiene precios por variante; esta es la regla adoptada y documentada.
+- **Una sola vez:** siempre se calcula desde la base, nunca sobre un precio ya rebajado. Sincronizar el carrito o reenviar el precio rebajado no vuelve a descontar.
+- **No aplica:** promoción inactiva, vencida, aún no iniciada o sin precio promocional. Un precio promocional igual o mayor al general tampoco rebaja un precio propio.
+- **Dónde:** `ownPriceWithPromo` y `optionPriceInfo` en `js/variants.js`; `linePrice` en `api/_lib/variants.js`. La tarjeta («Desde»), la ficha (precio final, base tachada, −%, texto de la promoción), la etiqueta de cada opción, el carrito y el checkout muestran el precio que se cobra.
+
+**Ejemplos (cifras de prueba, no de productos reales):**
+
+| Caso | Precio general | Promoción POS | Base | Origen | Final | Descuento c/u |
+|---|---|---|---|---|---|---|
+| Rubor · Coral | 35.000 | 31.500 (−10 %) | 38.000 | tono | **34.200** | 3.800 |
+| Rubor · Terracota | 35.000 | 31.500 | 37.000 | tono | **33.300** | 3.700 |
+| Rubor · Rosa (sin precio propio) | 35.000 | 31.500 | 35.000 | general | **31.500** | 3.500 |
+| Coral + Grande | 35.000 | 31.500 | 45.000 | presentación | **40.500** | 4.500 |
+| Coral + Mini (sin precio) | 35.000 | 31.500 | 38.000 | tono | **34.200** | 3.800 |
+| Precio fijo del POS | 30.000 | 25.000 | 36.000 | tono | **30.000** | 6.000 |
+| Redondeo hacia abajo | 30.000 | 25.000 | 37.000 | tono | **30.833** (30.833,33) | 6.167 |
+| Redondeo hacia arriba | 30.000 | 25.000 | 38.000 | tono | **31.667** (31.666,67) | 6.333 |
+| Promoción vencida | 35.000 | 31.500, vencida | 38.000 | tono | **38.000** | 0 |
+
+Total de ejemplo: 2 × Coral (34.200) + 1 × Polvo Grande (40.500) = **108.900**.
+
+**Limitación del POS (a conocer):**
+- **Tipos de promoción:** el POS solo maneja un precio promocional fijo por producto. No tiene promociones porcentuales ni de «monto de descuento» como tipos propios. El «−10 %» es la proporción entre el precio promocional y el general.
+- **Promoción de valor fijo:** se interpreta como lo que el POS ofrece, un precio promocional fijo del producto. Sobre un precio propio se traduce a su misma proporción. Si en el futuro el POS agrega un tipo «restar $X», habrá que decidir si se resta igual a cada variante.
+- **Precios por variante:** el POS no los conoce. Una venta hecha directamente en el POS cobra el precio general o el promocional del producto, no el de la variante.
+
+### 22.2 Auditoría y conciliación por línea de pedido (VPR-10, 2026-11-20)
+
+Cada línea de `orders.items` guarda, calculado por el servidor:
+
+| Campo | Contenido |
+|---|---|
+| `productId`, `name` | Producto del POS |
+| `variantId`, `variantName`, `shadeId`, `shadeName`, `presentationId`, `presentationName` | Variante, desde la ficha publicada |
+| `basePrice` | Precio base de la variante, antes de la promoción |
+| `priceSource` | Origen del precio base: `presentation`, `shade` o `product` (precio general) |
+| `promoApplied` | `true` si se aplicó la promoción del POS |
+| `promoText` | Texto de la promoción del POS, o `null` |
+| `promoProductPrice`, `promoProductPromoPrice` | Precio general y promocional del POS con los que se calculó. Es la referencia para conciliar; `null` sin promoción |
+| `discount` | Descuento por unidad (`basePrice − price`) |
+| `price` | Precio unitario final cobrado |
+| `quantity`, `lineSubtotal` | Cantidad y subtotal (`price × quantity`) |
+
+**Garantías:**
+- **Seguridad:** el navegador solo envía ids, opciones y cantidad. Base, elegibilidad, descuento, precio final, subtotal y total los calcula el servidor. Cualquier precio, descuento u origen enviado en la línea se ignora. Si el total esperado no coincide, responde 409 `PRICE_CHANGED` y no registra nada.
+- **Pedidos históricos:** no se recalculan nunca. Después de registrar un pedido solo se actualizan las marcas de aviso, nunca `items` ni `total`. Los pedidos anteriores a este ajuste, sin `basePrice`, se muestran en el Admin como siempre.
+- **Cambios posteriores:** cambiar después el precio del producto, de la variante o la promoción no altera pedidos ya registrados.
+- **Admin, detalle del pedido:** por línea muestra variante, base y origen, promoción y descuento por unidad, unitario final, cantidad y subtotal.
+
+**Para conciliar con el POS:**
+- **Qué comparar:** cada línea trae el unitario realmente cobrado (`price`) y la variante. Las cuentas cuadran por construcción: `basePrice − discount = price` y `price × quantity = lineSubtotal`.
+- **Promoción vigente:** `promoProductPrice` y `promoProductPromoPrice` muestran qué promoción del POS estaba vigente al registrar el pedido.
+- **Diferencias esperadas:** una línea con `priceSource` `shade` o `presentation` tendrá un precio distinto al que el POS tiene para el producto. Es esperado: el POS no maneja precios por variante.
+- **Sin integración nueva:** no se creó ninguna integración con el POS ni se alteró su proceso de registro.
+
+**Base de datos:** **sin migración.** Los campos nuevos viven dentro del JSON de `orders.items`, una columna que ya existe. No se ejecutó nada en producción.
+
+**Pruebas:**
+- **`scripts/test-variant-prices.mjs`:** 42 pruebas, entre ellas P1–P17:
+  - promoción porcentual sobre precio propio;
+  - precio fijo del POS;
+  - precio general heredado con promoción;
+  - precedencia de la presentación y caída al tono;
+  - producto sin precio propio;
+  - promoción vencida, aún no iniciada y no elegible;
+  - sin doble descuento;
+  - redondeo y totales;
+  - carrito y checkout;
+  - campos guardados;
+  - cambios posteriores de precio y de promoción;
+  - conciliación;
+  - manipulación;
+  - pedidos históricos.
+- **Pruebas anteriores reemplazadas:** la que afirmaba que un precio propio no recibe la promoción y la de VPR-06 (`priceSource: "variant"`) se reemplazaron por la regla vigente.
+- **Mutaciones de control:** cuatro errores introducidos a propósito, todos detectados:
+  - el servidor no aplica la promoción;
+  - el cliente aplica el descuento dos veces;
+  - el servidor redondea hacia abajo;
+  - el servidor no guarda la base.
+- **Suite completa:** 48 scripts, **1025 aprobadas, 0 fallidas**.
+- **Navegador real, en local con API simulada y pedido interceptado:**
+  - tienda con promoción a 1440 y 390;
+  - el cuerpo que envió el navegador, procesado por el handler real del servidor con base de datos simulada: mismas cifras;
+  - tienda sin promoción (regresión);
+  - Admin.
+  - Capturas `*-promo-*` y `admin-detalle-pedido.png` en `Catalogo VIBE/entregables-precio-variante/`.
+
+**Estado:** implementado y verificado en local. **Sin commit, push ni despliegue** (pendiente de aprobación expresa).
+
 ## Historial
 
 - **2026-10-28 (Fase 57):**
@@ -1250,3 +1428,5 @@ Ver el historial y el informe de esta fase: commit, despliegue en Vercel y verif
 - **2026-11-20 (label compacto, LBL-06):** franja más baja y en movimiento continuo en escritorio, tablet y mobile, con la misma imagen; pendiente de publicación.
 - **2026-11-20 (diagnóstico del label):** la propietaria veía la versión publicada (`2b7a4c6`, estática en escritorio). LBL-06 funciona en local, verificado con la animación real, y sigue pendiente de publicar.
 - **2026-11-20 (redes sociales, §21):** botones gráficos de Instagram y TikTok en «VIBE EN REDES» y TikTok en el pie, con los perfiles oficiales. LBL-06 pasa a publicado y verificado en producción (`fce3af7`).
+- **2026-11-20 (precio por variante, §22):** precio propio opcional por tono o presentación, de extremo a extremo (Admin, ficha, carrito, checkout, pedido y detalle en el Admin), con el servidor como autoridad. Sin migración. Implementado y verificado en local, sin publicar.
+- **2026-11-20 (ajuste final del precio por variante, §22.1–22.2):** la promoción vigente del POS se aplica también sobre el precio propio, con la misma proporción, una sola vez y redondeada al peso (reemplaza la regla anterior, que queda tachada en VPR-02). Cada línea del pedido guarda base, origen, promoción, descuento, unitario final, cantidad y subtotal, y el Admin los muestra. Sin migración y sin cambios en el POS. Suite: 1025 aprobadas y 0 fallidas. Sin publicar.

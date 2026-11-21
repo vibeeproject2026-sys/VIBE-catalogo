@@ -27,7 +27,7 @@ import {
 import { readStateFromSearch, buildUrl } from "./url-state.js";
 import { computeOrderSummary, validateCheckoutForm } from "./checkout.js";
 import { bindCartSwipe } from "./cart-swipe.js";
-import { hasOptions, resolveVariant, selectionStatus, autoShadeId, autoPresentationId, lineOptionProblem } from "./variants.js";
+import { hasOptions, resolveVariant, selectionStatus, autoShadeId, autoPresentationId, lineOptionProblem, optionPriceInfo, priceRange, priceOf, ownPriceWithPromo } from "./variants.js";
 
 // Fase 27: se agregan los filtros/orden de la PLP. Todos arrancan
 // "apagados" — ningún filtro activo por defecto, igual que antes.
@@ -215,8 +215,8 @@ function productCard(p) {
       <div class="card-options">${cardOptionsHtml(p)}</div>
       <div class="card-buy">
         <p class="card-price-row">
-          <span class="price">${money(showPromo ? p.promoPrice : p.price)}</span>
-          ${showPromo ? `<span class="old">${money(p.price)}</span>` : p.oldPrice ? `<span class="old">${money(p.oldPrice)}</span>` : ""}
+          ${hasOwnOptionPrices(p) ? cardOptionPriceHtml(p) : `<span class="price">${money(showPromo ? p.promoPrice : p.price)}</span>
+          ${showPromo ? `<span class="old">${money(p.price)}</span>` : p.oldPrice ? `<span class="old">${money(p.oldPrice)}</span>` : ""}`}
           ${p.available === false ? `<span class="availability-badge">Agotado</span>` : ""}
         </p>
         <button class="button card-cta" data-product="${p.id}">+ Agregar</button>
@@ -581,9 +581,66 @@ function closeCart() {
 // los productos demo tienen variantes con precios realmente distintos
 // entre sí (ej. tonos de labial) — y esos nunca tienen promoción real
 // detrás, así que ambos criterios nunca compiten entre sí en la práctica.
+// Precio por variante — ¿alguna opción comprable tiene precio propio?
+// Solo entonces cambian la tarjeta y las etiquetas; el resto de productos
+// se ve exactamente igual que antes.
+function hasOwnOptionPrices(p) {
+  return [...(p.shades || []), ...(p.presentations || [])].some((o) => o.active && priceOf(o) != null);
+}
+// Tarjeta: «Desde» el precio más bajo comprable, o el precio único si
+// todas las combinaciones cuestan lo mismo (sin tachado de promoción).
+function cardOptionPriceHtml(p) {
+  const r = priceRange(p);
+  return `<span class="price">${r.min !== r.max ? `<small class="price-from">Desde</small> ` : ""}${money(r.min)}</span>`;
+}
+// Precio propio de una opción tal como se cobra (con la promoción del POS
+// aplicada si está vigente), o null si la opción no tiene precio propio.
+const optionShownPrice = (o) => (priceOf(o) != null ? ownPriceWithPromo(state.product || {}, o.price) : null);
+// Nombre de una opción con su precio propio, si lo tiene.
+const optionLabel = (o) => (optionShownPrice(o) != null ? `${o.name} · ${money(optionShownPrice(o))}` : o.name);
+// Ficha: precio de la combinación elegida (cambia al instante al elegir
+// otra opción); mientras falte elegir y los precios varíen, «Desde» el más
+// bajo. Sin opciones, igual que antes (promoción del POS con tachado).
+function pdpPriceAreaHtml(p) {
+  let price;
+  let original = null;
+  let from = false;
+  if (hasOptions(p)) {
+    const v = resolveVariant(p, state.shadeId, state.presentationId);
+    const range = priceRange(p);
+    if (v) {
+      price = v.price;
+      original = v.originalPrice;
+    } else if (range.min !== range.max) {
+      price = range.min;
+      from = true;
+    } else {
+      const info = optionPriceInfo(p, state.shadeId, state.presentationId);
+      price = info.price;
+      original = info.originalPrice;
+    }
+  } else {
+    price = currentEffectivePrice();
+    original = pdpPriceInfo(p).originalPrice;
+  }
+  const pct = original != null && original > 0 && price < original ? Math.round((1 - price / original) * 100) : null;
+  return `<div class="pdp-price">
+      ${from ? `<span class="pdp-from">Desde</span>` : ""}<strong id="detailPrice">${money(price)}</strong>
+      ${original != null ? `<span class="old">${money(original)}</span>` : ""}
+      ${pct ? `<span class="pdp-discount">-${pct}%</span>` : ""}
+    </div>
+    ${original != null && p.promoText ? `<p class="pdp-promo-text">${esc(p.promoText)}</p>` : ""}`;
+}
+
 function currentEffectivePrice() {
   const p = state.product;
   if (!p) return 0;
+  // Precio por variante: con opciones, el precio de la combinación elegida
+  // (o el más bajo posible mientras falte elegir).
+  if (hasOptions(p)) {
+    const v = resolveVariant(p, state.shadeId, state.presentationId);
+    return v ? v.price : priceRange(p).min;
+  }
   if (p.promoActive === true && p.promoPrice != null) return p.promoPrice;
   return (selected() || p.variants[0]).price;
 }
@@ -594,7 +651,7 @@ function currentEffectivePrice() {
 // una dimensión se muestra (sin selector) y se aplica sola; con varias,
 // la clienta elige. Roving tabindex: el elegido, o el primero activo.
 function optionRadio({ cls, dim, opt, on, tabbable, style = "", text = "" }) {
-  const label = opt.active ? opt.name : `${opt.name} (no disponible)`;
+  const label = opt.active ? optionLabel(opt) : `${opt.name} (no disponible)`;
   return `<button type="button" class="${cls}${on ? " selected" : ""}${opt.active ? "" : ` ${cls}-off`}" role="radio" aria-checked="${on}" aria-label="${esc(label)}" title="${esc(label)}" data-${dim}="${esc(opt.id)}" data-active="${opt.active}" ${opt.active ? "" : 'aria-disabled="true"'} tabindex="${tabbable ? 0 : -1}"${style}>${text}</button>`;
 }
 function radioList(list, currentId, render) {
@@ -610,12 +667,12 @@ function shadePickerHtml(p) {
   if (!list.length) return "";
   if (list.length === 1) {
     const sh = list[0];
-    return `<div class="shade-picker shade-single"><p class="shade-label"><span class="cart-shade" style="--shade:${esc(sh.hex)}" aria-hidden="true"></span>Tono: <strong>${esc(sh.name)}</strong>${sh.active ? "" : " · no disponible"}</p></div>`;
+    return `<div class="shade-picker shade-single"><p class="shade-label"><span class="cart-shade" style="--shade:${esc(sh.hex)}" aria-hidden="true"></span>Tono: <strong>${esc(optionLabel(sh))}</strong>${sh.active ? "" : " · no disponible"}</p></div>`;
   }
   const current = list.find((x) => String(x.id) === String(state.shadeId));
   const swatches = radioList(list, state.shadeId, (opt, on, tabbable) => optionRadio({ cls: "shade", dim: "shade", opt, on, tabbable, style: ` style="--shade:${esc(opt.hex)}"` }));
   return `<div class="shade-picker">
-    <p class="shade-label">Tono: <strong id="shadeName">${current ? esc(current.name) : "elige uno"}</strong></p>
+    <p class="shade-label">Tono: <strong id="shadeName">${current ? esc(optionLabel(current)) : "elige uno"}</strong></p>
     <div class="shade-swatches" role="radiogroup" aria-label="Tonos disponibles">${swatches}</div>
   </div>`;
 }
@@ -624,12 +681,12 @@ function presentationPickerHtml(p) {
   if (!list.length) return "";
   if (list.length === 1) {
     const pr = list[0];
-    return `<div class="presentation-picker presentation-single"><p class="shade-label">Presentación: <strong>${esc(pr.name)}</strong>${pr.active ? "" : " · no disponible"}</p></div>`;
+    return `<div class="presentation-picker presentation-single"><p class="shade-label">Presentación: <strong>${esc(optionLabel(pr))}</strong>${pr.active ? "" : " · no disponible"}</p></div>`;
   }
   const current = list.find((x) => String(x.id) === String(state.presentationId));
-  const chips = radioList(list, state.presentationId, (opt, on, tabbable) => optionRadio({ cls: "presentation-option", dim: "presentation", opt, on, tabbable, text: esc(opt.name) }));
+  const chips = radioList(list, state.presentationId, (opt, on, tabbable) => optionRadio({ cls: "presentation-option", dim: "presentation", opt, on, tabbable, text: esc(opt.name) + (optionShownPrice(opt) != null ? `<span class="option-price">${money(optionShownPrice(opt))}</span>` : "") }));
   return `<div class="presentation-picker">
-    <p class="shade-label">Presentación: <strong id="presentationName">${current ? esc(current.name) : "elige una"}</strong></p>
+    <p class="shade-label">Presentación: <strong id="presentationName">${current ? esc(optionLabel(current)) : "elige una"}</strong></p>
     <div class="presentation-options" role="radiogroup" aria-label="Presentaciones disponibles">${chips}</div>
   </div>`;
 }
@@ -665,12 +722,12 @@ function syncOptionUi() {
       x.tabIndex = on || (!hasCurrent && x === firstActive) ? 0 : -1;
     });
     const cur = (list || []).find((o) => String(o.id) === String(state[key]));
-    if ($(nameEl) && cur) $(nameEl).textContent = cur.name;
+    if ($(nameEl) && cur) $(nameEl).textContent = optionLabel(cur);
   }
   const st = addButtonState(p);
   $("#addButton").disabled = st.disabled;
   $("#addButton").textContent = st.label;
-  $("#detailPrice").textContent = money(currentEffectivePrice());
+  $("#pdpPriceArea").innerHTML = pdpPriceAreaHtml(p);
 }
 
 function pdpGalleryHtml(p) {
@@ -759,7 +816,6 @@ function pdpRelatedHtml() {
 // sin cerrar/reabrir el diálogo.
 function renderProductDetail(p) {
   const unavailable = p.available === false;
-  const priceInfo = pdpPriceInfo(p);
   const badgeText = pdpBadge(p);
   const hasVariants = !hasOptions(p) && p.variants.length > 1;
   const addState = addButtonState(p);
@@ -777,12 +833,7 @@ function renderProductDetail(p) {
       p.commercialName ? `<p class="pdp-commercial-name">${esc(p.commercialName)}</p>` : ""
     }
     ${p.shortDescription ? `<p class="pdp-short-desc">${esc(p.shortDescription)}</p>` : ""}
-    <div class="pdp-price">
-      <strong id="detailPrice">${money(currentEffectivePrice())}</strong>
-      ${priceInfo.showPromo ? `<span class="old">${money(priceInfo.originalPrice)}</span>` : ""}
-      ${priceInfo.discountPercent ? `<span class="pdp-discount">-${priceInfo.discountPercent}%</span>` : ""}
-    </div>
-    ${priceInfo.showPromo && p.promoText ? `<p class="pdp-promo-text">${esc(p.promoText)}</p>` : ""}
+    <div id="pdpPriceArea" aria-live="polite">${pdpPriceAreaHtml(p)}</div>
     ${hasVariants ? `<div class="variants">${p.variants.map((v) => `<button type="button" class="variant ${v.id === state.variant ? "selected" : ""}" data-variant="${v.id}">${esc(v.name)}</button>`).join("")}</div>` : ""}
     ${shadePickerHtml(p)}
     ${presentationPickerHtml(p)}
@@ -1305,7 +1356,10 @@ $("#productDialog").addEventListener("click", e => {
     // server-side (Fase 29 — el carrito lo usa para mostrar el precio
     // tachado; ver pdpPriceInfo/cart.js).
     const priceInfo = pdpPriceInfo(state.product);
-    addToCart(state.product, { ...variant, price: currentEffectivePrice(), originalPrice: priceInfo.originalPrice }, qty);
+    // Precio por variante: con opciones, la variante resuelta ya trae su
+    // precio (propio de la opción o general, con la promoción del POS
+    // aplicada una sola vez) y su base como tachado.
+    addToCart(state.product, hasOptions(state.product) ? variant : { ...variant, price: currentEffectivePrice(), originalPrice: priceInfo.originalPrice }, qty);
     $("#productDialog").close();
     openCart();
   }
@@ -1442,9 +1496,14 @@ function syncCartWithCatalog() {
   return syncCartPrices((item) => {
     const p = findProduct(state.products, item.productId);
     if (!p || lineOptionProblem(p, item)) return null;
-    // Sin precio por opción en el POS: toda combinación usa el precio base
-    // (las variantes demo sí traen precio propio).
-    const v = hasOptions(p) ? p.variants[0] : p.variants.find((x) => String(x.id) === String(item.variantId)) || p.variants[0];
+    // Precio por variante: con opciones, el precio vigente de la combinación
+    // guardada (propio de la opción o el general con su promoción).
+    if (hasOptions(p)) {
+      const info = optionPriceInfo(p, item.shadeId ?? null, item.presentationId ?? null);
+      return { price: info.price, originalPrice: info.originalPrice };
+    }
+    // Sin opciones: precio base (las variantes demo sí traen precio propio).
+    const v = p.variants.find((x) => String(x.id) === String(item.variantId)) || p.variants[0];
     const promo = p.promoActive === true && p.promoPrice != null;
     return { price: promo ? p.promoPrice : v.price, originalPrice: promo ? p.price : null };
   });

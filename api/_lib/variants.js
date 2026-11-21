@@ -9,7 +9,13 @@
 //     ESTE producto y estar activo.
 // Sin presentaciones configuradas, la línea conserva la presentación de
 // texto de la ficha (ej. «30 ml») si existe; si no, no se inventa ninguna.
-// No hay precio ni inventario por opción: lo decide el POS por producto.
+// No hay inventario por opción (lo decide el POS por producto).
+// Precio por opción: si la opción elegida tiene precio propio, ese es el
+// precio base de la línea (optionPrice); si el tono y la presentación tienen
+// ambos precio propio, manda el de la presentación. Sin precio propio → null
+// y la línea usa el precio general del producto.
+// Promoción: la del POS (promo_active + vigencia, ya resuelta en
+// promoActive) se aplica sobre ese precio base — ver linePrice().
 
 function productOptions(details, legacyPresentation) {
   const d = details || {};
@@ -27,9 +33,11 @@ function variantKey(shadeId, presentationId) {
   return parts.length ? parts.join("|") : "default";
 }
 
+// Solo cuenta un precio válido (entero > 0); cualquier otra cosa = sin precio propio.
+const optionPriceOf = (opt) => (opt && Number.isInteger(opt.price) && opt.price > 0 ? opt.price : null);
 const idOf = (v) => (v === undefined || v === null || v === "" ? null : String(v));
 
-// → { ok: true, variantId, variantName, shadeId, shadeName, presentationId, presentationName }
+// → { ok: true, variantId, variantName, shadeId, shadeName, presentationId, presentationName, optionPrice, optionPriceSource }
 // | { ok: false, dimension: "shade" | "presentation" }
 function resolveSelection(options, item) {
   const opts = options || productOptions(null, null);
@@ -53,7 +61,48 @@ function resolveSelection(options, item) {
     shadeName,
     presentationId: pres.opt ? pres.opt.id : null,
     presentationName,
+    optionPrice: optionPriceOf(pres.opt) ?? optionPriceOf(shade.opt) ?? null,
+    optionPriceSource: optionPriceOf(pres.opt) != null ? "presentation" : optionPriceOf(shade.opt) != null ? "shade" : null,
   };
 }
 
-module.exports = { productOptions, resolveSelection, variantKey };
+// Precio de una línea de pedido (el servidor es la única autoridad).
+// `product` es el producto ya resuelto del POS (price, promoActive con su
+// vigencia, promoPrice, promoText); `sel` sale de resolveSelection.
+//
+// El POS define la promoción como un precio promocional del producto. Sobre
+// el precio general se cobra ese precio, como siempre. Sobre un precio propio
+// de variante se aplica la MISMA proporción de descuento
+// (promoPrice / price), redondeada al peso: p. ej. promo 31.500 sobre
+// 35.000 = −10 % → Coral 38.000 pasa a 34.200. Una sola vez, siempre sobre
+// el precio base, nunca sobre un precio ya rebajado.
+//
+// → { basePrice, price, discount, priceSource, promo }
+//   priceSource: "presentation" | "shade" | "product"
+//   promo: null o { text, productPrice, productPromoPrice } (referencia
+//   del POS con la que se calculó, para auditar y conciliar)
+function linePrice(product, sel) {
+  const general = product.price;
+  const promoOn = product.promoActive === true && product.promoPrice != null;
+  const own = sel && sel.optionPrice != null ? sel.optionPrice : null;
+  const basePrice = own != null ? own : general;
+  let price = basePrice;
+  let promoApplied = false;
+  if (promoOn && own == null) {
+    // Precio general: exactamente lo que ya cobraba el pedido (effectivePrice).
+    price = product.promoPrice;
+    promoApplied = true;
+  } else if (promoOn && general > 0 && product.promoPrice < general) {
+    price = Math.round((own * product.promoPrice) / general);
+    promoApplied = price < basePrice;
+  }
+  return {
+    basePrice,
+    price,
+    discount: basePrice - price,
+    priceSource: own != null ? sel.optionPriceSource : "product",
+    promo: promoApplied ? { text: product.promoText ?? null, productPrice: general, productPromoPrice: product.promoPrice } : null,
+  };
+}
+
+module.exports = { productOptions, resolveSelection, variantKey, linePrice };
