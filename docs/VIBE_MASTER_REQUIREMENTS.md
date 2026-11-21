@@ -1676,6 +1676,30 @@ Resultados: ver Historial.
 
 **Estado:** corregido y verificado en local; publicación automática autorizada. Verificación en producción: ver Historial.
 
+## 27. Veinte productos por página en escritorio (2026-11-21)
+
+| ID | Qué | Estado |
+|---|---|---|
+| GRID-02 | Escritorio: 20 productos por página (4 filas completas de 5). Tablet y móvil: 10 (5 filas de 2), sin cambios | PUBLICADO; ver Historial |
+
+**Reglas:**
+- **Tamaño de página por ancho:** más de 900 px, 20 (mismo corte que las 5 columnas de `#productGrid`); hasta 900 px, 10. GRID-01 (§26.4) pasa de 10 a 20 por página solo en escritorio.
+- **Sin cambios en:** filtrar, buscar y ordenar antes de paginar; volver a la página 1 al cambiarlos; conservar la página al volver de una ficha; empezar en la página 1 al recargar. Ofertas, Novedades, Más elegidos y el diseño de las tarjetas no cambian.
+- **Al cruzar el corte** (girar la tablet, cambiar el ancho de la ventana): la página se recalcula para que el primer producto que se estaba viendo siga a la vista, sin omitir ni repetir productos.
+- **Imágenes:** siguen con carga diferida y las versiones WebP optimizadas (§26).
+
+**Archivos:** `js/app.js` (`pageSize` y recálculo al cambiar de ancho) y `scripts/test-catalog-search-images.mjs`.
+
+**Pruebas:**
+- **Suite completa:** 51 scripts, 1049 aprobadas y 0 fallidas.
+- **Navegador real con el catálogo real** (70 productos):
+  - 1440 y 1024: 20 por página en 4 filas de 5, 4 páginas;
+  - 768 y 390: 10 por página en 5 filas de 2, 7 páginas;
+  - sin productos repetidos ni ocultos; la última página muestra los restantes;
+  - búsqueda, palabras clave, orden y vuelta desde la ficha;
+  - cambio de ancho 1440 ↔ 768.
+- **Regresión:** precios por variante y promociones, checkout y navegación: ALL OK.
+
 ## Historial
 
 - **2026-10-28 (Fase 57):**

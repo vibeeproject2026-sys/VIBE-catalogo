@@ -108,13 +108,16 @@ await test("la subida de producto y de carrusel pasa siempre por la optimizació
 });
 
 console.log("Cuadrícula");
-await test("escritorio: 5 columnas en el catálogo paginado (10 = 2 filas completas); ≤ 900 px, 2 columnas", () => {
+await test("escritorio: 5 columnas y 20 por página (4 filas completas); ≤ 900 px, 2 columnas y 10 por página", () => {
   const css = fs.readFileSync(path.join(root, "css/styles.css"), "utf8");
   assert.match(css, /@media\(min-width:901px\)\{#productGrid\{grid-template-columns:repeat\(5,minmax\(0,1fr\)\)/);
   assert.match(css, /@media\(max-width:900px\)\{\s*\.grid\{grid-template-columns:repeat\(2,1fr\)\}/);
   const app = fs.readFileSync(path.join(root, "js/app.js"), "utf8");
-  assert.match(app, /const PAGE_SIZE = 10;/);
-  for (const cols of [5, 2]) assert.equal(10 % cols, 0);
+  // Escritorio 20 por página (4 filas de 5); tablet y móvil 10 (5 filas de 2), mismo corte de 900 px.
+  assert.ok(app.includes('window.matchMedia("(min-width: 901px)")'), "corte de escritorio a 901 px");
+  assert.ok(app.includes("const pageSize = () => (DESKTOP_GRID && DESKTOP_GRID.matches ? 20 : 10);"), "20 por página en escritorio, 10 en tablet y móvil");
+  assert.equal(20 % 5, 0);
+  assert.equal(10 % 2, 0);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

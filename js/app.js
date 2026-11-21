@@ -46,10 +46,14 @@ const DEFAULT_FILTERS = {
 // Fase 57 — shadeId/presentationId: opciones elegidas en la ficha abierta
 // (dos dimensiones independientes, ver js/variants.js).
 const state = { ...DEFAULT_FILTERS, product: null, variant: null, shadeId: null, presentationId: null, products: [], page: 1 };
-// Paginación del catálogo: 10 productos por página, sobre el resultado YA
-// filtrado y ordenado. La página vive en memoria (no en la URL): cualquier
-// cambio de filtro, categoría, búsqueda u orden vuelve a la página 1.
-const PAGE_SIZE = 10;
+// Paginación del catálogo sobre el resultado YA filtrado y ordenado. La
+// página vive en memoria (no en la URL): cualquier cambio de filtro,
+// categoría, búsqueda u orden vuelve a la página 1. Productos por página
+// según la cuadrícula: escritorio (> 900 px, 5 columnas) 20 = 4 filas
+// completas; tablet y móvil (≤ 900 px, 2 columnas) 10 = 5 filas. Mismo
+// corte que #productGrid en css/styles.css.
+const DESKTOP_GRID = typeof window !== "undefined" && window.matchMedia ? window.matchMedia("(min-width: 901px)") : null;
+const pageSize = () => (DESKTOP_GRID && DESKTOP_GRID.matches ? 20 : 10);
 const $ = s => document.querySelector(s);
 
 // Inicio de página en cada carga nueva (apertura, enlace externo, URL
@@ -360,10 +364,12 @@ function renderProducts() {
   list = sortProducts(list, state.sort);
   // Paginación sobre el resultado completo (filtrado + ordenado).
   const total = list.length;
-  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const size = pageSize();
+  const pages = Math.max(1, Math.ceil(total / size));
   state.page = Math.min(Math.max(1, Number(state.page) || 1), pages);
-  const start = (state.page - 1) * PAGE_SIZE;
-  const pageList = list.slice(start, start + PAGE_SIZE);
+  const start = (state.page - 1) * size;
+  const pageList = list.slice(start, start + size);
+  state.pageSize = size;
   $("#productGrid").innerHTML = pageList.map(productCard).join("");
   renderPagination(pages);
   updateFilterSortButton();
@@ -1325,6 +1331,18 @@ $("#activeFilters").addEventListener("click", (e) => {
 });
 
 bindProductGrid("#productGrid");
+
+// Al cruzar el corte escritorio ↔ tablet (girar la tablet, cambiar el
+// ancho de la ventana) cambia el tamaño de página: se mantiene a la vista
+// el primer producto que se estaba viendo, sin omitir ni repetir ninguno.
+if (DESKTOP_GRID) {
+  DESKTOP_GRID.addEventListener("change", () => {
+    if (!state.products.length) return;
+    const firstIndex = (state.page - 1) * (state.pageSize || pageSize());
+    state.page = Math.floor(firstIndex / pageSize()) + 1;
+    renderProducts();
+  });
+}
 
 // Paginación: cambiar de página conserva filtros y búsqueda y lleva a la
 // clienta al inicio de la sección de productos (no al inicio del sitio).
