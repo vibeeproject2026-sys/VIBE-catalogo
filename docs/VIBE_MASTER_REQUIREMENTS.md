@@ -1781,3 +1781,4 @@ Resultados: ver Historial.
   - **Excepciones:** la imagen principal de 113 y las 4 adicionales de 135 tienen textura muy fina y ninguna versión alcanzó PSNR 36 dB; conservan el original.
   - **Duplicados (no se borraron):** las 4 imágenes adicionales de 135 son el mismo archivo subido 4 veces (sha256 idéntico).
   - Sin cambios en POS, base de datos, productos, precios ni pedidos; ningún original se modificó ni borró.
+- **2026-11-21 (publicación de §27):** commit `29a3fb3` en `main`, desplegado en Production (Vercel, success); `js/app.js` de producción idéntico al commit. Verificado en `www.vibebeautycol.com` con los 72 productos reales: 1440 y 1024, 20 por página en 4 filas de 5 (4 páginas); 768 y 390, 10 en 5 filas de 2 (8 páginas). Sin productos repetidos ni ocultos; búsqueda, orden, vuelta desde la ficha y cambio de ancho correctos; flujo de tonos hasta el checkout interceptado, sin errores de consola.
