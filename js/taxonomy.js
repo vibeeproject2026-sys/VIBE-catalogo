@@ -190,8 +190,9 @@ export function getSubcategories(products, group, category) {
 // aquí). Cada uno es estrictamente opuesto por defecto (ausente/false no
 // filtra nada) — mismo comportamiento de siempre para cualquier llamada
 // que no los use.
-// Búsqueda sin distinguir tildes ni mayúsculas: «acne» encuentra «Acné Patch».
-const searchFold = (s) => String(s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+// Búsqueda sin distinguir tildes, mayúsculas ni espacios repetidos: «acne»
+// encuentra «Acné Patch».
+const searchFold = (s) => String(s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ");
 
 export function filterProducts(products, { group, category, subcategory, search, available, promo, featuredOnly, newOnly, brand } = {}) {
   const q = searchFold(search || "").trim();

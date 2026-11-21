@@ -39,6 +39,92 @@ function readFileAsDataUrl(file) {
   });
 }
 
+// Optimización automática de imágenes al subirlas (producto y carrusel).
+// Se hace en el navegador, antes de enviar: no requiere dependencias en el
+// servidor y evita el límite de cuerpo de Vercel, así que también se puede
+// subir directamente una foto pesada de cámara. Reglas:
+// - orientación EXIF corregida (createImageBitmap «from-image»);
+// - se reduce, nunca se agranda, manteniendo la proporción, sin recortes,
+//   dentro de la caja de su uso y sin bajar de los mínimos que valida el
+//   servidor (api/admin/_lib/imageValidation.js);
+// - WebP calidad 0,85 (alta: color de empaques y tonos); si el navegador no
+//   sabe codificar WebP, JPEG 0,9; el re-codificado elimina los metadatos;
+// - si la imagen ya está optimizada (WebP dentro de la caja y más liviana
+//   que el resultado), se sube tal cual: nunca se procesa dos veces.
+// Si algo falla, la imagen NO se sube (sin referencias rotas).
+const MAX_SOURCE_BYTES = 40 * 1024 * 1024; // foto original antes de optimizar
+const IMAGE_PROFILES = {
+  "product:main": { maxW: 1200, maxH: 1500, minW: 800, minH: 1000 },
+  "product:secondary": { maxW: 1200, maxH: 1200, minW: 400, minH: 400 },
+  "hero:desktop": { maxW: 2400, maxH: 2400, minW: 1200, minH: 900 },
+  "hero:mobile": { maxW: 1200, maxH: 1600, minW: 800, minH: 1000 },
+};
+const WEBP_QUALITY = 0.85;
+// Escala: la mayor reducción que respeta la caja, sin bajar de los mínimos
+// ni agrandar (1 = tamaño original).
+function optimizeScale(w, h, p) {
+  const fit = Math.min(1, p.maxW / w, p.maxH / h);
+  const floor = Math.min(1, Math.max(p.minW / w, p.minH / h));
+  return Math.max(fit, floor);
+}
+function canvasToBlob(canvas, type, quality) {
+  return new Promise((resolve) => canvas.toBlob(resolve, type, quality));
+}
+async function optimizeImageForUpload(file, profileKey) {
+  const profile = IMAGE_PROFILES[profileKey];
+  const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+  try {
+    const scale = optimizeScale(bitmap.width, bitmap.height, profile);
+    const width = Math.max(1, Math.round(bitmap.width * scale));
+    const height = Math.max(1, Math.round(bitmap.height * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(bitmap, 0, 0, width, height);
+    let blob = await canvasToBlob(canvas, "image/webp", WEBP_QUALITY);
+    if (!blob || blob.type !== "image/webp") blob = await canvasToBlob(canvas, "image/jpeg", 0.9);
+    if (!blob || !blob.size) throw new Error("no se pudo codificar la imagen");
+    const stats = { beforeBytes: file.size, beforeW: bitmap.width, beforeH: bitmap.height, width, height };
+    if (file.type === "image/webp" && scale === 1 && file.size <= blob.size) {
+      return { file, stats: { ...stats, afterBytes: file.size, kept: true } };
+    }
+    const ext = blob.type === "image/webp" ? "webp" : "jpg";
+    const name = (file.name || "imagen").replace(/\.[^.]+$/, "") + "." + ext;
+    return { file: new File([blob], name, { type: blob.type }), stats: { ...stats, afterBytes: blob.size, kept: false } };
+  } finally {
+    if (bitmap.close) bitmap.close();
+  }
+}
+const kb = (n) => (n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
+function optimizationSummary(s) {
+  if (!s) return "";
+  return s.kept
+    ? ` Ya estaba optimizada (${s.width}×${s.height}, ${kb(s.afterBytes)}).`
+    : ` Optimizada automáticamente: ${kb(s.beforeBytes)} → ${kb(s.afterBytes)} (${s.beforeW}×${s.beforeH} → ${s.width}×${s.height}).`;
+}
+// Paso común antes de subir: valida el tipo, optimiza y devuelve el archivo
+// listo, o null tras escribir el motivo en statusEl.
+async function prepareImageForUpload(file, profileKey, statusEl) {
+  if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+    setImageStatus(statusEl, "error", "No se guardó la imagen. Motivo: tipo de archivo no permitido (usa WebP, JPEG o PNG).");
+    return null;
+  }
+  if (file.size > MAX_SOURCE_BYTES) {
+    setImageStatus(statusEl, "error", `No se guardó la imagen. Motivo: pesa ${kb(file.size)}; el máximo para optimizar es ${kb(MAX_SOURCE_BYTES)}.`);
+    return null;
+  }
+  setImageStatus(statusEl, "pending", "Optimizando imagen...");
+  try {
+    return await optimizeImageForUpload(file, profileKey);
+  } catch {
+    setImageStatus(statusEl, "error", "No se guardó la imagen. Motivo: no se pudo optimizar el archivo (¿está dañado?). Prueba con otro JPG, PNG o WebP.");
+    return null;
+  }
+}
+
 // Fase estabilización — bug reportado: un upload guardado-con-warning
 // ("peso sobre el objetivo de 300KB") y uno realmente rechazado se veían
 // EXACTAMENTE igual (mismo texto gris neutro, .image-status), así que no
@@ -58,11 +144,10 @@ function setImageStatus(el, kind, text) {
 // success, or null (after writing a message into statusEl) on failure —
 // the server is always re-checked even when the quick client-side check
 // above already passed.
-async function uploadProductImage(productId, file, slot, statusEl) {
-  if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
-    setImageStatus(statusEl, "error", "No se guardó la imagen. Motivo: tipo de archivo no permitido (usa WebP, JPEG o PNG).");
-    return null;
-  }
+async function uploadProductImage(productId, originalFile, slot, statusEl) {
+  const prepared = await prepareImageForUpload(originalFile, slot === "main" ? "product:main" : "product:secondary", statusEl);
+  if (!prepared) return null;
+  const file = prepared.file;
   if (file.size > MAX_UPLOAD_BYTES) {
     setImageStatus(
       statusEl,
@@ -99,9 +184,9 @@ async function uploadProductImage(productId, file, slot, statusEl) {
     // 300KB es un objetivo, nunca un límite duro (confirmado contra el
     // handler real: un archivo de 498KB responde 200 y se guarda) — el
     // texto lo deja explícito para que nunca se lea como un rechazo.
-    setImageStatus(statusEl, "warn", "Imagen guardada correctamente. Advertencia: " + payload.warnings.join(" "));
+    setImageStatus(statusEl, "warn", "Imagen guardada correctamente." + optimizationSummary(prepared.stats) + " Advertencia: " + payload.warnings.join(" "));
   } else {
-    setImageStatus(statusEl, "ok", "Imagen guardada correctamente.");
+    setImageStatus(statusEl, "ok", "Imagen guardada correctamente." + optimizationSummary(prepared.stats));
   }
   return payload;
 }
@@ -2014,11 +2099,10 @@ function updateHeroPreview() {
   });
 }
 
-async function uploadHeroImage(slideId, file, slot, statusEl) {
-  if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
-    setImageStatus(statusEl, "error", "No se guardó la imagen. Motivo: tipo de archivo no permitido (usa WebP, JPEG o PNG).");
-    return null;
-  }
+async function uploadHeroImage(slideId, originalFile, slot, statusEl) {
+  const prepared = await prepareImageForUpload(originalFile, slot === "mobile" ? "hero:mobile" : "hero:desktop", statusEl);
+  if (!prepared) return null;
+  const file = prepared.file;
   if (file.size > MAX_UPLOAD_BYTES) {
     setImageStatus(
       statusEl,
@@ -2065,9 +2149,9 @@ async function uploadHeroImage(slideId, file, slot, statusEl) {
     // 300KB es un objetivo, nunca un límite duro (confirmado contra el
     // handler real: un archivo de 498KB responde 200 y se guarda) — el
     // texto lo deja explícito para que nunca se lea como un rechazo.
-    setImageStatus(statusEl, "warn", "Imagen guardada correctamente. Advertencia: " + payload.warnings.join(" "));
+    setImageStatus(statusEl, "warn", "Imagen guardada correctamente." + optimizationSummary(prepared.stats) + " Advertencia: " + payload.warnings.join(" "));
   } else {
-    setImageStatus(statusEl, "ok", "Imagen guardada correctamente.");
+    setImageStatus(statusEl, "ok", "Imagen guardada correctamente." + optimizationSummary(prepared.stats));
   }
   return payload.slide;
 }

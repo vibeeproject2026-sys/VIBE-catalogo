@@ -137,6 +137,10 @@ function normalizeApiProduct(p) {
     shortDescription: p.shortDescription ?? "",
     description: p.description ?? "",
     benefits: Array.isArray(p.benefits) ? p.benefits : [],
+    // Palabras clave editoriales (Admin → catalog_metadata → API): solo se
+    // usan para buscar; la ficha no las muestra. Antes se descartaban aquí,
+    // así que la búsqueda nunca las veía.
+    searchKeywords: Array.isArray(p.searchKeywords) ? p.searchKeywords.filter((k) => typeof k === "string" && k.trim()).map((k) => k.trim()) : [],
     ingredients: p.ingredients ?? null,
     usage: p.usage ?? "",
     presentation: p.presentation ?? "",

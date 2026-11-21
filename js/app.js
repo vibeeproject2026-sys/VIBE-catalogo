@@ -156,13 +156,13 @@ function productImage(p, cls = "product-photo") {
   // Fase 57 — con versiones optimizadas (p.imageSrcset), el navegador
   // elige el ancho justo; data-fallback-src devuelve el original si alguna
   // versión falla (ver listener "error" más abajo).
-  const optimized = p.image && p.imageSrcset ? ` srcset="${esc(p.imageSrcset)}" sizes="(max-width: 900px) 50vw, 300px" data-fallback-src="${esc(p.image)}"` : "";
+  const optimized = p.image && p.imageSrcset ? ` srcset="${esc(p.imageSrcset)}" sizes="(max-width: 900px) 50vw, 240px" data-fallback-src="${esc(p.image)}"` : "";
   return p.image ? `<img class="${cls}" src="${p.image}"${optimized} alt="${esc(p.name)}" loading="lazy" decoding="async">` : `<span class="card-img-empty">${esc(p.imageLabel)}</span>`;
 }
 
 // Fase final — versiones optimizadas de CUALQUIER foto del producto
 // (galería, miniaturas, carrito, checkout), no solo la principal.
-const SIZES_CARD = "(max-width: 900px) 50vw, 300px";
+const SIZES_CARD = "(max-width: 900px) 50vw, 240px";
 const SIZES_PDP = "(max-width: 900px) 100vw, 560px";
 const SIZES_THUMB = "96px";
 function srcsetOf(p, url) {

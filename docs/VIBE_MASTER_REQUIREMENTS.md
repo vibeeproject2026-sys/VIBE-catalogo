@@ -1576,6 +1576,106 @@ Cada línea de `orders.items` guarda, calculado por el servidor:
 
 **Estado:** corregido y verificado en local; publicación automática autorizada. Verificación en producción: ver Historial.
 
+## 26. Imágenes optimizadas, palabras clave y cuadrícula completa (2026-11-21)
+
+| ID | Qué | Estado |
+|---|---|---|
+| IMG-OPT-01 | Optimización automática de toda imagen subida desde Admin (producto y carrusel) | IMPLEMENTADO; ver Estado |
+| IMG-OPT-02 | Optimización controlada de las imágenes ya publicadas | Ver §26.2 e Historial |
+| SRCH-KW-01 | Las palabras clave de Admin sirven para buscar en la tienda | CORREGIDO; ver Estado |
+| GRID-01 | Cada página del catálogo muestra sus 10 productos en filas completas | CORREGIDO; ver Estado |
+
+### 26.1 Optimización automática al subir (IMG-OPT-01)
+
+**Infraestructura:** las funciones del servidor no tienen dependencias de imagen (sin `package.json`) y Vercel limita el cuerpo de la petición; hasta ahora se rechazaba cualquier archivo de más de 3 MB.
+
+**Solución:** se optimiza en el navegador del Admin antes de subir (`createImageBitmap` + `canvas`), sin dependencias nuevas. El servidor sigue validando tipo, peso y dimensiones como antes.
+
+**Reglas:**
+- **Orientación:** se corrige la EXIF.
+- **Tamaño:** se reduce, nunca se agranda, manteniendo la proporción y sin recortes, dentro de la caja de cada uso y sin bajar de los mínimos que valida el servidor. Cajas:
+  - producto principal: 1200×1500 (mínimo 800×1000);
+  - adicional: 1200×1200 (mínimo 400×400);
+  - carrusel escritorio: 2400×2400 (mínimo 1200×900);
+  - carrusel móvil: 1200×1600 (mínimo 800×1000).
+- **Formato:** WebP calidad 0,85; si el navegador no codifica WebP, JPEG 0,9.
+- **Metadatos:** se eliminan al recodificar.
+- **Sin doble proceso:** un WebP que ya cabe y es más liviano se sube tal cual.
+- **Original de cámara:** hasta 40 MB.
+- **Si la optimización falla,** no se sube nada y se informa el motivo.
+- **Confirmación en Admin:** p. ej. «Optimizada automáticamente: 2.2 MB → 78 KB (4000×5000 → 1200×1500)».
+
+**Verificado** en navegador real con API simulada, capturando lo subido:
+
+| Archivo | Antes | Después | Fidelidad (PSNR) |
+|---|---|---|---|
+| JPG de cámara, vertical, girado por EXIF | 2,2 MB, 4000×5000 | 78 KB, 1200×1500 | 37,4 dB |
+| PNG real de producto | 1,5 MB | 82 KB, mismas dimensiones | 37,7 dB |
+| WebP adicional | 27 KB | 23 KB | 44,5 dB |
+| Banner panorámico del carrusel | 1,9 MB | 140 KB, proporción conservada | 38,9 dB |
+
+Archivo dañado: no se sube y se informa. Sin metadatos en ningún resultado.
+
+### 26.2 Imágenes ya publicadas (IMG-OPT-02)
+
+**Diagnóstico:** de 179 imágenes de productos publicadas, solo 12 tenían versiones optimizadas. Las demás eran 152 PNG, 12 JPG y 3 WebP, de hasta 1,5 MB.
+
+**Proceso controlado** (mecanismo de la Fase 57, sin tocar originales ni base de datos):
+1. Generar versiones WebP (producto 480/800/1200; carrusel 640/1024/1672; nunca más anchas que el original) con fidelidad PSNR ≥ 36 dB. Los anchos que no la alcanzan se descartan.
+2. Subirlas a `optimized/…` sin sobrescribir y verificar cada URL pública.
+3. Comprobar que los originales siguen idénticos (sha256).
+4. Respaldar el manifiesto y verificar el respaldo.
+5. Agregar las entradas nuevas al manifiesto, conservando las anteriores, y verificarlo.
+
+La tienda elige el ancho justo con `srcset` y vuelve al original si una versión falla.
+
+**Para revertir:** restaurar el respaldo del manifiesto. Los originales nunca se borraron.
+
+Resultados: ver Historial.
+
+### 26.3 Palabras clave en la búsqueda (SRCH-KW-01)
+
+**Causa raíz:** la cadena Admin («una por línea») → `catalog_metadata.search_keywords` → API (`searchKeywords`) funcionaba, pero el normalizador del navegador (`js/data-source.js`) no copiaba el campo. La búsqueda nunca lo veía.
+
+**Solución:**
+- Se conserva el campo: solo textos con contenido, sin espacios sobrantes.
+- La búsqueda ignora tildes, mayúsculas y espacios repetidos.
+- Cada producto aparece una sola vez.
+- Las palabras clave no se muestran en la tienda.
+
+**Datos reales:**
+- Acne Patch no tiene palabras clave configuradas en Admin (no se inventaron).
+- El único producto con palabras clave es Makeup Brush Set («brochas», «set de brochas», «maquillaje»). Antes, «Set de Brochas» daba 0 resultados en producción; ahora lo encuentra.
+- Los ejemplos de la propietaria («acne», «parches», «granitos», «imperfecciones», «cuidado facial») se probaron con datos de prueba, de Admin a la búsqueda, incluido que un cambio de palabras clave cambia los resultados.
+
+### 26.4 Cuadrícula y paginación (GRID-01)
+
+**Causa raíz:** no se perdía ningún producto (10 tarjetas renderizadas, ninguna oculta, sin errores). Dos efectos lo parecían:
+1. **Columnas:** con 4 columnas en escritorio, las 10 tarjetas quedaban en 4 + 4 + 2: la última fila con dos huecos justo antes de la paginación, como si la página se cortara.
+2. **Tarjetas en blanco:** con imágenes PNG de hasta 1,5 MB sin optimizar, las tarjetas se veían grises varios segundos (0 de 10 imágenes cargadas al abrir).
+
+**Solución:**
+- El catálogo paginado usa 5 columnas por encima de 900 px: 10 = 2 filas completas. Hasta 900 px siguen 2 columnas (5 filas completas). Ofertas y relacionados no cambian.
+- El `sizes` de las tarjetas se ajusta al nuevo ancho.
+- Las imágenes se optimizan (§26.1 y §26.2).
+- **Sin cambios:** 10 por página, filtrar y ordenar antes de paginar, volver a la página 1 al cambiar filtros/búsqueda/orden, conservar la página al volver de una ficha.
+
+**Archivos:** `admin/admin.js`, `js/data-source.js`, `js/taxonomy.js`, `js/app.js`, `css/styles.css` y `scripts/test-catalog-search-images.mjs` (nuevo, 9 pruebas).
+
+**Pruebas:**
+- **Suite completa:** 51 scripts, **1049 aprobadas y 0 fallidas**.
+- **Navegador real con el catálogo real**, a 1440, 1024, 768 y 390:
+  - página 1 con 10 productos en filas completas (5+5 o 2×5);
+  - 7 páginas que recorren los 65 productos sin repetir ni ocultar;
+  - volver de la ficha conserva la página; cambiar el orden vuelve a la página 1;
+  - búsquedas «brochas», «Set de Brochas», «acne» y «acné» sin duplicados;
+  - sin errores de consola.
+- **Producción antes del cambio:** filas 4+4+2 y «Set de Brochas» con 0 resultados (reproducido).
+- **Regresión en navegador:** precios por variante y promociones, checkout, las cuatro mejoras de §24, Admin y las 65 fichas: ALL OK.
+- **Capturas:** `Catalogo VIBE/entregables-imagenes/`.
+
+**Estado:** corregido y verificado en local; publicación automática autorizada. Verificación en producción: ver Historial.
+
 ## Historial
 
 - **2026-10-28 (Fase 57):**
