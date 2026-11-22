@@ -1850,6 +1850,79 @@ Banner y catálogo siempre visibles; las demás se activan u ocultan desde el Ad
 - **Regresión en navegador:** precios por variante y promociones, checkout, navegación y paginación, carrito, cuadrícula y búsqueda con datos reales, Admin de variantes y barrido de las 77 fichas: ALL OK.
 - **Contra datos reales (solo lectura):** taxonomía vigente con los 6 grupos («Accesorios beauty» con sus 2 categorías); organización por defecto (sin colecciones, sin lanzamiento); ranking de 11 productos publicados por unidades. Solo peticiones GET.
 
+## 30. Reclasificación integral de productos publicados (2026-11-22)
+
+**Alcance:** el 100 % de los productos publicados (79 en el inventario inicial, más #103, que la propietaria publicó durante el proceso), incluidos los que ya tenían categoría. El único no publicado (#162) no se tocó.
+
+**Mecanismo:** los mismos manejadores del Admin, ejecutados con las credenciales del servidor (el token del Admin de producción no está disponible localmente: 401).
+- **Taxonomía:** `/api/admin/products?resource=taxonomy`, una acción a la vez, con control de revisión (revisiones 1 a 15). Solo altas: no se renombró ni eliminó nada.
+- **Fichas:** `/api/admin/catalog-metadata` con solo `category` y `subcategory`, validadas contra la taxonomía vigente; el guardado actualiza únicamente esas columnas.
+- **Antes de aplicar:** simulación completa sin escrituras, y comprobación de que cada producto seguía publicado, con el mismo nombre y la misma clasificación del inventario.
+
+**Categorías y subcategorías nuevas (15 altas):**
+- **Maquillaje › Labios:** «Delineadores de labios», «Bálsamos labiales».
+- **Skincare:** categoría «Protección solar»; en Tratamiento, «Hidratantes en barra» y «Parches».
+- **Sets y regalos:** «Kits de maquillaje» (Labios, Rostro, Ojos), «Kits de skincare», «Kits de cuidado personal», «Calendarios y cajas sorpresa», «Sets de regalo».
+- **Cuidado personal:** «Manos y pies» › «Cremas de manos».
+- **Fragancias y bienestar:** sin productos publicados; queda sin categorías y no se muestra en la tienda.
+
+**Reclasificados (23):**
+
+| # | Producto | Antes | Después | Motivo |
+|---|---|---|---|---|
+| 59 | Suprliner | Labios › Kits de labios | Labios › Delineadores de labios | delineador de labios individual |
+| 132 | Signature Lip Pencil | Labios › Kits de labios | Labios › Delineadores de labios | delineador de labios individual |
+| 142 | Cactus Lip Balm | Labios › Gloss y oils | Labios › Bálsamos labiales | bálsamo labial con SPF |
+| 83 | VIBE Candy Case | Labios › Kits de labios | Kits de maquillaje › Labios | set labial + brillo |
+| 109 | Kit rainbow | Labios › Kits de labios | Kits de maquillaje › Labios | set gloss + bálsamo |
+| 110 | VIBE Lip Duo | Labios › Kits de labios | Kits de maquillaje › Labios | set delineador + labial |
+| 149 | Kit Monster | Labios › Kits de labios | Kits de maquillaje › Labios | set de tres brillos |
+| 140 | Rose Halo | Rostro › Kits de rostro | Kits de maquillaje › Rostro | set rubor + iluminador |
+| 106 | Set Perfect Lips | Labios › Kits de labios | Kits de maquillaje › Ojos | su descripción es un set de ojos y cejas (el nombre dice «Lips») |
+| 147 | Follow The Star | Rostro › Kits de rostro | Sets de regalo | set navideño de maquillaje + crema de manos |
+| 173 | Calendario Adviento Beauty | Rostro › Kits de rostro | Calendarios y cajas sorpresa | caja sorpresa |
+| 174 | Calendario Adviento Vibe | Rostro › Kits de rostro | Calendarios y cajas sorpresa | caja sorpresa |
+| 64 | Sakura Vibe Kit | Tratamiento › Kits | Kits de cuidado personal | set de cuerpo, manos y labios |
+| 165 | Removal of Acné kit | Tratamiento › Kits | Kits de skincare | kit de rutina facial de 3 piezas |
+| 170 | Centella Asiática Kit | Tratamiento › Kits | Kits de skincare | kit de rutina facial de 6 pasos |
+| 116 | Serum Perfect Lash | Ojos › Máscara de pestañas | Tratamiento › Pestañas y cejas (crecimiento) | esencia de cuidado de pestañas |
+| 91 | VIBE Oil Papers | Complementos de belleza › Cuidado personal | Tratamiento › Papel matificante | hojas absorbentes faciales |
+| 129 | Bye Bye Oil | Limpieza › Limpiadores | Tratamiento › Papel matificante | papel absorbente, no limpiador |
+| 131 | Oil Control | Limpieza › Limpiadores | Tratamiento › Papel matificante | papel absorbente, no limpiador |
+| 145 | Ice Stick | Tratamiento › Mascarillas | Tratamiento › Hidratantes en barra | barra hidratante, no mascarilla |
+| 175 | Acne Patch | Tratamiento › Mascarillas | Tratamiento › Parches | parches hidrocoloides |
+| 155 | Sun Screen | Tratamiento › Cremas faciales | Protección solar | protector solar SPF 50 |
+| 163 | Fruit Hand Cream | Tratamiento › (sin subcategoría) | Manos y pies › Cremas de manos | crema de manos |
+
+**Conservaron su clasificación (57):** ya era la más precisa. Son 56 del inventario inicial más #103 «VIBE Love-Blend Kit» (Accesorios beauty › Herramientas de aplicación › Esponjas, set de esponjas y borlas), publicado por la propietaria durante el proceso con esa clasificación, que coincide con el resto de las esponjas.
+
+**Pendientes por ambigüedad: 0.** Para revisar por la propietaria: el nombre de #106 «Set Perfect Lips» contradice su contenido (ojos y cejas). Se clasificó por su uso real; conviene corregir el nombre en el POS si corresponde.
+
+**Distribución publicada:**
+
+| Grupo | Productos |
+|---|---|
+| Maquillaje | 41 |
+| Skincare | 20 |
+| Sets y regalos | 12 |
+| Accesorios beauty | 6 (con #103) |
+| Cuidado personal | 1 |
+| Fragancias y bienestar | 0 |
+
+**Validación integral (comparación de datos antes y después):**
+- **POS:** `products` idéntico (95 productos: nombres, precios, inventario, promociones, imágenes, descripciones).
+- **Fichas:** solo cambiaron `category`/`subcategory` de los 23 previstos; ningún otro campo de ninguna ficha (imágenes, descripciones, tonos y presentaciones dentro de `additional_info`, publicación) cambió.
+- **No publicados:** #162 idéntico, incluida su fecha de actualización.
+- **Taxonomía guardada:** revisión 15. Publicados sin clasificación válida: 0. Sin productos duplicados.
+- **Colecciones y etiquetas:** intactas (el documento comercial sigue sin existir). Ventas y pedidos sin tocar.
+- **Producción, a 1440, 1024, 768 y 390:**
+  - pestañas Maquillaje, Skincare, Sets y regalos, Accesorios beauty y Cuidado personal;
+  - «Sets y regalos» con 12 productos y «Kits de maquillaje» con 6; «Protección solar» con Sun Screen; «Labios» ya sin kits;
+  - búsqueda y paginación, flujo de tonos hasta el checkout interceptado, carrito y barrido de las 80 fichas: ALL OK, sin errores;
+  - Más elegidos sin cambios.
+- **Sin cambios de código:** no hubo commit de código ni despliegue; solo este registro.
+- **Datos de respaldo:** copia de `catalog_metadata` y `products` antes y después, para revertir si hiciera falta (fuera del repositorio).
+
 ## Historial
 
 - **2026-10-28 (Fase 57):**
@@ -1934,3 +2007,4 @@ Banner y catálogo siempre visibles; las demás se activan u ocultan desde el Ad
 - **2026-11-21 (publicación de §27):** commit `29a3fb3` en `main`, desplegado en Production (Vercel, success); `js/app.js` de producción idéntico al commit. Verificado en `www.vibebeautycol.com` con los 72 productos reales: 1440 y 1024, 20 por página en 4 filas de 5 (4 páginas); 768 y 390, 10 en 5 filas de 2 (8 páginas). Sin productos repetidos ni ocultos; búsqueda, orden, vuelta desde la ficha y cambio de ancho correctos; flujo de tonos hasta el checkout interceptado, sin errores de consola.
 - **2026-11-21 (publicación de §28):** commit `aac23e5` en `main`, desplegado en Production (Vercel, success); `js/app.js`, `css/styles.css` e `index.html` de producción idénticos al commit. Verificado en `www.vibebeautycol.com` a 1440, 1024, 768, 390 y 320 px con productos reales (Bye Bye Oil, Cactus Lip Balm, Candy Case, Heart Flush, Acne Patch): «Eliminar» completo y con texto, descripciones completas sin desborde, eliminación por botón y por deslizamiento, «Continuar comprando» conserva el carrito, subtotal y contador correctos, checkout interceptado; sin errores de consola.
 - **2026-11-22 (publicación de §29, organización comercial):** commit `b964c19` en `main`, desplegado en Production (Vercel, success); archivos de producción idénticos al commit. Verificado en `www.vibebeautycol.com` con datos reales a 1440, 1024, 768 y 390: banner › Más elegidos (10 productos por unidades vendidas: 89, 67, 56, 68, 73, 77, 79, 96, 110, 120) › catálogo (pestañas Maquillaje, Skincare, Accesorios beauty) › Descubre tu VIBE. Novedades y Colecciones ocultas (sin lanzamiento oficial, sin fijados ni colecciones) y Ofertas oculta (sin promociones vigentes). Búsqueda, paginación, tonos, carrito y checkout interceptado correctos; sin errores de consola. `/api/catalog/products` sin cambios. Sin cambios en el POS ni en datos; ningún documento de organización comercial creado todavía (rigen los valores por defecto).
+- **2026-11-22 (reclasificación integral, §30):** 80 productos publicados revisados; 23 reclasificados, 57 conservados, 0 pendientes; 15 categorías/subcategorías nuevas (taxonomía revisión 15). Solo cambió category/subcategory; POS, precios, inventario, imágenes, tonos, presentaciones, colecciones, ventas y pedidos intactos; el no publicado #162 sin cambios. Verificado en producción a 1440, 1024, 768 y 390.
