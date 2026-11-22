@@ -225,7 +225,7 @@ export function getSubcategories(products, group, category) {
 // encuentra «Acné Patch».
 const searchFold = (s) => String(s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ");
 
-export function filterProducts(products, { group, category, subcategory, search, available, promo, featuredOnly, newOnly, brand, collection, tag } = {}) {
+export function filterProducts(products, { group, category, subcategory, search, available, promo, featuredOnly, newOnly, brand, collection, tag, newIds } = {}) {
   const q = searchFold(search || "").trim();
   return products.filter((p) => {
     // Organización comercial: colección y etiqueta (asignadas en el Admin).
@@ -237,7 +237,10 @@ export function filterProducts(products, { group, category, subcategory, search,
     if (available === true && p.available === false) return false;
     if (promo === true && p.promoActive !== true) return false;
     if (featuredOnly === true && p.featured !== true) return false;
-    if (newOnly === true && !isNewBadge(p)) return false;
+    // Novedades: con la lista de la vitrina (newIds, desde js/app.js) solo
+    // cuentan los productos fijados o del lanzamiento oficial; la etiqueta
+    // antigua «Nuevo» solo se usa si no se pasa esa lista.
+    if (newOnly === true && !(newIds instanceof Set ? newIds.has(Number(p.id)) : isNewBadge(p))) return false;
     if (brand && p.brand !== brand) return false;
     if (q) {
       // Fase 36 — brand ya estaba en el shape del producto pero nunca se

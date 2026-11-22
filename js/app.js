@@ -55,7 +55,7 @@ let merch = null;
 let bestSellerIds = [];
 // Fase 57 — shadeId/presentationId: opciones elegidas en la ficha abierta
 // (dos dimensiones independientes, ver js/variants.js).
-const state = { ...DEFAULT_FILTERS, product: null, variant: null, shadeId: null, presentationId: null, products: [], page: 1 };
+const state = { ...DEFAULT_FILTERS, product: null, variant: null, shadeId: null, presentationId: null, products: [], page: 1, newIds: new Set() };
 // Paginación del catálogo sobre el resultado YA filtrado y ordenado. La
 // página vive en memoria (no en la URL): cualquier cambio de filtro,
 // categoría, búsqueda u orden vuelve a la página 1. Productos por página
@@ -477,16 +477,23 @@ const SECTION_IDS = { hero: "inicio", novedades: "novedades", masElegidos: "masE
 const SECTION_NAV_LINKS = { novedades: ["#navNovedades", "#mobileNavNovedades"], masElegidos: ["#navElegidos", "#mobileNavElegidos"], ofertas: ["#navOfertas", "#mobileNavOfertas", 'footer a[href="#ofertas"]'], descubre: ["#navDescubre", "#mobileNavDescubre"] };
 const sectionVisible = {};
 
+// Layout aprobado: Novedades y Más elegidos son DESTINOS del menú superior,
+// no bloques fijos del inicio. Solo se muestran cuando la clienta los abre
+// desde su botón; Novedades sin productos fijados muestra un aviso discreto.
+const showcaseOpen = { novedades: false, masElegidos: false };
 function renderShowcaseGrid(sectionId, titleId, gridId, cfg, items) {
-  const show = Boolean(cfg && cfg.active !== false && items.length);
-  $("#" + sectionId).classList.toggle("hidden", !show);
-  if (!show) {
-    $("#" + gridId).innerHTML = "";
-    return false;
-  }
-  $("#" + titleId).textContent = cfg.title;
-  $("#" + gridId).innerHTML = items.map(productCard).join("");
-  return true;
+  const has = Boolean(cfg && cfg.active !== false && items.length);
+  const open = showcaseOpen[sectionId] === true;
+  $("#" + sectionId).classList.toggle("hidden", !open);
+  if (cfg && cfg.title) $("#" + titleId).textContent = cfg.title;
+  $("#" + gridId).innerHTML = has ? items.map(productCard).join("") : open ? `<p class="empty">${sectionId === "novedades" ? "Muy pronto encontrarás aquí las novedades de VIBE." : "Muy pronto verás aquí los favoritos de VIBE."}</p>` : "";
+  return has;
+}
+function openShowcase(key) {
+  showcaseOpen.novedades = key === "novedades";
+  showcaseOpen.masElegidos = key === "masElegidos";
+  renderShowcases();
+  $("#" + key).scrollIntoView({ behavior: "smooth" });
 }
 
 function renderCollections() {
@@ -508,7 +515,12 @@ function renderCollections() {
 
 function renderShowcases() {
   const sc = merch && merch.showcases ? merch.showcases : null;
-  sectionVisible.novedades = sc ? renderShowcaseGrid("novedades", "novedadesTitle", "novedadesGrid", sc.novedades, selectNovedades(state.products, sc.novedades, sc.novedades.autoProductIds || [])) : renderShowcaseGrid("novedades", "novedadesTitle", "novedadesGrid", null, []);
+  // Novedades: solo fijados a mano y, cuando exista el lanzamiento oficial,
+  // los incorporados después de esa fecha (autoProductIds, calculado en el
+  // servidor solo con launchDate). Nunca la etiqueta antigua «Nuevo».
+  const novedades = sc ? selectNovedades(state.products, sc.novedades, sc.novedades.autoProductIds || []) : [];
+  state.newIds = new Set(novedades.map((p) => Number(p.id)));
+  sectionVisible.novedades = renderShowcaseGrid("novedades", "novedadesTitle", "novedadesGrid", sc ? sc.novedades : null, novedades);
   sectionVisible.masElegidos = sc ? renderShowcaseGrid("masElegidos", "masElegidosTitle", "masElegidosGrid", sc.masElegidos, selectBestSellers(state.products, sc.masElegidos, bestSellerIds)) : renderShowcaseGrid("masElegidos", "masElegidosTitle", "masElegidosGrid", null, []);
   sectionVisible.colecciones = renderCollections();
   applySectionLayout();
@@ -528,12 +540,9 @@ function applySectionLayout() {
     if (section === "novedades" || section === "masElegidos") continue; // estos enlaces tienen alternativa (ver más abajo)
     for (const sel of links) document.querySelectorAll(sel).forEach((a) => a.classList.toggle("hidden", !sectionVisible[section]));
   }
-  if (!sc || !Array.isArray(sc.order)) return;
-  const anchor = document.getElementById("instagram");
-  for (const key of sc.order) {
-    const el = document.getElementById(SECTION_IDS[key]);
-    if (el && anchor && el.parentNode === anchor.parentNode) anchor.parentNode.insertBefore(el, anchor);
-  }
+  // Layout aprobado: el orden de las secciones del inicio es el de
+  // index.html (banner principal › franja › Descubre tu VIBE › catálogo…).
+  // El orden guardado en el Admin ya no reordena la página.
 }
 
 // Descubre tu VIBE: con selecciones configuradas en el Admin (categorías,
@@ -1382,8 +1391,7 @@ document.querySelectorAll("#navNovedades, #mobileNavNovedades").forEach((el) => 
     e.preventDefault();
     // Organización comercial: si la vitrina Novedades está visible, el
     // enlace lleva a ella; si no, al filtro de siempre.
-    if (sectionVisible.novedades) { $("#novedades").scrollIntoView({ behavior: "smooth" }); return; }
-    goToFilter({ newOnly: true });
+    openShowcase("novedades"); // fijados (o aviso discreto); nunca la etiqueta antigua «Nuevo»
   });
 });
 // Fase 46 — "Más elegidos": selección editorial = productos marcados
@@ -1393,7 +1401,7 @@ document.querySelectorAll("#navNovedades, #mobileNavNovedades").forEach((el) => 
 document.querySelectorAll("#navElegidos, #mobileNavElegidos").forEach((el) => {
   el.addEventListener("click", (e) => {
     e.preventDefault();
-    if (sectionVisible.masElegidos) { $("#masElegidos").scrollIntoView({ behavior: "smooth" }); return; }
+    if (sectionVisible.masElegidos) { openShowcase("masElegidos"); return; }
     goToFilter({ featuredOnly: true });
   });
 });
