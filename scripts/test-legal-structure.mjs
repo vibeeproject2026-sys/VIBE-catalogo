@@ -99,7 +99,7 @@ await test("legal.html coincide con js/legal.js y no depende de JavaScript", () 
   assert.equal(body, legalPageHtml(), "ejecuta: node scripts/build-legal.mjs");
   assert.doesNotMatch(page, /<script/);
   for (const id of ["envios", "pagos", "cambios", "datos", "contacto-legal"]) assert.match(page, new RegExp(`id="${id}"`));
-  assert.match(pageText, /Vigente desde el 28 de octubre de 2026\./);
+  assert.match(pageText, /Vigente desde el 22 de noviembre de 2026\./);
 });
 await test("legal.html: canonical en el dominio oficial, título y hoja de estilos del sitio", () => {
   assert.match(page, /<link rel="canonical" href="https:\/\/www\.vibebeautycol\.com\/legal\.html">/);

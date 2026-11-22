@@ -16,6 +16,9 @@
 // por completo al fallback (no se mezclan).
 import { getHeroSlides } from "./hero-source.js";
 import { buildSlideHref } from "./hero-links.js";
+// Analítica comercial: solo mide impresiones y clics de las piezas (con
+// consentimiento; ver js/analytics.js). No cambia el carrusel.
+import { instrumentBanners } from "./analytics.js";
 
 const FALLBACK_HERO_SLIDES = [
   { image: "assets/hero/slide-1.svg", alt: "Nueva colección VIBE", ctaHref: "#catalogo", order: 1, active: true },
@@ -118,6 +121,8 @@ async function initHeroCarousel() {
   }
 
   slidesEl.innerHTML = slides.map(heroSlideHtml).join("");
+  let shownIndex = 0;
+  const bannerSeen = instrumentBanners(root, slidesEl, slides.map((s, i) => ({ id: s.id != null ? String(s.id) : String(i + 1), name: s.title || s.alt || `Pieza ${i + 1}` })), () => shownIndex);
 
   // El contenedor asumía una proporción fija (4/5 en mobile, height fija
   // con object-fit:cover en desktop — ver css/styles.css) como si la
@@ -173,6 +178,8 @@ async function initHeroCarousel() {
   function render() {
     slidesEl.querySelectorAll(".hero-slide").forEach((el, i) => el.classList.toggle("active", i === current));
     dotsEl.querySelectorAll(".hero-dot").forEach((el, i) => el.classList.toggle("active", i === current));
+    shownIndex = current;
+    bannerSeen(current);
   }
 
   function goTo(index) {

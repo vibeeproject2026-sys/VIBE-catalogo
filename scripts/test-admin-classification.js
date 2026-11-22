@@ -165,10 +165,10 @@ async function main() {
     assert.match(fn[1], /while \(body\.firstChild\) section\.appendChild\(body\.firstChild\)/);
     assert.doesNotMatch(fn[1], /\.remove\(\)|innerHTML\s*=\s*""|removeChild/);
   });
-  await test("el panel tiene las 6 áreas aprobadas (organización comercial suma «Vitrinas»)", () => {
+  await test("el panel tiene las 7 áreas aprobadas (organización comercial suma «Vitrinas»; analítica, «Analítica»)", () => {
     const html = require("fs").readFileSync(require("path").join(__dirname, "..", "admin", "index.html"), "utf8");
     const views = [...html.matchAll(/class="nav-item[^"]*" data-view="([a-z]+)"/g)].map((m) => m[1]);
-    assert.deepEqual(views, ["home", "products", "taxonomy", "merch", "hero", "orders"]);
+    assert.deepEqual(views, ["home", "products", "taxonomy", "merch", "hero", "orders", "analytics"]);
     for (const v of views) assert.match(html, new RegExp(`data-view-panel="${v}"`));
   });
 

@@ -20,6 +20,8 @@ import { getCategoriesInGroup, getSubcategories, VIBE_CATEGORY_GROUPS, SUBCATEGO
 import { SECTION_DESTINATIONS, describeSlideDestination } from "../js/hero-links.js";
 // Video del producto (codificación en el navegador; ver admin/video-panel.js).
 import { mountVideoPanel } from "./video-panel.js";
+// Analítica comercial (vista propia, solo lectura).
+import { openAnalytics } from "./analytics-view.js";
 
 const TOKEN_KEY = "vibe_admin_token";
 const $ = (s) => document.querySelector(s);
@@ -1768,7 +1770,7 @@ async function openEdit(productId) {
 let heroState = { slides: [], loaded: false };
 
 // Fase 52 — cinco áreas de trabajo (barra lateral / navegación inferior).
-const ADMIN_VIEWS = ["home", "products", "taxonomy", "merch", "hero", "orders"];
+const ADMIN_VIEWS = ["home", "products", "taxonomy", "merch", "hero", "orders", "analytics"];
 function switchAdminView(view) {
   if (!ADMIN_VIEWS.includes(view)) view = "home";
   document.querySelectorAll("[data-view-panel]").forEach((el) => el.classList.toggle("hidden", el.dataset.viewPanel !== view));
@@ -1784,6 +1786,7 @@ function switchAdminView(view) {
   if (view === "home") renderHome();
   if (view === "taxonomy") renderTaxonomy();
   if (view === "merch") loadMerch();
+  if (view === "analytics") openAnalytics({ adminFetch, onUnauthorized: () => { clearToken(); showLogin("Token incorrecto o vencido."); } });
 }
 
 // Fase 52 — reparte las secciones del editor en pestañas. Solo MUEVE los

@@ -21,6 +21,7 @@ const { sendJson, sendError, methodNotAllowed } = require("../catalog/_lib/http"
 const { resolveCategoryGroup } = require("../catalog/_lib/categoryGroups");
 const { handleTaxonomy } = require("./_lib/taxonomyAdmin");
 const { handleMerchandising, handleBestSellers } = require("./_lib/merchandisingAdmin");
+const { handleAnalytics } = require("./_lib/analyticsAdmin");
 
 const PRODUCT_COLUMNS = "id,name,price,stock,category";
 // Fase 39 — se agrega `category` (columna editorial, distinta de la
@@ -41,6 +42,8 @@ module.exports = async function handler(req, res) {
   // ventas: mismo endpoint, mismo motivo.
   const isMerch = req.query && req.query.resource === "merchandising";
   const isBest = req.query && req.query.resource === "bestsellers";
+  // Analítica comercial (GA4 + ventas confirmadas del POS), solo lectura.
+  const isAnalytics = req.query && req.query.resource === "analytics";
   const canPost = isTaxonomy || isMerch;
   if (req.method !== "GET" && !(canPost && req.method === "POST")) return methodNotAllowed(res, canPost ? ["GET", "POST"] : ["GET"]);
   if (!requireAdmin(req, res)) return;
@@ -56,6 +59,7 @@ module.exports = async function handler(req, res) {
   if (isTaxonomy) return handleTaxonomy(req, res, env);
   if (isMerch) return handleMerchandising(req, res, env);
   if (isBest) return handleBestSellers(req, res, env);
+  if (isAnalytics) return handleAnalytics(req, res, env);
 
   try {
     const [products, metadataRows] = await Promise.all([

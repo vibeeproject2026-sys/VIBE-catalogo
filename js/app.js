@@ -31,6 +31,12 @@ import { selectNovedades, selectBestSellers, collectionsWithProducts, descubrePi
 import { computeOrderSummary, validateCheckoutForm } from "./checkout.js";
 import { bindCartSwipe } from "./cart-swipe.js";
 import { hasOptions, resolveVariant, selectionStatus, autoShadeId, autoPresentationId, lineOptionProblem, optionPriceInfo, priceRange, priceOf, ownPriceWithPromo } from "./variants.js";
+import { initAnalytics, track, trackOnce, whenVisible, gaItem, promoItem, sanitizeSearchTerm, LIST_NAMES, CURRENCY } from "./analytics.js";
+
+// Analítica comercial (GA4): solo con consentimiento y en producción (ver
+// js/analytics.js). Estas llamadas solo MIDEN: no cambian nada de lo que
+// la tienda muestra ni hace.
+initAnalytics();
 
 // Fase 27: se agregan los filtros/orden de la PLP. Todos arrancan
 // "apagados" — ningún filtro activo por defecto, igual que antes.
@@ -65,6 +71,51 @@ const state = { ...DEFAULT_FILTERS, product: null, variant: null, shadeId: null,
 const DESKTOP_GRID = typeof window !== "undefined" && window.matchMedia ? window.matchMedia("(min-width: 901px)") : null;
 const pageSize = () => (DESKTOP_GRID && DESKTOP_GRID.matches ? 20 : 10);
 const $ = s => document.querySelector(s);
+
+// ── Analítica: de qué lista viene cada producto ───────────────────────
+// La cuadrícula del catálogo se atribuye a la vitrina que llevó a ella:
+// una colección (Colecciones VIBE), una tarjeta de Descubre tu VIBE, o el
+// catálogo a secas. Cualquier otro cambio de filtro vuelve a «catalogo».
+let catalogOrigin = null;
+let pendingCatalogOrigin = null;
+const GRID_LISTS = { "#novedadesGrid": "novedades", "#masElegidosGrid": "mas_elegidos", "#destacadosGrid": "destacados", "#ofertasGrid": "ofertas" };
+function catalogListId() {
+  if (state.collection && catalogOrigin !== "descubre") return "colecciones";
+  return catalogOrigin || "catalogo";
+}
+function listIdOfGrid(gridSel) {
+  return gridSel === "#productGrid" ? catalogListId() : GRID_LISTS[gridSel] || "catalogo";
+}
+const gaProduct = (p, extra) => gaItem(p, publicPlacement(p), extra);
+// Fuente de la ficha abierta (lista + posición), si se abrió desde una lista.
+let nextProductSource = null;
+let productSource = null;
+// Impresión de una lista: los productos que se pintaron, cuando la sección
+// entra en pantalla; una vez por lista y contenido en la página.
+function observeList(gridSel, listId, products) {
+  const el = $(gridSel);
+  if (!el || !products.length) return;
+  const key = `list:${listId}:${products.map((p) => p.id).join(",")}`;
+  whenVisible(el, key, () => trackOnce(key, "view_item_list", {
+    item_list_id: listId,
+    item_list_name: LIST_NAMES[listId],
+    items: products.map((p, index) => gaProduct(p, { listId, index })),
+  }));
+}
+function observePromos(gridSel, slot, tiles) {
+  const el = $(gridSel);
+  if (!el || !tiles.length) return;
+  const key = `promo:${slot}:${tiles.map((t) => t.id).join(",")}`;
+  whenVisible(el, key, () => trackOnce(key, "view_promotion", { items: tiles.map((t, index) => promoItem({ slot, id: t.id, name: t.name, index })) }));
+}
+function cartLineItem(line, quantity = line.quantity) {
+  const p = productById(line.productId) || { id: line.productId, name: line.name, brand: line.brand };
+  return gaProduct(p, { variant: line.variantName, price: line.price, quantity });
+}
+function cartEventParams() {
+  const lines = getCart();
+  return { currency: CURRENCY, value: getCartTotal(), items: lines.map((l) => cartLineItem(l)) };
+}
 
 // Inicio de página en cada carga nueva (apertura, enlace externo, URL
 // escrita, recarga, pestaña nueva). Causa raíz de que a veces abriera a
@@ -382,6 +433,7 @@ function renderProducts() {
   const pageList = list.slice(start, start + size);
   state.pageSize = size;
   $("#productGrid").innerHTML = pageList.map(productCard).join("");
+  observeList("#productGrid", catalogListId(), pageList);
   renderPagination(pages);
   updateFilterSortButton();
 
@@ -415,6 +467,8 @@ function renderProducts() {
 // re-renderiza navegación + grid (que a su vez actualiza heading,
 // breadcrumb, chips y contador) y sincroniza la URL.
 function applyFiltersAndRender() {
+  catalogOrigin = pendingCatalogOrigin; // analítica: vitrina que llevó a este filtro (o ninguna)
+  pendingCatalogOrigin = null;
   state.page = 1; // nuevo filtro, categoría, búsqueda u orden → página 1
   renderNav();
   renderProducts();
@@ -467,7 +521,10 @@ function renderOfertasPage() {
   $("#ofertasLead").textContent = copy.lead;
   $("#ofertasGrid").classList.toggle("hidden", !hasPromotions);
   $("#ofertasEmpty").classList.toggle("hidden", hasPromotions);
-  if (hasPromotions) $("#ofertasGrid").innerHTML = list.map(productCard).join("");
+  if (hasPromotions) {
+    $("#ofertasGrid").innerHTML = list.map(productCard).join("");
+    observeList("#ofertasGrid", "ofertas", list);
+  }
 }
 
 // ── Organización comercial: vitrinas ──────────────────────────────────
@@ -487,6 +544,7 @@ function renderShowcaseGrid(sectionId, titleId, gridId, cfg, items) {
   $("#" + sectionId).classList.toggle("hidden", !open);
   if (cfg && cfg.title) $("#" + titleId).textContent = cfg.title;
   $("#" + gridId).innerHTML = has ? items.map(productCard).join("") : open ? `<p class="empty">${sectionId === "novedades" ? "Muy pronto encontrarás aquí las novedades de VIBE." : "Muy pronto verás aquí los favoritos de VIBE."}</p>` : "";
+  if (has) observeList("#" + gridId, GRID_LISTS["#" + gridId], items);
   return has;
 }
 function openShowcase(key) {
@@ -510,6 +568,7 @@ function renderCollections() {
         <span class="collection-card-cta">${c.count === 1 ? "1 producto" : `${c.count} productos`} · Ver colección →</span>
       </span>
     </button>`).join("");
+  observePromos("#coleccionesGrid", "colecciones", list.map((c) => ({ id: c.id, name: c.name })));
   return true;
 }
 
@@ -533,6 +592,7 @@ function renderShowcases() {
   if (!rankingShown && destacados.length) $("#masElegidosGrid").innerHTML = "";
   $("#destacadosBlock").classList.toggle("hidden", !destacados.length);
   $("#destacadosGrid").innerHTML = destacados.map(productCard).join("");
+  observeList("#destacadosGrid", "destacados", destacados);
   sectionVisible.masElegidos = rankingShown || destacados.length > 0;
   sectionVisible.colecciones = renderCollections();
   applySectionLayout();
@@ -580,7 +640,23 @@ function renderDescubrePicks() {
     </button>`;
   }).join("");
   window.dispatchEvent(new Event("resize"));
+  observeDescubre();
   return true;
+}
+
+// Analítica: cada tarjeta de Descubre tu VIBE como pieza promocional
+// (categoría, colección o etiqueta), identificada por su destino.
+function descubreTile(b) {
+  const d = b.dataset;
+  const id = d.collection ? `coleccion:${d.collection}` : d.tag ? `etiqueta:${d.tag}` : `categoria:${d.group || "Todos"}${d.category ? "›" + d.category : ""}`;
+  const label = b.querySelector(".discover-tile-label");
+  return { id, name: label ? label.textContent.trim() : id };
+}
+function observeDescubre() {
+  observePromos("#discoverVibeGrid", "descubre", [...document.querySelectorAll("#discoverVibeGrid .discover-tile")].map(descubreTile));
+}
+function trackPromoClick(slot, tile, index) {
+  track("select_promotion", { items: [promoItem({ slot, id: tile.id, name: tile.name, index })] });
 }
 
 // Lleva al catálogo filtrado por una colección o etiqueta.
@@ -589,7 +665,11 @@ document.addEventListener("click", (e) => {
   if (!b || !b.closest("#coleccionesGrid, #discoverVibeGrid")) return;
   e.preventDefault();
   e.stopPropagation();
-  goToFilter(b.dataset.collection ? { collection: b.dataset.collection } : { tag: b.dataset.tag });
+  const inDescubre = Boolean(b.closest("#discoverVibeGrid"));
+  const siblings = [...b.parentNode.children];
+  if (inDescubre) trackPromoClick("descubre", descubreTile(b), siblings.indexOf(b));
+  else trackPromoClick("colecciones", { id: b.dataset.collection, name: (b.querySelector(".collection-card-name") || b).textContent.trim() }, siblings.indexOf(b));
+  goToFilter(b.dataset.collection ? { collection: b.dataset.collection } : { tag: b.dataset.tag }, inDescubre ? "descubre" : "colecciones");
 }, true);
 
 // Punto de entrada compartido por Shop by World, los enlaces de mundo del
@@ -597,9 +677,10 @@ document.addEventListener("click", (e) => {
 // todos los filtros y aplica exactamente los que se pidan, para que
 // saltar desde el header nunca deje una combinación de filtros previa a
 // medias.
-function goToFilter(overrides) {
+function goToFilter(overrides, origin = null) {
   Object.assign(state, DEFAULT_FILTERS, overrides);
   $("#searchInput").value = state.search;
+  pendingCatalogOrigin = origin;
   applyFiltersAndRender();
   $("#catalogo").scrollIntoView({ behavior: "smooth" });
 }
@@ -675,6 +756,7 @@ function renderDiscoverVibe() {
   // real recién inyectado arriba — reutiliza el mismo listener de
   // "resize" que ya recalcula ese estado, en vez de duplicar la lógica.
   window.dispatchEvent(new Event("resize"));
+  observeDescubre();
 }
 
 // Fase 29, sección 2 — una línea del carrito: imagen, marca (si existe),
@@ -1138,6 +1220,13 @@ function openProduct(id, { pushHistory = true } = {}) {
   state.shadeId = autoShadeId(p);
   state.presentationId = autoPresentationId(p);
   renderProductDetail(p);
+  // Analítica: vista de ficha, atribuida a la lista desde la que se abrió
+  // (si se abrió desde una); y la impresión de «También te puede interesar».
+  productSource = nextProductSource && nextProductSource.id === String(p.id) ? nextProductSource : null;
+  nextProductSource = null;
+  const viewed = gaProduct(p, productSource ? { listId: productSource.listId, index: productSource.index } : {});
+  track("view_item", { currency: CURRENCY, value: viewed.price, items: [viewed] });
+  observeList("#productDetail .pdp-related .grid", "relacionados", selectRelated(state.products, p));
   if (pushHistory) {
     // Fase final — si el cierre anterior aún está volviendo atrás en el
     // historial (history.back() es asíncrono), empujar ahora haría que ese
@@ -1361,11 +1450,23 @@ function restoreProductTriggerFocus(trigger) {
   if (el) el.focus({ preventScroll: true });
 }
 
+// Analítica: clic en un producto de una lista (select_item) y fuente de la
+// ficha que se abre (para atribuir la vista y el «agregar» a esa lista).
+function selectFromList(btn, listId) {
+  const p = productById(btn.dataset.product);
+  if (!p) return;
+  const card = btn.closest(".card");
+  const index = card && card.parentNode ? [...card.parentNode.children].indexOf(card) : undefined;
+  nextProductSource = { id: String(p.id), listId, index };
+  track("select_item", { item_list_id: listId, item_list_name: LIST_NAMES[listId], items: [gaProduct(p, { listId, index })] });
+}
+
 function bindProductGrid(id) {
   $(id).addEventListener("click", e => {
     const b = e.target.closest("[data-product]");
     if (!b) return;
     if (!$("#productDialog").open) productTrigger = { grid: id, productId: b.dataset.product };
+    selectFromList(b, listIdOfGrid(id));
     openProduct(b.dataset.product);
   });
 }
@@ -1472,7 +1573,14 @@ $("#groupTabs").addEventListener("click", e => {
   state.category = "Todos";
   state.subcategory = "Todos";
   applyFiltersAndRender();
+  trackCategoryClick();
 });
+
+// Analítica: clic en un grupo / categoría / subcategoría del catálogo.
+function trackCategoryClick() {
+  const path = [state.group, state.category, state.subcategory].filter((x) => x && x !== "Todos");
+  track("select_content", { content_type: "categoria", content_id: path.length ? path.join("›") : "Todos" });
+}
 
 $("#categoryTabs").addEventListener("click", e => {
   const b = e.target.closest("[data-category]");
@@ -1480,6 +1588,7 @@ $("#categoryTabs").addEventListener("click", e => {
   state.category = b.dataset.category;
   state.subcategory = "Todos";
   applyFiltersAndRender();
+  trackCategoryClick();
 });
 
 $("#subcategoryTabs").addEventListener("click", e => {
@@ -1487,11 +1596,13 @@ $("#subcategoryTabs").addEventListener("click", e => {
   if (!b) return;
   state.subcategory = b.dataset.subcategory;
   applyFiltersAndRender();
+  trackCategoryClick();
 });
 
 $("#subcategorySelect").addEventListener("change", e => {
   state.subcategory = e.target.value;
   applyFiltersAndRender();
+  trackCategoryClick();
 });
 
 // Navegación por grupo/categoría desde las tarjetas de "Descubre tu VIBE"
@@ -1504,7 +1615,8 @@ function bindWorldNav(selector) {
     const b = e.target.closest("[data-group]");
     if (!b) return;
     e.preventDefault();
-    goToFilter({ group: b.dataset.group, category: b.dataset.category || "Todos" });
+    trackPromoClick("descubre", descubreTile(b), [...b.parentNode.children].indexOf(b));
+    goToFilter({ group: b.dataset.group, category: b.dataset.category || "Todos" }, "descubre");
   });
 }
 bindWorldNav("#discoverVibeGrid");
@@ -1584,9 +1696,24 @@ $("#emptyState").addEventListener("click", (e) => {
   goToFilter({});
 });
 
+// Analítica: la búsqueda se envía cuando la visitante deja de escribir
+// (1,5 s), una vez por término, y solo si no parece un dato personal.
+let searchTrackTimer = null;
+let lastTrackedSearch = null;
+function scheduleSearchTrack(value) {
+  clearTimeout(searchTrackTimer);
+  searchTrackTimer = setTimeout(() => {
+    const term = sanitizeSearchTerm(value);
+    if (!term || term === lastTrackedSearch) return;
+    lastTrackedSearch = term;
+    track("search", { search_term: term });
+  }, 1500);
+}
+
 $("#searchInput").addEventListener("input", e => {
   state.search = e.target.value;
   applyFiltersAndRender();
+  scheduleSearchTrack(e.target.value);
 });
 
 // Filter & Sort — aplica al confirmar (no en vivo por cada click): a
@@ -1665,7 +1792,10 @@ bindProductGrid("#novedadesGrid");
 bindProductGrid("#masElegidosGrid");
 bindProductGrid("#destacadosGrid");
 
-$("#cartButton").onclick = openCart;
+$("#cartButton").onclick = () => {
+  openCart();
+  track("view_cart", cartEventParams()); // solo la apertura explícita (no la automática tras agregar)
+};
 $("#closeCart").onclick = closeCart;
 // «Continuar comprando»: solo cierra el carrito y devuelve al catálogo donde
 // estaba la clienta; el carrito (productos, tonos, presentaciones,
@@ -1675,12 +1805,24 @@ $("#overlay").onclick = closeCart;
 $("#closeProduct").onclick = () => $("#productDialog").close();
 $("#checkoutButton").onclick = () => {
   if (!getCart().length) return;
+  track("begin_checkout", cartEventParams());
   closeCart();
   openCheckout();
 };
 $("#closeCheckout").onclick = () => $("#checkoutDialog").close();
 
 bindCartSwipe($("#cartItems"));
+
+// Analítica: retirar del carrito (botón Eliminar, deslizar, o bajar la
+// cantidad de 1 a 0). Se mide ANTES de modificar el carrito.
+// Subir la cantidad desde el carrito cuenta como agregar una unidad.
+function trackCartRemoval(pid, vid, action) {
+  if (action !== "del" && action !== "dec" && action !== "inc") return;
+  const line = getCart().find((l) => String(l.productId) === String(pid) && String(l.variantId) === String(vid));
+  if (!line) return;
+  const qty = action === "del" ? line.quantity : 1;
+  track(action === "inc" ? "add_to_cart" : "remove_from_cart", { currency: CURRENCY, value: line.price * qty, items: [cartLineItem(line, qty)] });
+}
 
 $("#cartItems").addEventListener("click", e => {
   if (e.target.id === "cartEmptyCta") {
@@ -1692,6 +1834,7 @@ $("#cartItems").addEventListener("click", e => {
   const b = e.target.closest("[data-a]");
   if (!b) return;
   const d = b.dataset.a;
+  trackCartRemoval(b.dataset.p, b.dataset.v, d);
   if (d === "inc") changeQuantity(b.dataset.p, b.dataset.v, 1);
   if (d === "dec") changeQuantity(b.dataset.p, b.dataset.v, -1);
   if (d === "del") removeFromCart(b.dataset.p, b.dataset.v);
@@ -1723,6 +1866,7 @@ $("#productDialog").addEventListener("click", e => {
   // duplicar el mecanismo de apertura.
   const related = e.target.closest("[data-product]");
   if (related) {
+    selectFromList(related, "relacionados");
     openProduct(related.dataset.product);
     return;
   }
@@ -1765,6 +1909,9 @@ $("#productDialog").addEventListener("click", e => {
     // precio (propio de la opción o general, con la promoción del POS
     // aplicada una sola vez) y su base como tachado.
     addToCart(state.product, hasOptions(state.product) ? variant : { ...variant, price: currentEffectivePrice(), originalPrice: priceInfo.originalPrice }, qty);
+    const unitPrice = hasOptions(state.product) ? variant.price : currentEffectivePrice();
+    const src = productSource && productSource.id === String(state.product.id) ? { listId: productSource.listId, index: productSource.index } : {};
+    track("add_to_cart", { currency: CURRENCY, value: unitPrice * qty, items: [gaProduct(state.product, { ...src, variant: variant.name, price: unitPrice, quantity: qty })] });
     $("#productDialog").close();
     openCart();
   }
@@ -2163,6 +2310,7 @@ $("#checkoutDialog").addEventListener("click", (e) => {
   }
   const removeBtn = e.target.closest("[data-remove-line]");
   if (removeBtn) {
+    trackCartRemoval(removeBtn.dataset.p, removeBtn.dataset.v, "del");
     removeFromCart(removeBtn.dataset.p, removeBtn.dataset.v);
     renderCart();
     rerenderCheckoutSummary();
@@ -2263,6 +2411,11 @@ $("#checkoutDialog").addEventListener("submit", async (e) => {
 
     // 201 = pedido nuevo; 200 + replayed = este mismo intento ya estaba
     // registrado (p. ej. tras un corte de red): se confirma ese pedido.
+    // Analítica: solicitud de pedido registrada (NO es una venta: la venta
+    // se confirma después con la clienta). Solo el total y la moneda: nunca
+    // datos de la clienta ni el número de pedido. Un reintento del mismo
+    // intento (200 + replayed) no se cuenta dos veces.
+    if (res.status === 201) track("generate_lead", { currency: CURRENCY, value: expectedTotal, lead_source: "pedido_catalogo" });
     clearCheckoutAttempt();
     clearCart();
     renderCart();

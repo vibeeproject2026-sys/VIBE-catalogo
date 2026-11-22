@@ -45,6 +45,7 @@
       <button type="button" class="nav-item" data-view="merch" id="navMerch"><span class="nav-ico" aria-hidden="true">✦</span><span>Vitrinas</span></button>
       <button type="button" class="nav-item" data-view="hero" id="navHero"><span class="nav-ico" aria-hidden="true">◐</span><span>Carrusel</span></button>
       <button type="button" class="nav-item" data-view="orders" id="navOrders"><span class="nav-ico" aria-hidden="true">✉</span><span>Pedidos</span></button>
+      <button type="button" class="nav-item" data-view="analytics" id="navAnalytics"><span class="nav-ico" aria-hidden="true">◔</span><span>Analítica</span></button>
     </nav>
     <button id="logoutButton" type="button" class="sidebar-logout">Salir</button>
   </aside>
@@ -124,6 +125,15 @@
         <button type="button" id="merchSave" class="button dark" disabled>Guardar cambios</button>
       </div>
       <div id="merchRoot" class="merch-root"><p class="section-hint">Cargando…</p></div>
+    </main>
+
+    <main id="analyticsApp" class="admin-main view-panel hidden" data-view-panel="analytics">
+      <header class="view-head">
+        <p class="eyebrow">Analítica comercial</p>
+        <h1>Tráfico, interés y ventas</h1>
+        <p class="view-sub">Visitas y comportamiento en el catálogo (Google Analytics 4), interés por productos, categorías y vitrinas, intención de compra y ventas confirmadas del POS. Todo es de solo lectura: nada de lo que ves aquí cambia la tienda ni el POS.</p>
+      </header>
+      <div id="analyticsRoot" class="an-root"></div>
     </main>
 
     <main id="heroApp" class="admin-main view-panel hidden" data-view-panel="hero">

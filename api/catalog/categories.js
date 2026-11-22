@@ -17,6 +17,7 @@ const { sendJson, sendError, methodNotAllowed } = require("./_lib/http");
 const { loadTaxonomy, publicTaxonomy } = require("../_lib/taxonomyStore");
 const { loadMerchandising, publicMerchandising, computeNewArrivals } = require("../_lib/merchandising");
 const { loadBestSellers } = require("../_lib/bestsellers");
+const { measurementId } = require("../_lib/ga4");
 
 const PRODUCT_COLUMNS = "id,name,price,stock,category";
 const METADATA_COLUMNS = "product_id,subcategory,featured,editorial_order,published";
@@ -26,6 +27,15 @@ module.exports = async function handler(req, res) {
 
   if (req.method === "OPTIONS") return res.status(204).end();
   if (req.method !== "GET") return methodNotAllowed(res);
+
+  // Analítica comercial — ?view=analytics: SOLO el id de medición de GA4
+  // («G-…», público por naturaleza: viaja en cada etiqueta de GA). Nunca la
+  // propiedad ni credenciales. Sin configurar → null (la tienda no carga
+  // ninguna etiqueta ni muestra el aviso). No depende de Supabase.
+  if (req.query && req.query.view === "analytics") {
+    res.setHeader("Cache-Control", "public, max-age=300, s-maxage=300, stale-while-revalidate=600");
+    return sendJson(res, 200, { measurementId: measurementId(process.env) });
+  }
 
   let env;
   try {

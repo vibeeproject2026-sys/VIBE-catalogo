@@ -19,7 +19,7 @@
 // (lista con viñetas). Todo se escapa al pintarse.
 
 export const LEGAL_PAGE = "legal.html";
-export const LEGAL_UPDATED = "28 de octubre de 2026";
+export const LEGAL_UPDATED = "22 de noviembre de 2026";
 
 export const LEGAL = {
   identity: {
@@ -84,6 +84,7 @@ export const LEGAL = {
         },
         { lead: "Autorización.", text: "Al marcar la casilla de autorización y enviar tu pedido, nos autorizas a tratar tus datos para estas finalidades. Sin esa autorización no podemos registrar el pedido." },
         { lead: "Proveedores.", text: "Para operar el catálogo usamos proveedores tecnológicos de alojamiento, base de datos y envío de correos, que tratan los datos por cuenta de VIBE." },
+        { lead: "Analítica del sitio.", text: "Solo si lo aceptas en el aviso de privacidad, usamos Google Analytics para medir de forma agregada cómo se usa el catálogo: páginas y productos vistos, búsquedas, uso del carrito, origen de la visita, tipo de dispositivo y ubicación aproximada. Para eso Google Analytics guarda cookies en tu navegador. No enviamos tu nombre, teléfono, correo, dirección ni los datos de tu pedido, y no usamos esta información para publicidad. Puedes aceptar, rechazar o cambiar tu decisión cuando quieras desde «Preferencias de privacidad», al final de la página principal." },
         "Tus derechos (artículo 8 de la Ley 1581 de 2012):",
         {
           list: [

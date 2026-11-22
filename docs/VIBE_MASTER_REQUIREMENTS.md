@@ -1923,6 +1923,145 @@ Banner y catálogo siempre visibles; las demás se activan u ocultan desde el Ad
 - **Sin cambios de código:** no hubo commit de código ni despliegue; solo este registro.
 - **Datos de respaldo:** copia de `catalog_metadata` y `products` antes y después, para revertir si hiciera falta (fuera del repositorio).
 
+## 31. Analítica comercial en el Admin (2026-11-22)
+
+### 31.1 Auditoría inicial
+
+- **GA4:** no instalado. Ni el sitio ni el historial de Git tienen etiqueta (`gtag`, `googletagmanager`) ni identificador de medición; tampoco hay variables `GA4_*` en `.env.local`. **No existen datos históricos de visitas:** la medición empieza el día en que se active.
+- **Consentimiento:** no existía ningún aviso ni mecanismo de cookies.
+- **Ventas confirmadas disponibles:** POS `sales` (pagadas, activas y no anuladas), en solo lectura, con el mismo criterio que «Más elegidos» (§29).
+
+### 31.2 Requisitos
+
+| ID | Requisito | Estado |
+|---|---|---|
+| AN-01 | Etiqueta GA4 única, solo con consentimiento expreso (Ley 1581), solo en el dominio de producción; sin id configurado, la tienda no cambia | IMPLEMENTADO; ver Historial |
+| AN-02 | Eventos de productos, listas, vitrinas, piezas, categorías, búsqueda, carrito, checkout, solicitud de pedido y WhatsApp, sin duplicados y sin datos personales | IMPLEMENTADO; ver Historial |
+| AN-03 | Id estable del producto y clasificación vigente en cada evento; el Admin distingue la clasificación vigente de la del momento del evento | IMPLEMENTADO; ver Historial |
+| AN-04 | Admin › Analítica: resumen, adquisición, productos y categorías, vitrinas, embudo y ventas confirmadas; períodos y comparación; estados de carga, sin datos, sin configuración y error | IMPLEMENTADO; ver Historial |
+| AN-05 | Consulta de GA4 en el servidor (Data API), credenciales solo en variables de entorno, endpoint protegido por el token del Admin, caché de 10 min | IMPLEMENTADO; ver Historial |
+| AN-06 | Ventas confirmadas del POS y solicitudes del catálogo mostradas aparte de GA4, sin atribuir ventas a visitas | IMPLEMENTADO; ver Historial |
+| AN-07 | Política de datos actualizada (analítica con consentimiento) y «Preferencias de privacidad» en el pie | IMPLEMENTADO; revisión de la propietaria recomendada |
+| AN-08 | Propiedad GA4, flujo web, cuenta de servicio y variables en Vercel | PENDIENTE DE LA PROPIETARIA (§31.6) |
+
+### 31.3 Arquitectura
+
+- **Tienda (`js/analytics.js`):**
+  - pide el id de medición a `/api/catalog/categories?view=analytics` (público; solo el «G-…» o `null`; caché de 5 min; no depende de Supabase);
+  - sin id: ni etiqueta ni aviso;
+  - con id: aviso con «Aceptar» y «Rechazar» del mismo tamaño;
+  - solo tras aceptar carga `gtag.js` una vez (no agrega otra si ya existe), con publicidad denegada (`ad_storage`, `ad_user_data`, `ad_personalization`), `allow_google_signals: false` y `page_location` limitado a parámetros conocidos (producto, filtros y UTM; nunca la búsqueda);
+  - la decisión se guarda en el navegador (`vibe_analytics_consent_v1`) y se puede cambiar en «Preferencias de privacidad»;
+  - retirar el consentimiento desactiva GA y borra las cookies `_ga`;
+  - solo mide en `www.vibebeautycol.com` y `vibebeautycol.com`: vistas previas, localhost y pruebas no envían nada.
+- **Servidor:**
+  - `api/_lib/ga4.js`: firma JWT RS256 con `crypto` de Node (sin dependencias nuevas), alcance `analytics.readonly`, token reutilizado y errores con mensaje claro (sin acceso, propiedad, cuota, red).
+  - `api/admin/_lib/analyticsAdmin.js`: tres `batchRunReports` por consulta, lectura del POS y del catálogo, y caché de 10 min por rango. Un error de GA4 no se guarda en caché. «Actualizar» fuerza datos frescos, con al menos 60 s entre consultas.
+  - Expuesto en `/api/admin/products?resource=analytics`, que reutiliza un endpoint existente: sigue habiendo 11 funciones serverless.
+- **Admin:** `admin/analytics-view.js` (vista propia) y la nueva área «Analítica» en la barra lateral. En móvil, las 7 áreas quedan en una fila desplazable.
+- **Sin tablas ni almacenamiento nuevos; sin migraciones.**
+
+### 31.4 Eventos instrumentados
+
+| Evento (GA4) | Cuándo | Datos |
+|---|---|---|
+| `page_view` | al cargar (automático de GA4, tras aceptar) | ubicación limpia |
+| `view_item_list` | una lista entra en pantalla (una vez por lista y contenido) | `item_list_id`: `novedades`, `mas_elegidos`, `ofertas`, `catalogo`, `colecciones`, `descubre`, `relacionados` |
+| `select_item` | clic en un producto de una lista | lista y posición |
+| `view_item` | se abre una ficha | atribuida a la lista de origen (o ninguna si se abrió por enlace) |
+| `view_promotion` / `select_promotion` | tarjetas de Colecciones VIBE y Descubre tu VIBE y piezas del carrusel (vista en pantalla / clic) | `creative_slot`: `colecciones`, `descubre`, `banner`; id prefijado (`coleccion:…`, `categoria:…`), nunca numérico |
+| `select_content` | clic en grupo, categoría o subcategoría del catálogo | `content_type: categoria`, ruta |
+| `search` | 1,5 s después de dejar de escribir, una vez por término | término normalizado; se descartan los que tienen «@» o 6 o más dígitos |
+| `add_to_cart` / `remove_from_cart` | agregar desde la ficha, «+» y «−»/«Eliminar»/deslizar en el carrito | variante, precio, cantidad, lista de origen |
+| `view_cart` | apertura del carrito con su botón (no la automática tras agregar) | líneas y total |
+| `begin_checkout` | «Continuar pedido» | líneas y total |
+| `generate_lead` | solicitud de pedido registrada (solo respuesta 201; un reintento no cuenta) | solo `value`, `currency` y `lead_source`: **no es una venta**; nunca se envía `purchase` |
+| `contact_whatsapp` | clic en un enlace de WhatsApp | zona de la página: **contacto, no venta** |
+
+Cada producto viaja con `item_id` (id estable del POS), `item_name`, `item_brand`, `item_category`, `item_category2` e `item_category3` (grupo, categoría y subcategoría **vigentes en el momento del evento**). Nunca se envían nombre, teléfono, correo, dirección, notas ni el número de pedido. Un evento idéntico repetido en menos de 1 s se descarta.
+
+### 31.5 Panel e indicadores
+
+- **Resumen general:**
+  - usuarios activos, usuarios nuevos, sesiones y vistas de página, cada uno con su comparación con el período anterior de igual largo;
+  - evolución diaria, con el período anterior en línea discontinua y tooltip;
+  - dispositivos, nuevos frente a recurrentes y ubicación aproximada.
+- **Períodos:** hoy, 7, 30 y 90 días, y rango personalizado de hasta 366 días, en calendario de Bogotá.
+- **Tráfico y adquisición:** canales con su valor anterior, y fuente, medio y campaña UTM.
+- **Productos y categorías:**
+  - **tabla de productos publicados**, incluidos los que no tuvieron vistas: vistas de ficha, clics en listas, agregados al carrito y unidades vendidas según el POS (otra fuente). Se filtra por grupo, categoría o producto y se ordena por más vistos, más interacciones, menos consultados o más vendidos;
+  - **otras vistas:** grupos, categorías y subcategorías, las búsquedas y los clics en categorías;
+  - **clasificación:** el interruptor «Clasificación vigente / Al momento del evento» muestra las dos lecturas, y los productos reclasificados durante el período se marcan;
+  - las filas de GA4 de productos que hoy no están publicados se excluyen y se cuentan aparte.
+- **Vitrinas:**
+  - por vitrina: productos mostrados, clics, tasa de clic (clics ÷ mostrados), fichas vistas desde ella y agregados al carrito;
+  - tarjetas mostradas y clicadas en Colecciones y Descubre, y rendimiento de cada pieza del carrusel.
+- **Embudo** (personas que hicieron cada acción al menos una vez): visitantes › vieron un producto › agregaron al carrito › iniciaron el pedido › enviaron la solicitud. Aparte se muestran los clics a WhatsApp y las ventas confirmadas del POS, rotulados como fuentes distintas.
+- **Ventas confirmadas:**
+  - del POS: ventas, unidades y total, con su comparación, y desglose por canal;
+  - del catálogo: solicitudes recibidas, confirmadas y canceladas (de los pedidos solo se leen el id, la fecha, el estado y el total);
+  - no se atribuyen a visitas: no hay vínculo confiable ni compatible con la privacidad.
+- **Estados:** carga, sin datos, GA4 sin configurar (con las variables que faltan y la sección de ventas operativa), error de GA4 (con las ventas visibles), sin conexión y reintento. Nunca se muestran cifras de ejemplo.
+
+### 31.6 Pendiente de la propietaria (configuración externa)
+
+1. En Google Analytics (analytics.google.com), con la cuenta de VIBE: crear una propiedad «VIBE Catálogo» con **zona horaria Colombia** y **moneda COP**, y un **flujo web** para `https://www.vibebeautycol.com`. Copiar el **ID de medición** («G-…») y el **ID de la propiedad** (número).
+2. En el flujo web › Medición mejorada:
+   - desactivar «Cambios de página basados en el historial del navegador» y «Búsquedas en el sitio»: el catálogo ya los mide sin duplicar, y la búsqueda filtrada protege datos personales;
+   - opcionalmente, en «Redacción de datos», agregar el parámetro `q`.
+3. En Google Cloud (console.cloud.google.com): en un proyecto, habilitar «Google Analytics Data API», crear una **cuenta de servicio** y descargar su **clave JSON**.
+4. En GA4 › Administrar › Gestión del acceso a la propiedad: agregar el correo de esa cuenta de servicio con rol **Lector**.
+5. En Vercel › Settings › Environment Variables (Production): `GA4_MEASUREMENT_ID`, `GA4_PROPERTY_ID` y `GA4_SERVICE_ACCOUNT_KEY` (el JSON completo o en base64). Luego, volver a desplegar.
+6. Revisar el texto agregado a la política de datos («Analítica del sitio», `legal.html#datos`).
+
+### 31.7 Limitaciones de medición y atribución
+
+- **Datos:** no hay datos anteriores a la activación, y GA4 tarda horas en procesar la actividad del día.
+- **Cobertura:** solo se mide a quien acepta; quien rechaza o bloquea anuncios no aparece. Las cifras son de la población que consintió, no del total de visitantes.
+- **Clasificación:** la taxonomía no tiene ids propios; grupos y categorías viajan por nombre. Renombrar una categoría separa su historia en GA4 (el nombre anterior sigue en los eventos anteriores); el id del producto sí es estable. GA4 conserva la clasificación del momento del evento y nunca la reescribe; la lectura «vigente» se calcula en el Admin.
+- **Listas e impresiones:** un producto «mostrado» es uno pintado en una lista que entró en pantalla (aproximación por sección, una vez por contenido y por página). La atribución a lista solo existe cuando la ficha se abrió desde un clic en esa lista.
+- **Embudo:** usa personas por evento en el período, no una secuencia estricta por persona.
+- **Ventas:** las del POS incluyen todos los canales y no se vinculan con visitas. Una solicitud de pedido y un clic a WhatsApp no son ventas.
+- **Piezas promocionales:** en los informes propios de GA4 aparecen como «items» con id prefijado; el Admin las separa.
+
+### 31.8 Validación integral
+
+- **Suite Node:** 54 scripts, 1093 aprobadas y 0 fallidas. Incluye `scripts/test-analytics.mjs` (24 pruebas):
+  - consentimiento y dominio;
+  - privacidad de búsquedas y URL;
+  - items con id y clasificación;
+  - duplicados y JWT;
+  - errores de la API;
+  - rangos y ventas confirmadas;
+  - solo publicados y clasificación histórica;
+  - endpoint protegido (401 sin token, 405 en POST);
+  - caché;
+  - ausencia de secretos en respuestas y registros;
+  - endpoint público;
+  - 11 funciones.
+- **Navegador, tienda local con la red a Google bloqueada y el pedido interceptado:** 38 comprobaciones con GA4 simulado y 4 sin configurar, ALL OK.
+  - antes de decidir no hay etiqueta ni eventos; «Rechazar» se respeta al volver; «Aceptar» carga una sola etiqueta;
+  - todos los eventos de §31.4 con su lista y clasificación;
+  - ningún dato personal ni número de pedido en `dataLayer`; sin duplicados;
+  - retirar el consentimiento detiene el envío;
+  - aviso dentro de pantalla a 1440, 1024, 768 y 390.
+- **Navegador, Admin › Analítica con el manejador real y fuentes simuladas, a 1440, 1024, 768 y 390:** 101 comprobaciones, ALL OK. Cubren los estados de §31.5, el tooltip con mouse y táctil, filtros, rango personalizado, ausencia de desplazamiento horizontal y la navegación a las demás áreas, sin errores de consola.
+- **Corregido durante la validación:**
+  - la tabla de productos ensanchaba la tarjeta y el ejemplo UTM desbordaba a 390 px;
+  - la barra inferior con 7 áreas desbordaba;
+  - el tooltip se cerraba tras un toque.
+- **Regresión local:** Vitrinas del Admin 28, carrito 51, checkout 36, búsqueda y cuadrícula 40, vitrinas de la tienda 56, navegación 53 y fichas 35, ALL OK. El flujo de tonos (`shade-flow`) requiere la API real: queda para la verificación en producción.
+- **Lectura real de prueba (local, solo GET):** el informe sin GA4 devolvió 85 productos publicados, las ventas confirmadas del POS por período y canal, y las solicitudes del catálogo.
+- **POS:** intacto (solo lecturas GET a `sales`, `products` y `orders`). Sin cambios de precios, inventario, pedidos, clasificación, vitrinas, nombres ni descripciones.
+
+### 31.9 Publicación
+
+**Actualización (2026-11-22):** la propietaria creó la propiedad GA4 (ID 565484007, flujo `G-R4YBBE3F2P`), la cuenta de servicio con rol Lector, habilitó la Data API y cargó las tres variables en Vercel (Production). Validación local con la propiedad real: autenticación correcta, metadatos y las 13 consultas del módulo responden (propiedad aún sin actividad). Publicación autorizada expresamente; ver Historial.
+
+**Panel en seis áreas:** A. Resumen (9 indicadores con comparación y definición), B. Tráfico, C. Productos (búsqueda, filtros, «publicados sin visitas», período anterior y detalle por producto con clasificación vigente e histórica), D. Embudo (7 etapas con avance y abandono; WhatsApp como % de visitantes), E. Vitrinas (Más vendidos y Destacados VIBE por separado), F. Ventas POS (unidades, evolución diaria, productos y categorías), siempre separadas de GA4.
+
+~~No publicado. La autorización de esta fase condiciona el commit, el push y el despliegue a que no haya dependencias externas pendientes de la propietaria, y faltan la propiedad de GA4, la cuenta de servicio y las variables de Vercel (§31.6). Los cambios quedan preparados en el área de trabajo local, sin commit. Una vez publicados, el módulo queda inactivo en la tienda mientras falte `GA4_MEASUREMENT_ID`. El Admin mostraría desde el primer día las ventas confirmadas y las indicaciones de configuración.~~ *(superado el 2026-11-22: configuración completada y publicación autorizada)*
+
 ## Historial
 
 - **2026-10-28 (Fase 57):**
@@ -2008,3 +2147,4 @@ Banner y catálogo siempre visibles; las demás se activan u ocultan desde el Ad
 - **2026-11-21 (publicación de §28):** commit `aac23e5` en `main`, desplegado en Production (Vercel, success); `js/app.js`, `css/styles.css` e `index.html` de producción idénticos al commit. Verificado en `www.vibebeautycol.com` a 1440, 1024, 768, 390 y 320 px con productos reales (Bye Bye Oil, Cactus Lip Balm, Candy Case, Heart Flush, Acne Patch): «Eliminar» completo y con texto, descripciones completas sin desborde, eliminación por botón y por deslizamiento, «Continuar comprando» conserva el carrito, subtotal y contador correctos, checkout interceptado; sin errores de consola.
 - **2026-11-22 (publicación de §29, organización comercial):** commit `b964c19` en `main`, desplegado en Production (Vercel, success); archivos de producción idénticos al commit. Verificado en `www.vibebeautycol.com` con datos reales a 1440, 1024, 768 y 390: banner › Más elegidos (10 productos por unidades vendidas: 89, 67, 56, 68, 73, 77, 79, 96, 110, 120) › catálogo (pestañas Maquillaje, Skincare, Accesorios beauty) › Descubre tu VIBE. Novedades y Colecciones ocultas (sin lanzamiento oficial, sin fijados ni colecciones) y Ofertas oculta (sin promociones vigentes). Búsqueda, paginación, tonos, carrito y checkout interceptado correctos; sin errores de consola. `/api/catalog/products` sin cambios. Sin cambios en el POS ni en datos; ningún documento de organización comercial creado todavía (rigen los valores por defecto).
 - **2026-11-22 (reclasificación integral, §30):** 80 productos publicados revisados; 23 reclasificados, 57 conservados, 0 pendientes; 15 categorías/subcategorías nuevas (taxonomía revisión 15). Solo cambió category/subcategory; POS, precios, inventario, imágenes, tonos, presentaciones, colecciones, ventas y pedidos intactos; el no publicado #162 sin cambios. Verificado en producción a 1440, 1024, 768 y 390.
+- **2026-11-22 (analítica comercial, §31):** auditoría (GA4 nunca instalado: sin datos históricos), medición GA4 con consentimiento previo, eventos de productos, vitrinas, categorías, búsqueda, carrito, checkout, solicitud de pedido y WhatsApp sin datos personales, y Admin › Analítica (GA4 en el servidor + ventas confirmadas del POS en solo lectura). Política de datos actualizada («Analítica del sitio»; vigente desde el 22 de noviembre de 2026). Suite 1093/0; navegador: tienda 38 + 4 y Admin 101, ALL OK. Sin publicar: faltan la propiedad de GA4, la cuenta de servicio y las variables de Vercel (§31.6). POS intacto.
