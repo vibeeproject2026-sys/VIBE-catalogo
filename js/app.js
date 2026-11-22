@@ -521,7 +521,19 @@ function renderShowcases() {
   const novedades = sc ? selectNovedades(state.products, sc.novedades, sc.novedades.autoProductIds || []) : [];
   state.newIds = new Set(novedades.map((p) => Number(p.id)));
   sectionVisible.novedades = renderShowcaseGrid("novedades", "novedadesTitle", "novedadesGrid", sc ? sc.novedades : null, novedades);
-  sectionVisible.masElegidos = sc ? renderShowcaseGrid("masElegidos", "masElegidosTitle", "masElegidosGrid", sc.masElegidos, selectBestSellers(state.products, sc.masElegidos, bestSellerIds)) : renderShowcaseGrid("masElegidos", "masElegidosTitle", "masElegidosGrid", null, []);
+  // Más elegidos = dos criterios separados y rotulados:
+  // · Más vendidos: ranking de unidades vendidas (POS, solo lectura) con los
+  //   fijados/excluidos del Admin › Vitrinas;
+  // · Destacados VIBE: selección editorial (casilla «Producto destacado» de
+  //   la ficha), en orden editorial. Nunca se presentan como más vendidos.
+  const ranking = sc ? selectBestSellers(state.products, sc.masElegidos, bestSellerIds) : [];
+  const destacados = state.products.filter((p) => p.featured === true).sort((a, b) => (a.editorialOrder ?? 1e9) - (b.editorialOrder ?? 1e9) || String(a.name).localeCompare(String(b.name), "es"));
+  const rankingShown = renderShowcaseGrid("masElegidos", "masElegidosTitle", "masElegidosGrid", sc ? sc.masElegidos : null, ranking);
+  $("#masVendidosHead").classList.toggle("hidden", !rankingShown);
+  if (!rankingShown && destacados.length) $("#masElegidosGrid").innerHTML = "";
+  $("#destacadosBlock").classList.toggle("hidden", !destacados.length);
+  $("#destacadosGrid").innerHTML = destacados.map(productCard).join("");
+  sectionVisible.masElegidos = rankingShown || destacados.length > 0;
   sectionVisible.colecciones = renderCollections();
   applySectionLayout();
 }
@@ -1493,6 +1505,7 @@ $("#catalogPagination").addEventListener("click", (e) => {
 bindProductGrid("#ofertasGrid");
 bindProductGrid("#novedadesGrid");
 bindProductGrid("#masElegidosGrid");
+bindProductGrid("#destacadosGrid");
 
 $("#cartButton").onclick = openCart;
 $("#closeCart").onclick = closeCart;

@@ -2895,7 +2895,8 @@ function renderMerch() {
   }).join("");
 
   const nov = sc.novedades;
-  const novPinned = nov.pinned.map((id) => `<li>${esc(merchName(id))} <button type="button" class="tax-act tax-danger" data-merch-remove="novedades.pinned" data-id="${id}">Quitar</button></li>`).join("") || `<li class="section-hint">Ninguno.</li>`;
+  // Novedades: orden de aparición = orden de esta lista (subir/bajar).
+  const novPinned = nov.pinned.map((id, i) => `<li>${i + 1}. ${esc(merchName(id))} <button type="button" class="tax-act" data-merch-nov-move="-1" data-id="${id}"${i === 0 ? " disabled" : ""} aria-label="Subir">↑</button><button type="button" class="tax-act" data-merch-nov-move="1" data-id="${id}"${i === nov.pinned.length - 1 ? " disabled" : ""} aria-label="Bajar">↓</button> <button type="button" class="tax-act tax-danger" data-merch-remove="novedades.pinned" data-id="${id}">Quitar</button></li>`).join("") || `<li class="section-hint">Ninguno.</li>`;
   const novExcluded = nov.excluded.map((id) => `<li>${esc(merchName(id))} <button type="button" class="tax-act" data-merch-remove="novedades.excluded" data-id="${id}">Quitar exclusión</button></li>`).join("") || `<li class="section-hint">Ninguno.</li>`;
 
   const mas = sc.masElegidos;
@@ -3073,6 +3074,14 @@ $("#merchRoot").addEventListener("click", (e) => {
       if (show === "masElegidos" && other === "pinned") sc.masElegidos.pinned = sc.masElegidos.pinned.filter((p) => p.productId !== id);
       else sc[show][other] = sc[show][other].filter((x) => x !== id);
     }
+    return done();
+  }
+  if (b.dataset.merchNovMove) {
+    const list = sc.novedades.pinned;
+    const i = list.indexOf(Number(b.dataset.id));
+    const j = i + Number(b.dataset.merchNovMove);
+    if (i < 0 || j < 0 || j >= list.length) return;
+    [list[i], list[j]] = [list[j], list[i]];
     return done();
   }
   if (b.dataset.merchRemove) {
