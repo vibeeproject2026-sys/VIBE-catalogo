@@ -948,20 +948,24 @@ function pdpGalleryHtml(p) {
   // reemplaza el alt genérico (el nombre del producto), nunca al revés.
   // Fase 35.1 — navegación manual con flechas (sección 4): solo se
   // renderizan si hay más de una imagen; nunca autoplay, nunca hover.
+  // Video del producto (opcional): una miniatura más, con símbolo de
+  // reproducción. El archivo NO se descarga hasta que la clienta lo elige
+  // y pulsa reproducir (preload="none"); nunca se reproduce solo.
+  const video = p.video && p.video.url ? p.video : null;
   const arrows =
-    images.length > 1
+    images.length > 1 || video
       ? `<button type="button" class="pdp-arrow pdp-arrow-prev" data-gallery-nav="-1" aria-label="Imagen anterior">‹</button>
          <button type="button" class="pdp-arrow pdp-arrow-next" data-gallery-nav="1" aria-label="Imagen siguiente">›</button>`
       : "";
   const main = `<div class="pdp-gallery-main"><img id="pdpMainImage" class="detail-photo" src="${esc(images[0])}"${optimizedAttrs(p, images[0], SIZES_PDP)} alt="${esc(p.mainImageAlt || p.name)}" loading="eager">${arrows}</div>`;
   const thumbs =
-    images.length > 1
+    images.length > 1 || video
       ? `<div class="pdp-thumbs">${images
           .map(
             (img, i) =>
               `<button type="button" class="pdp-thumb${i === 0 ? " active" : ""}" data-thumb="${i}" aria-label="Imagen ${i + 1} de ${esc(p.name)}"><img src="${esc(img)}"${optimizedAttrs(p, img, SIZES_THUMB)} alt="" loading="${i === 0 ? "eager" : "lazy"}"></button>`
           )
-          .join("")}</div>`
+          .join("")}${video ? `<button type="button" class="pdp-thumb pdp-thumb-video" data-thumb-video aria-label="Video de ${esc(p.name)}"><img src="${esc(video.poster)}" alt="" loading="lazy"><span class="pdp-play" aria-hidden="true"></span></button>` : ""}</div>`
       : "";
   return main + thumbs;
 }
@@ -1022,6 +1026,7 @@ function pdpRelatedHtml() {
 // poder re-renderizar en el lugar cuando se abre un producto relacionado
 // sin cerrar/reabrir el diálogo.
 function renderProductDetail(p) {
+  stopPdpVideo();
   const unavailable = p.available === false;
   const badgeText = pdpBadge(p);
   const hasVariants = !hasOptions(p) && p.variants.length > 1;
@@ -1162,7 +1167,38 @@ function selected() {
   return p.variants.find((v) => String(v.id) === String(state.variant)) || p.variants[0];
 }
 
+// Video de la ficha: se crea al elegir su miniatura y se libera al volver a
+// una foto, al cambiar de ficha o al cerrarla.
+function stopPdpVideo() {
+  const v = document.getElementById("pdpVideo");
+  if (!v) return;
+  try { v.pause(); v.removeAttribute("src"); v.load(); } catch {}
+  v.remove();
+  const img = document.getElementById("pdpMainImage");
+  if (img) img.hidden = false;
+}
+function showPdpVideo(thumb) {
+  const p = state.product;
+  if (!p || !p.video) return;
+  const main = document.querySelector(".pdp-gallery-main");
+  const img = document.getElementById("pdpMainImage");
+  if (!main || document.getElementById("pdpVideo")) return;
+  const v = document.createElement("video");
+  v.id = "pdpVideo";
+  v.className = "detail-photo pdp-video";
+  v.controls = true;
+  v.playsInline = true;
+  v.preload = "none";
+  v.poster = p.video.poster;
+  v.src = p.video.url;
+  v.setAttribute("aria-label", `Video de ${p.name}`);
+  if (img) { img.hidden = true; main.insertBefore(v, img); } else main.prepend(v);
+  document.querySelectorAll(".pdp-thumb").forEach((t) => t.classList.toggle("active", t === thumb));
+}
+
 function selectGalleryThumb(thumb) {
+  if (thumb.hasAttribute("data-thumb-video")) return showPdpVideo(thumb);
+  stopPdpVideo();
   const images = pdpGalleryImages(state.product);
   const idx = Number(thumb.dataset.thumb);
   const main = $("#pdpMainImage");
@@ -1177,11 +1213,10 @@ function selectGalleryThumb(thumb) {
 // estado de "cuál está activa".
 function moveGalleryBy(delta) {
   if (!state.product) return;
-  const images = pdpGalleryImages(state.product);
-  if (images.length < 2) return;
   const thumbs = [...document.querySelectorAll(".pdp-thumb")];
+  if (thumbs.length < 2) return;
   const current = thumbs.findIndex((t) => t.classList.contains("active"));
-  const nextIndex = Math.max(0, Math.min(images.length - 1, (current === -1 ? 0 : current) + delta));
+  const nextIndex = Math.max(0, Math.min(thumbs.length - 1, (current === -1 ? 0 : current) + delta));
   if (thumbs[nextIndex]) thumbs[nextIndex].click();
 }
 
@@ -1547,7 +1582,7 @@ $("#productDialog").addEventListener("click", e => {
     return;
   }
 
-  const thumb = e.target.closest("[data-thumb]");
+  const thumb = e.target.closest("[data-thumb], [data-thumb-video]");
   if (thumb) {
     selectGalleryThumb(thumb);
     return;
@@ -1659,6 +1694,7 @@ $("#productDialog").addEventListener(
     if (e.touches.length > 1) pdpMultiTouch = true;
     if (!e.target.closest("[data-gallery]")) return;
     if (e.touches.length > 1) return;
+    if (e.target.closest("video")) return; // los controles del video (barra de tiempo) no cambian de imagen
     const t = e.touches[0];
     pdpTouchStartX = t.clientX;
     pdpTouchStartY = t.clientY;
@@ -1688,12 +1724,11 @@ $("#productDialog").addEventListener(
     pdpTouchStartX = null;
     pdpTouchStartY = null;
     if (!gallery) return;
-    const images = pdpGalleryImages(state.product);
-    if (images.length < 2) return;
+    const thumbs = [...document.querySelectorAll(".pdp-thumb")];
+    if (thumbs.length < 2) return;
     if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > PDP_SWIPE_THRESHOLD) {
-      const thumbs = [...document.querySelectorAll(".pdp-thumb")];
       const current = thumbs.findIndex((t) => t.classList.contains("active"));
-      const nextIndex = deltaX < 0 ? Math.min(current + 1, images.length - 1) : Math.max(current - 1, 0);
+      const nextIndex = deltaX < 0 ? Math.min(current + 1, thumbs.length - 1) : Math.max(current - 1, 0);
       if (thumbs[nextIndex]) thumbs[nextIndex].click();
     }
   },
@@ -1709,6 +1744,7 @@ $("#productDialog").addEventListener(
 // por este único evento nativo 'close' del <dialog>.
 let suppressHistoryOnClose = false;
 $("#productDialog").addEventListener("close", () => {
+  stopPdpVideo(); // detiene la reproducción y libera el video al cerrar
   // Fase final — el evento 'close' llega en una tarea posterior: si para
   // entonces la ficha ya se volvió a abrir (con otro producto), este
   // evento pertenece a la apertura anterior y no debe cerrar ni limpiar

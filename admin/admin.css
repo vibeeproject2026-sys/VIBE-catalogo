@@ -475,3 +475,24 @@ button.sub-chip.sub-edit:hover{outline:2px solid var(--blush-ink);outline-offset
 .tax-off{opacity:.62}
 .tax-new-group{display:flex;flex-wrap:wrap;align-items:center;gap:10px;font-size:13px;color:#555;margin:0 0 14px}
 @media(max-width:720px){.merch-cols{grid-template-columns:1fr}.merch-row select{max-width:100%}}
+
+/* Video del producto (admin/video-panel.js) */
+.video-panel{display:grid;gap:10px}
+.vp-status{display:inline-block;margin-left:8px;border-radius:999px;padding:2px 10px;font-size:11px;font-weight:700;background:#f0f0f0;color:#666;letter-spacing:0;text-transform:none}
+.vp-published{background:#e6f8ee;color:#1a7f4c}.vp-review{background:#ffe3f0;color:#c30063}.vp-processing{background:#fff0e0;color:#a15c00}.vp-error{color:#b42318}
+p.vp-error{margin:0;font-size:13px}
+.vp-status.vp-error{background:#fdecea}
+.vp-preview{width:100%;max-width:420px;max-height:420px;background:#111;border-radius:12px;display:block}
+.vp-info{margin:0;font-size:13px;color:#4a4246}
+.vp-hint{margin:0;font-size:12px;color:#6f6469}
+.vp-actions{display:flex;flex-wrap:wrap;gap:8px}
+.vp-actions label.button{cursor:pointer}
+.vp-trim{display:grid;gap:8px;padding:12px;border:1px solid #ece4e8;border-radius:12px;background:#fffafc}
+.vp-trim p{margin:0;font-size:13px}
+.vp-trim input{width:110px;margin-left:6px}
+.vp-progress{height:10px;border-radius:999px;background:#f3eaee;overflow:hidden;max-width:420px}
+.vp-progress span{display:block;height:100%;background:#ff007a;transition:width .3s ease}
+.vp-settings summary{cursor:pointer;font-size:13px;font-weight:700}
+.vp-settings-row{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin:10px 0 6px}
+.vp-settings-row label{display:grid;gap:3px;font-size:12px;font-weight:700}
+.vp-settings-row input,.vp-settings-row select{min-height:36px;border:1px solid #ddd;border-radius:10px;padding:0 8px}

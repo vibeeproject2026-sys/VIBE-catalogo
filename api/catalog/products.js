@@ -16,6 +16,7 @@ const { resolveCategoryGroup } = require("./_lib/categoryGroups");
 const { applyCors } = require("./_lib/cors");
 const { sendJson, sendError, methodNotAllowed } = require("./_lib/http");
 const { loadImageVariants, srcsetFor } = require("../_lib/imageVariants");
+const { loadVideos, publicVideo } = require("../_lib/productVideos");
 
 // Explicit column whitelists — never `select=*`. This is what actually
 // keeps cost_base, cost_pack, min_stock, etc. out of reach, independent
@@ -67,7 +68,7 @@ module.exports = async function handler(req, res) {
   try {
     // Fase 57 — versiones optimizadas (si existe el manifiesto); nunca
     // hace fallar el catálogo: sin manifiesto → Map vacío → originales.
-    const [products, metadataRows, imageVariants] = await Promise.all([
+    const [products, metadataRows, imageVariants, videoManifest] = await Promise.all([
       pgrestSelect({
         table: "products",
         columns: PRODUCT_COLUMNS,
@@ -81,6 +82,7 @@ module.exports = async function handler(req, res) {
         env,
       }),
       query.format === "sitemap" ? new Map() : loadImageVariants(env),
+      query.format === "sitemap" ? { videos: {} } : loadVideos(env),
     ]);
 
     const joined = joinCatalog(products, metadataRows);
@@ -96,7 +98,9 @@ module.exports = async function handler(req, res) {
         const set = srcsetFor(imageVariants, url);
         if (set) srcsetByUrl[url] = set;
       }
-      return { ...p, imageSrcset: srcsetFor(imageVariants, p.image), srcsetByUrl };
+      // Video de producto (solo la versión optimizada publicada), si existe.
+      const video = publicVideo(videoManifest.videos[p.id]);
+      return { ...p, imageSrcset: srcsetFor(imageVariants, p.image), srcsetByUrl, ...(video ? { video } : {}) };
     });
 
     // Fase 56 — /sitemap.xml (rewrite en vercel.json): portada + fichas

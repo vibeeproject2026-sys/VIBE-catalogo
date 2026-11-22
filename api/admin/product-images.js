@@ -33,6 +33,7 @@ const { requireAdmin } = require("./_lib/auth");
 const { sendJson, sendError, methodNotAllowed } = require("../catalog/_lib/http");
 const { decodeBase64Image, validateUpload } = require("./_lib/imageValidation");
 const { loadSlides } = require("../_lib/heroSlides");
+const { handleVideo } = require("./_lib/videoAdmin");
 const {
   buildMainPath,
   buildSecondaryPath,
@@ -45,8 +46,10 @@ const {
 } = require("./_lib/storage");
 
 module.exports = async function handler(req, res) {
-  if (req.method !== "POST" && req.method !== "DELETE") {
-    return methodNotAllowed(res, ["POST", "DELETE"]);
+  // Videos de producto: ?resource=video (ver _lib/videoAdmin.js).
+  const isVideo = req.query && req.query.resource === "video";
+  if (req.method !== "POST" && req.method !== "DELETE" && !(isVideo && req.method === "GET")) {
+    return methodNotAllowed(res, isVideo ? ["GET", "POST", "DELETE"] : ["POST", "DELETE"]);
   }
   if (!requireAdmin(req, res)) return;
 
@@ -57,6 +60,7 @@ module.exports = async function handler(req, res) {
     console.error("[admin/product-images] " + e.message);
     return sendError(res, 500, "Servicio no disponible temporalmente.");
   }
+  if (isVideo) return handleVideo(req, res, env);
 
   const body = req.body && typeof req.body === "object" ? req.body : {};
   const productId = Number(body.product_id);

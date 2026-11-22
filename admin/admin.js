@@ -18,6 +18,8 @@
 
 import { getCategoriesInGroup, getSubcategories, VIBE_CATEGORY_GROUPS, SUBCATEGORIES_BY_CATEGORY, publicPlacement, isListedSubcategory, needsClassificationReview, suggestClassification, applyTaxonomy } from "../js/taxonomy.js";
 import { SECTION_DESTINATIONS, describeSlideDestination } from "../js/hero-links.js";
+// Video del producto (codificación en el navegador; ver admin/video-panel.js).
+import { mountVideoPanel } from "./video-panel.js";
 
 const TOKEN_KEY = "vibe_admin_token";
 const $ = (s) => document.querySelector(s);
@@ -1063,6 +1065,7 @@ async function openEdit(productId) {
           <button type="button" id="uploadSecondaryBtn" class="button">Agregar adicional</button>
           <p id="secondaryImageStatus" class="image-status"></p>
         </div>
+        <div class="image-block video-panel" id="videoPanel"></div>
       </div>
     </details>
 
@@ -1685,6 +1688,8 @@ async function openEdit(productId) {
       btn.disabled = false;
     }
   });
+
+  mountVideoPanel($("#videoPanel"), product.id, { adminFetch, onUnauthorized: () => { clearToken(); showLogin("Token incorrecto o vencido."); } });
 
   $("#uploadMainBtn").addEventListener("click", async () => {
     const file = $("#mainImageInput").files[0];

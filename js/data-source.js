@@ -140,6 +140,8 @@ function normalizeApiProduct(p) {
     // Palabras clave editoriales (Admin → catalog_metadata → API): solo se
     // usan para buscar; la ficha no las muestra. Antes se descartaban aquí,
     // así que la búsqueda nunca las veía.
+    // Video de producto (versión optimizada publicada), solo con URLs https.
+    video: p.video && typeof p.video.url === "string" && p.video.url.startsWith("https://") && typeof p.video.poster === "string" && p.video.poster.startsWith("https://") ? { url: p.video.url, poster: p.video.poster, width: Number(p.video.width) || null, height: Number(p.video.height) || null, duration: Number(p.video.duration) || null } : null,
     searchKeywords: Array.isArray(p.searchKeywords) ? p.searchKeywords.filter((k) => typeof k === "string" && k.trim()).map((k) => k.trim()) : [],
     ingredients: p.ingredients ?? null,
     usage: p.usage ?? "",
