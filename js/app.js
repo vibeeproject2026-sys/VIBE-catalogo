@@ -1629,10 +1629,23 @@ $("#productDialog").addEventListener("keydown", (e) => {
 const PDP_SWIPE_THRESHOLD = 40;
 let pdpTouchStartX = null;
 let pdpTouchStartY = null;
+// Zoom con dos dedos: un gesto que usó más de un dedo, o hecho con la página
+// ampliada (desplazarse por la foto con zoom), nunca cambia de imagen.
+let pdpMultiTouch = false;
+const pdpPageZoomed = () => Boolean(window.visualViewport && window.visualViewport.scale > 1.01);
+$("#productDialog").addEventListener(
+  "touchmove",
+  (e) => {
+    if (e.touches.length > 1) pdpMultiTouch = true;
+  },
+  { passive: true }
+);
 $("#productDialog").addEventListener(
   "touchstart",
   (e) => {
+    if (e.touches.length > 1) pdpMultiTouch = true;
     if (!e.target.closest("[data-gallery]")) return;
+    if (e.touches.length > 1) return;
     const t = e.touches[0];
     pdpTouchStartX = t.clientX;
     pdpTouchStartY = t.clientY;
@@ -1642,6 +1655,18 @@ $("#productDialog").addEventListener(
 $("#productDialog").addEventListener(
   "touchend",
   (e) => {
+    if (e.touches.length === 0 && pdpMultiTouch) {
+      // Fin de un pellizco: se descarta el gesto completo.
+      pdpMultiTouch = false;
+      pdpTouchStartX = null;
+      pdpTouchStartY = null;
+      return;
+    }
+    if (pdpMultiTouch || pdpPageZoomed()) {
+      pdpTouchStartX = null;
+      pdpTouchStartY = null;
+      return;
+    }
     if (pdpTouchStartX === null || !state.product) return;
     const gallery = e.target.closest("[data-gallery]");
     const t = e.changedTouches[0];

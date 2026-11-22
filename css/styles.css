@@ -509,7 +509,12 @@ dialog::backdrop{background:#000d}
    terminaba mucho más alto que ancho, y object-fit:contain dejaba la
    foto pequeña en el medio). Con align-items:start, la columna de
    imagen conserva su propia altura (definida por aspect-ratio abajo). */
-#productDetail{display:grid;grid-template-columns:1fr 1fr;align-items:start}
+#productDetail{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start}
+/* Ficha en móvil: una palabra o nombre largo nunca ensancha la ficha ni la
+   galería (minmax(0,1fr) + corte de palabra solo cuando no cabe). */
+#productDetail > *{min-width:0}
+.detail-copy{overflow-wrap:break-word}
+.pdp-spec-row dd,.pdp-spec-row dt{min-width:0;overflow-wrap:anywhere}
 /* aspect-ratio:4/5 (el estándar recomendado de foto de producto, ver
    docs/fase35-estandar-imagenes.md) le da a la columna de imagen una
    altura predecible basada en su propio ancho, en vez de min-height
@@ -611,7 +616,7 @@ dialog::backdrop{background:#000d}
 .pdp-thumb.active{border-color:var(--pink)}
 .pdp-thumb img{width:100%;height:100%;object-fit:contain;background:#111;display:block}
 
-.pdp-breadcrumb{margin-bottom:16px}
+.pdp-breadcrumb{margin-bottom:16px;white-space:normal;overflow:visible;text-overflow:clip}
 .pdp-badge{display:inline-block;position:static;background:var(--pink);color:#fff;font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:4px 10px;border-radius:999px;margin-bottom:10px}
 .pdp-brand{margin:0 0 6px;font-size:13px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--pink)}
 .pdp-commercial-name{margin:-4px 0 8px;font-size:13px;color:#ccc;font-style:italic}
@@ -914,7 +919,7 @@ footer .wrap.footer-grid{display:grid;grid-template-columns:1.1fr 1fr 1.3fr;gap:
   .grid{gap:16px}
   .cta-final{padding:50px 0}
   .detail-copy{padding:30px 24px}
-  #productDetail{grid-template-columns:1fr}
+  #productDetail{grid-template-columns:minmax(0,1fr)}
   /* Restaura exactamente el patrón mobile de siempre (sin tocarlo): el
      contenedor OUTER vuelve a fijar la proporción (4/5) y el área de la
      foto vuelve a flex:1/min-height:0 estirándose dentro de ese total —
