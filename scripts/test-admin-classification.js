@@ -73,7 +73,7 @@ async function main() {
   });
   await test("publicPlacement = navegación pública: la categoría editorial manda", () => {
     assert.deepEqual(t.publicPlacement({ category: "Labios", categoryGroup: "Maquillaje", editorialCategory: "Ojos" }), { group: "Maquillaje", category: "Ojos" });
-    assert.deepEqual(t.publicPlacement({ category: "Otro", categoryGroup: "Accesorios", editorialCategory: "Herramientas de aplicación" }), { group: "Accesorios", category: "Herramientas de aplicación" });
+    assert.deepEqual(t.publicPlacement({ category: "Otro", categoryGroup: "Accesorios", editorialCategory: "Herramientas de aplicación" }), { group: "Accesorios beauty", category: "Herramientas de aplicación" });
   });
   await test("publicPlacement sin categoría editorial: grupo del POS, salvo «Otro» (solo «Todos»)", () => {
     assert.deepEqual(t.publicPlacement({ category: "Labios", categoryGroup: "Maquillaje", editorialCategory: null }), { group: "Maquillaje", category: "Labios" });
@@ -85,7 +85,7 @@ async function main() {
       { id: 2, name: "b", category: "Otro", categoryGroup: "Accesorios", editorialCategory: "Herramientas de aplicación" },
       { id: 3, name: "c", category: "Labios", categoryGroup: "Maquillaje", editorialCategory: "Limpieza" },
     ];
-    for (const group of ["Accesorios", "Maquillaje", "Skincare"]) {
+    for (const group of ["Accesorios beauty", "Maquillaje", "Skincare"]) {
       const viaFilter = t.filterProducts(products, { group }).map((p) => p.id);
       const viaPlacement = products.filter((p) => t.publicPlacement(p).group === group).map((p) => p.id);
       assert.deepEqual(viaPlacement, viaFilter, group);
@@ -165,10 +165,10 @@ async function main() {
     assert.match(fn[1], /while \(body\.firstChild\) section\.appendChild\(body\.firstChild\)/);
     assert.doesNotMatch(fn[1], /\.remove\(\)|innerHTML\s*=\s*""|removeChild/);
   });
-  await test("el panel tiene las 5 áreas aprobadas", () => {
+  await test("el panel tiene las 6 áreas aprobadas (organización comercial suma «Vitrinas»)", () => {
     const html = require("fs").readFileSync(require("path").join(__dirname, "..", "admin", "index.html"), "utf8");
     const views = [...html.matchAll(/class="nav-item[^"]*" data-view="([a-z]+)"/g)].map((m) => m[1]);
-    assert.deepEqual(views, ["home", "products", "taxonomy", "hero", "orders"]);
+    assert.deepEqual(views, ["home", "products", "taxonomy", "merch", "hero", "orders"]);
     for (const v of views) assert.match(html, new RegExp(`data-view-panel="${v}"`));
   });
 

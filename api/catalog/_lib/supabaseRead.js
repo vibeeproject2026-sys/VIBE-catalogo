@@ -7,7 +7,10 @@
 // ALLOWED_TABLES check below is defense-in-depth against a future coding
 // mistake, not a client-facing mechanism.
 
-const ALLOWED_TABLES = new Set(["products", "catalog_metadata"]);
+// Organización comercial — «sales» (ventas del POS) solo para calcular en
+// lectura el ranking de «Más elegidos» (api/_lib/bestsellers.js). Este
+// módulo solo hace GET: nunca escribe en el POS.
+const ALLOWED_TABLES = new Set(["products", "catalog_metadata", "sales"]);
 
 async function pgrestSelect({ table, columns, filters = [], order, env, fetchImpl = fetch }) {
   if (!ALLOWED_TABLES.has(table)) {

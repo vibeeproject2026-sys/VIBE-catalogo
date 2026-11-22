@@ -37,11 +37,21 @@ const DEFAULT_GROUPS = [
     { name: "Limpieza", subcategories: ["Limpiadores", "Tónicos"] },
     { name: "Tratamiento", subcategories: ["Cremas faciales", "Sérums", "Contorno de ojos", "Cuello y escote", "Pestañas y cejas (crecimiento)", "Papel matificante", "Mascarillas", "Kits"] },
   ] },
-  { group: "Accesorios", categories: [
+  { group: "Accesorios beauty", categories: [
     { name: "Herramientas de aplicación", subcategories: ["Brochas", "Esponjas", "Rizadores de pestañas"] },
     { name: "Complementos de belleza", subcategories: ["Accesorios para el cabello", "Cuidado personal"] },
   ] },
 ];
+// Organización comercial (2026-11-22): 6 grupos iniciales, administrables
+// (crear, renombrar, ordenar, activar/desactivar). Los grupos nuevos nacen
+// vacíos: no se clasifica ningún producto automáticamente y un grupo sin
+// productos no se muestra en la tienda.
+const INITIAL_GROUPS = ["Maquillaje", "Skincare", "Sets y regalos", "Accesorios beauty", "Cuidado personal", "Fragancias y bienestar"];
+// El grupo «Accesorios» guardado antes es el mismo grupo, con su nombre nuevo.
+const GROUP_ALIASES = { Accesorios: "Accesorios beauty" };
+const canonicalGroup = (name) => GROUP_ALIASES[name] || name;
+const MAX_GROUPS = 20;
+// Compatibilidad: nombres de los grupos de código (antes eran fijos).
 const GROUP_NAMES = DEFAULT_GROUPS.map((g) => g.group);
 
 const MAX_NAME_LENGTH = 60;
@@ -66,31 +76,56 @@ function validateName(value, what) {
   return { name };
 }
 
+// Grupos iniciales que todavía no están (vacíos, activos) se insertan en su
+// lugar del orden inicial: justo después del grupo inicial anterior que sí
+// exista (o al principio). Nunca se tocan ni se reordenan los existentes.
+function withInitialGroups(groups) {
+  INITIAL_GROUPS.forEach((name, i) => {
+    if (groups.some((g) => nameKey(g.group) === nameKey(name))) return;
+    let at = 0;
+    for (let k = i - 1; k >= 0; k--) {
+      const idx = groups.findIndex((g) => nameKey(g.group) === nameKey(INITIAL_GROUPS[k]));
+      if (idx !== -1) { at = idx + 1; break; }
+    }
+    groups.splice(at, 0, { group: name, active: true, categories: [] });
+  });
+  return groups;
+}
+
 function defaultTaxonomy() {
-  return { revision: 0, updatedAt: null, groups: JSON.parse(JSON.stringify(DEFAULT_GROUPS)) };
+  return { revision: 0, updatedAt: null, groups: withInitialGroups(JSON.parse(JSON.stringify(DEFAULT_GROUPS)).map((g) => ({ ...g, active: true }))) };
 }
 
 // Acepta solo la forma esperada; cualquier cosa inválida → null (se usa la
-// taxonomía por defecto, nunca se rompe el catálogo).
+// taxonomía por defecto, nunca se rompe el catálogo). Grupos en el orden
+// guardado (administrable); `active: false` oculta un grupo o una categoría
+// de la navegación pública sin ocultar sus productos.
 function sanitizeTaxonomy(raw) {
   if (!raw || typeof raw !== "object" || !Array.isArray(raw.groups)) return null;
-  const groups = GROUP_NAMES.map((group) => {
-    const src = raw.groups.find((g) => g && g.group === group) || { categories: [] };
-    const seenCat = new Set();
-    const categories = (Array.isArray(src.categories) ? src.categories : [])
-      .map((c) => {
-        const name = cleanName(c && c.name);
-        if (!name || seenCat.has(nameKey(name))) return null;
-        seenCat.add(nameKey(name));
-        const seenSub = new Set();
-        const subcategories = (Array.isArray(c.subcategories) ? c.subcategories : [])
-          .map(cleanName)
-          .filter((s) => s && !seenSub.has(nameKey(s)) && seenSub.add(nameKey(s)));
-        return { name, subcategories };
-      })
-      .filter(Boolean);
-    return { group, categories };
-  });
+  const seenGroups = new Set();
+  const groups = raw.groups
+    .map((src) => {
+      const group = canonicalGroup(cleanName(src && src.group));
+      if (!group || seenGroups.has(nameKey(group)) || seenGroups.size >= MAX_GROUPS) return null;
+      seenGroups.add(nameKey(group));
+      const seenCat = new Set();
+      const categories = (Array.isArray(src.categories) ? src.categories : [])
+        .map((c) => {
+          const name = cleanName(c && c.name);
+          if (!name || seenCat.has(nameKey(name))) return null;
+          seenCat.add(nameKey(name));
+          const seenSub = new Set();
+          const subcategories = (Array.isArray(c.subcategories) ? c.subcategories : [])
+            .map(cleanName)
+            .filter((s) => s && !seenSub.has(nameKey(s)) && seenSub.add(nameKey(s)));
+          return c.active === false ? { name, subcategories, active: false } : { name, subcategories };
+        })
+        .filter(Boolean);
+      return { group, active: src.active !== false, categories };
+    })
+    .filter(Boolean);
+  if (!groups.length) return null;
+  withInitialGroups(groups);
   // Una categoría solo puede estar en un grupo.
   const all = groups.flatMap((g) => g.categories.map((c) => nameKey(c.name)));
   if (new Set(all).size !== all.length) return null;
@@ -139,11 +174,19 @@ function subcategoriesByCategory(taxonomy) {
 }
 // Forma pública/compatible con js/taxonomy.js (VIBE_CATEGORY_GROUPS +
 // SUBCATEGORIES_BY_CATEGORY).
+// Organización comercial: cada grupo informa si está activo y qué
+// categorías están desactivadas (campos nuevos; los anteriores no cambian).
 function publicTaxonomy(taxonomy) {
   return {
     revision: taxonomy.revision,
-    groups: taxonomy.groups.map((g) => ({ group: g.group, categories: g.categories.map((c) => c.name) })),
+    groups: taxonomy.groups.map((g) => ({
+      group: g.group,
+      active: g.active !== false,
+      categories: g.categories.map((c) => c.name),
+      inactiveCategories: g.categories.filter((c) => c.active === false).map((c) => c.name),
+    })),
     subcategories: subcategoriesByCategory(taxonomy),
+    groupAliases: { ...GROUP_ALIASES },
   };
 }
 
@@ -151,6 +194,10 @@ module.exports = {
   TAXONOMY_PATH,
   DEFAULT_GROUPS,
   GROUP_NAMES,
+  INITIAL_GROUPS,
+  GROUP_ALIASES,
+  MAX_GROUPS,
+  canonicalGroup,
   MAX_NAME_LENGTH,
   cleanName,
   nameKey,

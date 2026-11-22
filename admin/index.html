@@ -42,6 +42,7 @@
       <button type="button" class="nav-item active" data-view="home" id="navHome"><span class="nav-ico" aria-hidden="true">◇</span><span>Inicio</span></button>
       <button type="button" class="nav-item" data-view="products" id="navProducts"><span class="nav-ico" aria-hidden="true">▢</span><span>Productos</span></button>
       <button type="button" class="nav-item" data-view="taxonomy" id="navTaxonomy"><span class="nav-ico" aria-hidden="true">≡</span><span>Clasificación</span></button>
+      <button type="button" class="nav-item" data-view="merch" id="navMerch"><span class="nav-ico" aria-hidden="true">✦</span><span>Vitrinas</span></button>
       <button type="button" class="nav-item" data-view="hero" id="navHero"><span class="nav-ico" aria-hidden="true">◐</span><span>Carrusel</span></button>
       <button type="button" class="nav-item" data-view="orders" id="navOrders"><span class="nav-ico" aria-hidden="true">✉</span><span>Pedidos</span></button>
     </nav>
@@ -110,6 +111,19 @@
         <div class="panel-head"><h2>Categorías de origen (POS)</h2></div>
         <div id="taxonomyPos" class="pos-chips"></div>
       </section>
+    </main>
+
+    <main id="merchApp" class="admin-main view-panel hidden" data-view-panel="merch">
+      <header class="view-head">
+        <p class="eyebrow">Organización comercial</p>
+        <h1>Vitrinas, colecciones y etiquetas</h1>
+        <p class="view-sub">Orden y visibilidad de las secciones de la tienda, Novedades, Más elegidos, colecciones, etiquetas y asignación de productos. Nada cambia en la tienda hasta que pulses «Guardar cambios». Esto es del catálogo: no modifica el POS.</p>
+      </header>
+      <div class="merch-savebar">
+        <span id="merchStatus" class="save-status" role="status" aria-live="polite"></span>
+        <button type="button" id="merchSave" class="button dark" disabled>Guardar cambios</button>
+      </div>
+      <div id="merchRoot" class="merch-root"><p class="section-hint">Cargando…</p></div>
     </main>
 
     <main id="heroApp" class="admin-main view-panel hidden" data-view-panel="hero">

@@ -176,6 +176,56 @@ function planAction(current, body, usage) {
     [list[i], list[j]] = [list[j], list[i]];
     return { tax, changes: [], affected: [] };
   }
+  // Organización comercial — grupos administrables. Ningún producto guarda
+  // el grupo (se deriva de su categoría), así que crear, renombrar, ordenar
+  // o desactivar un grupo no cambia ninguna ficha. Un grupo solo se elimina
+  // vacío: nunca deja productos sin clasificación.
+  const findGroup = (name) => tax.groups.find((g) => T.nameKey(g.group) === T.nameKey(name));
+  if (a === "addGroup") {
+    const v = T.validateName(body.name, "grupo");
+    if (v.error) return fail(400, v.error.replace("de la grupo", "del grupo").replace("una grupo", "un grupo"));
+    if (findGroup(v.name)) return fail(409, `Ya existe un grupo «${v.name}».`);
+    if (tax.groups.length >= T.MAX_GROUPS) return fail(400, `Se admiten como máximo ${T.MAX_GROUPS} grupos.`);
+    tax.groups.push({ group: v.name, active: true, categories: [] });
+    return { tax, changes: [], affected: [] };
+  }
+  if (["renameGroup", "reorderGroup", "setGroupActive", "deleteGroup"].includes(a)) {
+    const g = findGroup(body.group);
+    if (!g) return fail(404, "Ese grupo no existe.");
+    if (a === "renameGroup") {
+      const v = T.validateName(body.newName, "grupo");
+      if (v.error) return fail(400, v.error.replace("de la grupo", "del grupo").replace("una grupo", "un grupo"));
+      const other = findGroup(v.name);
+      if (other && other !== g) return fail(409, `Ya existe un grupo «${v.name}».`);
+      g.group = v.name;
+      return { tax, changes: [], affected: [] };
+    }
+    if (a === "reorderGroup") {
+      if (body.direction !== -1 && body.direction !== 1) return fail(400, "Dirección inválida.");
+      const i = tax.groups.indexOf(g);
+      const j = i + body.direction;
+      if (j < 0 || j >= tax.groups.length) return fail(400, "Ya está en el extremo; no se cambió nada.");
+      [tax.groups[i], tax.groups[j]] = [tax.groups[j], tax.groups[i]];
+      return { tax, changes: [], affected: [] };
+    }
+    if (a === "setGroupActive") {
+      if (typeof body.active !== "boolean") return fail(400, "Estado inválido.");
+      g.active = body.active;
+      return { tax, changes: [], affected: [] };
+    }
+    // deleteGroup
+    if (g.categories.length) return fail(409, "El grupo tiene categorías: muévelas a otro grupo o elimínalas primero (así ningún producto queda sin clasificación).");
+    tax.groups = tax.groups.filter((x) => x !== g);
+    return { tax, changes: [], affected: [] };
+  }
+  if (a === "setCategoryActive") {
+    const found = findCategory(tax, body.name);
+    if (!found) return fail(404, "Esa categoría no existe.");
+    if (typeof body.active !== "boolean") return fail(400, "Estado inválido.");
+    if (body.active) delete found.category.active;
+    else found.category.active = false;
+    return { tax, changes: [], affected: [] };
+  }
   return fail(400, "Acción inválida.");
 }
 

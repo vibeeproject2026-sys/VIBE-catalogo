@@ -15,6 +15,8 @@ const { resolveCategoryGroup } = require("./_lib/categoryGroups");
 const { applyCors } = require("./_lib/cors");
 const { sendJson, sendError, methodNotAllowed } = require("./_lib/http");
 const { loadTaxonomy, publicTaxonomy } = require("../_lib/taxonomyStore");
+const { loadMerchandising, publicMerchandising, computeNewArrivals } = require("../_lib/merchandising");
+const { loadBestSellers } = require("../_lib/bestsellers");
 
 const PRODUCT_COLUMNS = "id,name,price,stock,category";
 const METADATA_COLUMNS = "product_id,subcategory,featured,editorial_order,published";
@@ -45,6 +47,45 @@ module.exports = async function handler(req, res) {
     } catch (e) {
       console.error("[catalog/categories] taxonomía no disponible (" + (e && e.status ? "HTTP " + e.status : "error") + ").");
       return sendError(res, 502, "Taxonomía no disponible.");
+    }
+  }
+
+  // Organización comercial — ?view=merchandising: colecciones vigentes,
+  // etiquetas activas, sus asignaciones y la configuración de vitrinas
+  // (sin datos internos). Caché corta, como el resto del catálogo.
+  if (req.query && req.query.view === "merchandising") {
+    try {
+      const raw = await loadMerchandising(env);
+      const doc = publicMerchandising(raw);
+      // Novedades automáticas (solo con fecha de lanzamiento oficial).
+      const rows = raw.showcases.novedades.launchDate
+        ? await pgrestSelect({ table: "catalog_metadata", columns: "product_id,published,created_at", filters: [["published", "eq.true"]], env })
+        : [];
+      doc.showcases.novedades.autoProductIds = computeNewArrivals(rows, raw.showcases.novedades);
+      res.setHeader("Cache-Control", "public, max-age=15, s-maxage=30, stale-while-revalidate=60");
+      return sendJson(res, 200, { merchandising: doc });
+    } catch (e) {
+      console.error("[catalog/categories] organización comercial no disponible (" + (e && e.status ? "HTTP " + e.status : "error") + ").");
+      return sendError(res, 502, "Organización comercial no disponible.");
+    }
+  }
+  // ?view=bestsellers: orden de «Más elegidos» por unidades vendidas en el
+  // período configurado (ventas confirmadas del POS, solo lectura). La
+  // tienda recibe solo el ORDEN de los productos publicados, nunca las
+  // unidades. Se recalcula como máximo cada 24 horas (caché de la CDN).
+  if (req.query && req.query.view === "bestsellers") {
+    try {
+      const merch = await loadMerchandising(env);
+      const [best, metadataRows] = await Promise.all([
+        loadBestSellers(env, { periodDays: merch.showcases.masElegidos.periodDays }),
+        pgrestSelect({ table: "catalog_metadata", columns: "product_id,published", filters: [["published", "eq.true"]], env }),
+      ]);
+      const published = new Set(metadataRows.filter((m) => m && m.published === true).map((m) => Number(m.product_id)));
+      res.setHeader("Cache-Control", "public, max-age=3600, s-maxage=86400, stale-while-revalidate=3600");
+      return sendJson(res, 200, { periodDays: best.periodDays, computedAt: best.computedAt, productIds: best.ranking.filter((r) => published.has(r.productId)).map((r) => r.productId) });
+    } catch (e) {
+      console.error("[catalog/categories] ranking no disponible (" + (e && e.status ? "HTTP " + e.status : "error") + ").");
+      return sendError(res, 502, "Ranking no disponible.");
     }
   }
 

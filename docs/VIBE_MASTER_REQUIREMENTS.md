@@ -1735,6 +1735,121 @@ Resultados: ver Historial.
 - **Regresión en navegador:** precios por variante y promociones, checkout y navegación: ALL OK.
 - **Capturas:** `Catalogo VIBE/entregables-carrito/` (antes y después).
 
+## 29. Organización comercial y vitrinas inteligentes (2026-11-22)
+
+| ID | Qué | Estado |
+|---|---|---|
+| ORG-01 | Grupos, categorías y subcategorías administrables (crear, editar, ordenar, activar/desactivar); 6 grupos iniciales; subcategoría opcional | PUBLICADO; ver Historial |
+| ORG-02 | Colecciones (con programación opcional) y etiquetas comerciales reutilizables; asignación individual y masiva; pendientes de clasificación | PUBLICADO; ver Historial |
+| ORG-03 | Vitrinas: Novedades (sin lanzamiento oficial), Más elegidos (unidades vendidas), Ofertas, Colecciones VIBE y Descubre tu VIBE; orden, visibilidad, títulos, cantidad, fijados y excluidos desde el Admin | PUBLICADO; ver Historial |
+
+### 29.1 Modelo de datos (sin migración SQL)
+
+Se reutiliza el patrón existente de documentos JSON en el bucket de Storage del catálogo (como `config/taxonomy.json` y `hero/slides.json`). No hay tablas nuevas ni cambios en el POS.
+
+- **`config/taxonomy.json` (ampliado):**
+  - grupos con orden y `active`; categorías con `active: false` opcional;
+  - 6 grupos iniciales: Maquillaje, Skincare, Sets y regalos, Accesorios beauty, Cuidado personal y Fragancias y bienestar;
+  - el grupo guardado «Accesorios» se lee como «Accesorios beauty», con las mismas categorías; los enlaces viejos `?group=Accesorios` siguen funcionando;
+  - los grupos iniciales que falten se insertan vacíos en su lugar; ningún producto se clasifica solo;
+  - ningún producto guarda su grupo (se deriva de la categoría), así que crear, renombrar, ordenar o desactivar grupos no cambia fichas.
+- **`config/merchandising.json` (nuevo), con control de revisión como la taxonomía:**
+  - colecciones: id, nombre, descripción, activa, desde/hasta opcionales;
+  - etiquetas: id, nombre, activa;
+  - asignaciones por producto (varias colecciones y varias etiquetas);
+  - vitrinas: orden, visibilidad, título, cantidad, fijados, excluidos, lanzamiento de Novedades, período de Más elegidos y selecciones de Descubre.
+  - Sin el documento rigen los valores por defecto: nada publicado y Novedades sin lanzamiento.
+- **Clasificación principal:** sigue siendo la categoría editorial de `catalog_metadata` (sin cambios). Pendientes = publicados sin categoría de la taxonomía vigente; siguen visibles en la tienda.
+- **Protección contra eliminaciones:** un grupo solo se elimina vacío; una categoría en uso exige elegir a qué categoría pasan sus productos (regla existente). Ningún producto queda sin clasificación.
+
+### 29.2 APIs (11 funciones, sin sumar ninguna)
+
+- **`/api/catalog/products`:** sin cambios.
+- **`/api/catalog/categories`:** respuesta por defecto sin cambios.
+  - `?view=taxonomy`: suma `active`, `inactiveCategories` y `groupAliases`.
+  - `?view=merchandising` (nuevo, caché de 30 s): colecciones vigentes, etiquetas activas, asignaciones, vitrinas y Novedades automáticas (solo con lanzamiento).
+  - `?view=bestsellers` (nuevo, caché de 24 h): solo el **orden** de productos publicados de Más elegidos; nunca las unidades.
+- **`/api/admin/products`** (con token del Admin):
+  - `?resource=merchandising`: GET devuelve documento, Novedades automáticas y pendientes; POST guarda el documento completo saneado (409 si otra sesión guardó antes);
+  - `?resource=bestsellers`: ranking con unidades, solo para el Admin.
+  - La taxonomía suma las acciones `addGroup`, `renameGroup`, `reorderGroup`, `setGroupActive`, `deleteGroup` y `setCategoryActive`.
+
+### 29.3 Más elegidos: fuente de ventas y limitaciones
+
+**Fuente:** tabla `sales` del POS, **solo lectura**. El módulo de lectura del catálogo solo hace GET; se agregó `sales` a su lista permitida.
+
+Auditoría de los datos reales:
+- 54 ventas, todas pagadas, ninguna anulada.
+- `sale_items` está vacía. El detalle por producto vive en `items`, un JSON guardado como texto.
+- `product_id`/`qty` de la venta **no** son por producto: en una venta de dos productos, `qty` es el total. Por eso solo se usan las líneas de `items`.
+- `sold_at` está vacío; la fecha efectiva es `date`.
+
+**Reglas:**
+- **Se cuentan:** unidades de ventas con `paid = true`, `status = "active"` y sin `voided_at`, dentro del período (30 días por defecto, configurable), una vez por venta.
+- **Se excluyen:** ventas anuladas, no pagadas, con otro estado o ilegibles (no se adivinan).
+- **Ventas borradas:** se borran del POS hacia `sales_deleted_archive` y no cuentan.
+- **Pedidos web y carritos:** los pedidos web (`orders`, «recibido») y los carritos no son ventas confirmadas y no se usan.
+
+**Limitaciones:**
+- El POS no registra devoluciones parciales: no hay información confiable para descontarlas (una anulación completa sí excluye la venta).
+- Volumen actual: 5 ventas confirmadas en los últimos 30 días, 16 productos con unidades, 11 de ellos publicados.
+- **Fijados y excluidos:** los fijados aparecen primero en su posición, los excluidos nunca y no hay duplicados.
+
+### 29.4 Vitrinas en la tienda
+
+**Orden inicial recomendado:**
+1. Banner.
+2. Novedades.
+3. Más elegidos.
+4. Explora por categoría (el catálogo con sus pestañas).
+5. Colecciones VIBE.
+6. Ofertas.
+7. Descubre tu VIBE.
+
+Banner y catálogo siempre visibles; las demás se activan u ocultan desde el Admin. Una vitrina sin productos nunca se muestra, y su enlace del menú tampoco (p. ej. «Ofertas» sin promociones vigentes).
+
+- **Novedades:**
+  - **Lanzamiento oficial sin configurar:** solo muestra los productos fijados a mano; sin fijados, no aparece.
+  - **Con la fecha configurada por la propietaria:** entran solos los productos que lleguen al catálogo desde ese día (`catalog_metadata.created_at`), durante 30 días (configurable), más los fijados y menos los excluidos.
+  - La carga inicial no cuenta como novedad.
+- **Colecciones VIBE:** tarjetas de colecciones activas, vigentes y con productos; llevan al catálogo filtrado (`?collection=`).
+- **Descubre tu VIBE:** sin selecciones, las tarjetas de categoría de siempre. Con selecciones (categoría, colección o etiqueta, con título opcional), esas tarjetas, solo las que tengan productos. El título aprobado se conserva salvo que el Admin defina otro.
+- **Ofertas:** promociones vigentes del POS, sin cambios en precios, fechas ni descuentos.
+- **Si la configuración no se puede leer,** la Home queda exactamente como antes.
+- **Sin cambios en:** búsqueda, paginación, cuadrícula, fichas, variantes, precios, promociones, carrito, checkout e imágenes.
+
+**Admin («Vitrinas»):**
+- secciones (orden, visibilidad, título, cantidad);
+- Novedades (fecha de lanzamiento, permanencia, fijados, excluidos);
+- Más elegidos (período, fijados con posición, excluidos, ranking con unidades);
+- colecciones, con programación;
+- etiquetas;
+- asignación por producto (filtros: pendientes, sin colección ni etiqueta, por colección o etiqueta; agregar o quitar a varios a la vez);
+- Descubre tu VIBE.
+
+**«Clasificación»:** grupos y categorías se crean, renombran, ordenan, activan y desactivan.
+
+**Archivos:**
+- **Nuevos:** `api/_lib/merchandising.js`, `api/_lib/bestsellers.js`, `api/admin/_lib/merchandisingAdmin.js`, `js/showcases.js` y `scripts/test-merchandising.mjs`.
+- **Modificados:** `api/_lib/taxonomyStore.js`, `api/admin/_lib/taxonomyAdmin.js`, `api/admin/products.js`, `api/catalog/categories.js`, `api/catalog/_lib/supabaseRead.js`, `js/app.js`, `js/taxonomy.js`, `js/data-source.js`, `js/url-state.js`, `index.html`, `css/styles.css`, `admin/admin.js`, `admin/index.html` y `admin/admin.css`.
+- **Pruebas actualizadas al contrato nuevo:** 6 grupos administrables, «Accesorios beauty» y 6 áreas del Admin.
+
+### 29.5 Validación integral
+
+- **Suite completa:** 53 scripts, **1069 aprobadas y 0 fallidas** (nueva: `test-merchandising.mjs`, 14 pruebas).
+- **Navegador real, tienda** (catálogo real servido en local, organización simulada; 1440, 1024, 768 y 390 px):
+  - orden configurado; vitrinas vacías y enlace de Ofertas ocultos;
+  - Novedades sin lanzamiento, solo con fijados;
+  - Más elegidos con fijado en posición 2 y excluido;
+  - sin duplicados;
+  - colecciones que filtran el catálogo, con su chip y su enlace;
+  - Descubre por colección y etiqueta;
+  - ficha desde una vitrina;
+  - sin configuración, la Home queda igual; sin errores de consola.
+- **Navegador real, Admin** (API simulada; 1440 y 390): grupos (crear, desactivar, ordenar; eliminar solo vacíos), ranking con unidades, pendientes, creación de colección y etiqueta, asignación masiva, fijados y excluidos, orden y visibilidad, y guardado con revisión.
+- **Regresión en navegador:** precios por variante y promociones, checkout, navegación y paginación, carrito, cuadrícula y búsqueda con datos reales, Admin de variantes y barrido de las 77 fichas: ALL OK.
+- **Contra datos reales (solo lectura):** taxonomía vigente con los 6 grupos («Accesorios beauty» con sus 2 categorías); organización por defecto (sin colecciones, sin lanzamiento); ranking de 11 productos publicados por unidades. Solo peticiones GET.
+
 ## Historial
 
 - **2026-10-28 (Fase 57):**

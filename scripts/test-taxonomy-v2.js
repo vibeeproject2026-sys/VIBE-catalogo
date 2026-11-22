@@ -92,7 +92,7 @@ async function main() {
     assert.ok(S.Ojos.includes("Máscara de pestañas") && !S.Ojos.includes("Pestañas"));
     assert.ok(S.Tratamiento.includes("Pestañas y cejas (crecimiento)") && !S.Tratamiento.includes("Pestañas (crecimiento)"));
     assert.ok(S.Ojos.includes("Kits de ojos") && S.Tratamiento.includes("Cremas faciales") && S.Rostro.includes("Rubor"));
-    assert.deepEqual(t.VIBE_CATEGORY_GROUPS.map((g) => g.group), ["Maquillaje", "Skincare", "Accesorios"]);
+    assert.deepEqual(t.VIBE_CATEGORY_GROUPS.map((g) => g.group), ["Maquillaje", "Skincare", "Sets y regalos", "Accesorios beauty", "Cuidado personal", "Fragancias y bienestar"]);
     assert.deepEqual(Object.keys(S).sort(), t.VIBE_CATEGORY_GROUPS.flatMap((g) => g.categories).sort());
   });
   await test("isListedSubcategory depende de la categoría", () => {

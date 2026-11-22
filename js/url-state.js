@@ -30,6 +30,9 @@ export function readStateFromSearch(search) {
     // mecanismo que product, nunca coexisten en la práctica (abrir uno
     // cierra el otro, ver js/app.js).
     article: params.get("article") || null,
+    // Organización comercial: colección y etiqueta (ids del Admin).
+    collection: params.get("collection") || null,
+    tag: params.get("tag") || null,
   };
 }
 
@@ -46,6 +49,8 @@ export function buildUrl(pathname, state) {
   if (state.featuredOnly) params.set("featured", "true");
   if (state.newOnly) params.set("new", "true");
   if (state.sort && state.sort !== "relevance") params.set("sort", state.sort);
+  if (state.collection) params.set("collection", state.collection);
+  if (state.tag) params.set("tag", state.tag);
   // state.product puede llegar como id (string/number, uso de la Fase 28
   // en app.js) o como el objeto producto completo (uso legado de
   // state.product en el resto de la app) — se normaliza aquí para que

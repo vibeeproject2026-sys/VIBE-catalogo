@@ -454,3 +454,24 @@ button.sub-chip.sub-edit:hover{outline:2px solid var(--blush-ink);outline-offset
 .order-lines .order-line-name{font-weight:700}
 .order-lines .order-line-meta{color:var(--muted,#6b6b6b)}
 .order-lines .nowrap{white-space:nowrap}
+
+/* Organización comercial — Vitrinas, colecciones, etiquetas, asignación. */
+.merch-savebar{position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:flex-end;gap:12px;padding:10px 0;margin-bottom:8px;background:var(--bg,#fff)}
+.merch-root{display:grid;gap:18px}
+.merch-table{width:100%;border-collapse:collapse;font-size:13px}
+.merch-table th,.merch-table td{padding:8px 6px;border-bottom:1px solid #eee;text-align:left;vertical-align:middle}
+.merch-table th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#777}
+.merch-order{white-space:nowrap}
+.merch-input{min-height:36px;padding:6px 10px;border:1px solid #ddd;border-radius:10px;font:inherit;font-size:13px;max-width:100%}
+.merch-num{width:76px}
+.merch-row{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px 14px;margin:10px 0}
+.merch-row label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:700}
+.merch-row select{max-width:320px}
+.merch-cols{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.merch-cols h3,.merch-root h3{font-size:13px;margin:12px 0 6px}
+.merch-list{list-style:none;margin:0;padding:0;display:grid;gap:6px;font-size:13px}
+.merch-list li{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.table-scroll{overflow-x:auto}
+.tax-off{opacity:.62}
+.tax-new-group{display:flex;flex-wrap:wrap;align-items:center;gap:10px;font-size:13px;color:#555;margin:0 0 14px}
+@media(max-width:720px){.merch-cols{grid-template-columns:1fr}.merch-row select{max-width:100%}}

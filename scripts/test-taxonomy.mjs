@@ -74,8 +74,8 @@ const apiLike = [
 ];
 
 console.log("getGroups");
-test("deriva los 3 grupos demo, ordenados, sin duplicados", () => {
-  assert.deepEqual(getGroups(demoLike), ["Accesorios", "Maquillaje", "Skincare"]);
+test("deriva los 3 grupos demo, en el orden de la taxonomía (Admin), sin duplicados", () => {
+  assert.deepEqual(getGroups(demoLike), ["Maquillaje", "Skincare", "Accesorios beauty"]);
 });
 
 console.log("getCategoriesInGroup");

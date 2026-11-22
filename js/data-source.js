@@ -226,6 +226,33 @@ export async function getTaxonomy(fetchImpl = fetch) {
   }
 }
 
+// Organización comercial: colecciones, etiquetas, asignaciones y vitrinas
+// (null si no se puede leer: el sitio sigue igual que antes, sin vitrinas
+// nuevas). Y el orden de «Más elegidos» (ids de productos publicados por
+// unidades vendidas; [] si no hay ventas o no se puede leer).
+export async function getMerchandising(fetchImpl = fetch) {
+  if (resolveMode() !== "api") return null;
+  try {
+    const res = await fetchImpl(`${API_BASE}/categories?view=merchandising`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data && data.merchandising && typeof data.merchandising === "object" ? data.merchandising : null;
+  } catch {
+    return null;
+  }
+}
+export async function getBestSellers(fetchImpl = fetch) {
+  if (resolveMode() !== "api") return [];
+  try {
+    const res = await fetchImpl(`${API_BASE}/categories?view=bestsellers`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data && data.productIds) ? data.productIds.filter((id) => Number.isInteger(id)) : [];
+  } catch {
+    return [];
+  }
+}
+
 export async function getCategories() {
   if (resolveMode() === "api") {
     try {

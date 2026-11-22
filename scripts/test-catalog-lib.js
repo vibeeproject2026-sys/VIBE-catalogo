@@ -327,7 +327,7 @@ async function main() {
       throw new Error("should never be called");
     };
     await assert.rejects(
-      () => pgrestSelect({ table: "sales", columns: "id", env: { url: "https://x", serviceRoleKey: "k" }, fetchImpl }),
+      () => pgrestSelect({ table: "orders", columns: "id", env: { url: "https://x", serviceRoleKey: "k" }, fetchImpl }),
       (err) => err.code === "TABLE_NOT_ALLOWED"
     );
     assert.equal(fetchCalled, false);

@@ -84,8 +84,9 @@ async function main() {
   await test("sin categoría editorial se conserva el grupo del POS (Labios → Maquillaje)", () => {
     assert.ok(ids(t.filterProducts(CATALOG, { group: "Maquillaje" })).includes(110));
   });
-  await test("la taxonomía exportada es la aprobada (3 grupos, 7 categorías)", () => {
-    assert.deepEqual(t.EDITORIAL_GROUPS, ["Maquillaje", "Skincare", "Accesorios"]);
+  await test("la taxonomía exportada es la vigente (6 grupos iniciales, 7 categorías; «Accesorios» = «Accesorios beauty»)", () => {
+    assert.deepEqual(t.EDITORIAL_GROUPS, ["Maquillaje", "Skincare", "Sets y regalos", "Accesorios beauty", "Cuidado personal", "Fragancias y bienestar"]);
+    assert.equal(t.canonicalGroup("Accesorios"), "Accesorios beauty");
     assert.equal(t.VIBE_CATEGORY_GROUPS.flatMap((g) => g.categories).length, 7);
   });
 
@@ -122,8 +123,8 @@ async function main() {
   });
 
   console.log("normalizeSelection — sin combinaciones contradictorias");
-  await test("Accesorios + «Otro» (enlace viejo) → Accesorios + Todos", () => {
-    assert.deepEqual(t.normalizeSelection(CATALOG, { group: "Accesorios", category: "Otro" }), { group: "Accesorios", category: "Todos", subcategory: "Todos" });
+  await test("Accesorios + «Otro» (enlace viejo) → Accesorios beauty + Todos", () => {
+    assert.deepEqual(t.normalizeSelection(CATALOG, { group: "Accesorios", category: "Otro" }), { group: "Accesorios beauty", category: "Todos", subcategory: "Todos" });
   });
   await test("Skincare + «Skincare» (chip duplicado) → Skincare + Todos", () => {
     assert.deepEqual(t.normalizeSelection(CATALOG, { group: "Skincare", category: "Skincare" }), { group: "Skincare", category: "Todos", subcategory: "Todos" });
@@ -133,7 +134,7 @@ async function main() {
     assert.deepEqual(t.normalizeSelection(CATALOG, sel), sel);
   });
   await test("un grupo editorial sin productos se conserva (para mostrar su estado vacío)", () => {
-    assert.equal(t.normalizeSelection([CATALOG[2]], { group: "Accesorios" }).group, "Accesorios");
+    assert.equal(t.normalizeSelection([CATALOG[2]], { group: "Accesorios" }).group, "Accesorios beauty");
   });
   await test("un grupo desconocido vuelve a Todos", () => {
     assert.equal(t.normalizeSelection(CATALOG, { group: "Inventado" }).group, "Todos");

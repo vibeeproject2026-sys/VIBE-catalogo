@@ -110,7 +110,8 @@ await test("la subida de producto y de carrusel pasa siempre por la optimizació
 console.log("Cuadrícula");
 await test("escritorio: 5 columnas y 20 por página (4 filas completas); ≤ 900 px, 2 columnas y 10 por página", () => {
   const css = fs.readFileSync(path.join(root, "css/styles.css"), "utf8");
-  assert.match(css, /@media\(min-width:901px\)\{#productGrid\{grid-template-columns:repeat\(5,minmax\(0,1fr\)\)/);
+  // Las vitrinas (Novedades, Más elegidos) comparten la misma cuadrícula de 5 columnas.
+  assert.match(css, /@media\(min-width:901px\)\{#productGrid,\.showcase-grid\{grid-template-columns:repeat\(5,minmax\(0,1fr\)\)/);
   assert.match(css, /@media\(max-width:900px\)\{\s*\.grid\{grid-template-columns:repeat\(2,1fr\)\}/);
   const app = fs.readFileSync(path.join(root, "js/app.js"), "utf8");
   // Escritorio 20 por página (4 filas de 5); tablet y móvil 10 (5 filas de 2), mismo corte de 900 px.

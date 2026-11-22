@@ -23,7 +23,7 @@ function test(name, fn) {
   }
 }
 
-const DEFAULTS = { group: "Todos", category: "Todos", subcategory: "Todos", search: "", available: false, promo: false, featuredOnly: false, newOnly: false, sort: "relevance", product: null, article: null };
+const DEFAULTS = { group: "Todos", category: "Todos", subcategory: "Todos", search: "", available: false, promo: false, featuredOnly: false, newOnly: false, sort: "relevance", product: null, article: null, collection: null, tag: null };
 
 console.log("readStateFromSearch (simula un refresh / link compartido)");
 test("querystring vacío -> todo en su default", () => {
@@ -143,6 +143,13 @@ test("round-trip de un link de artículo compartido (Fase 30)", () => {
   const url = buildUrl("/", original);
   const queryPart = url.split("#")[0].split("?")[1] || "";
   const roundTripped = readStateFromSearch("?" + queryPart);
+  assert.deepEqual(roundTripped, original);
+});
+test("round-trip de un link filtrado por colección y etiqueta (organización comercial)", () => {
+  const original = { ...DEFAULTS, collection: "navidad-2026", tag: "regalo" };
+  const url = buildUrl("/", original);
+  assert.ok(url.includes("collection=navidad-2026") && url.includes("tag=regalo"));
+  const roundTripped = readStateFromSearch("?" + (url.split("#")[0].split("?")[1] || ""));
   assert.deepEqual(roundTripped, original);
 });
 

@@ -542,7 +542,7 @@ let taxState = { loaded: false, doc: null, usage: [] };
 
 function taxToPublic(doc) {
   return {
-    groups: doc.groups.map((g) => ({ group: g.group, categories: g.categories.map((c) => c.name) })),
+    groups: doc.groups.map((g) => ({ group: g.group, active: g.active !== false, categories: g.categories.map((c) => c.name), inactiveCategories: g.categories.filter((c) => c.active === false).map((c) => c.name) })),
     subcategories: Object.fromEntries(doc.groups.flatMap((g) => g.categories.map((c) => [c.name, c.subcategories]))),
   };
 }
@@ -560,6 +560,10 @@ async function loadTaxonomyAdmin() {
     // edición quedan deshabilitadas (ver renderTaxonomy).
   }
 }
+
+const taxDocGroup = (name) => (taxState.doc && Array.isArray(taxState.doc.groups) ? taxState.doc.groups.find((g) => g.group === name) : null);
+const taxGroupInactive = (name) => { const g = taxDocGroup(name); return Boolean(g && g.active === false); };
+const taxCategoryInactive = (name) => Boolean(taxState.doc && Array.isArray(taxState.doc.groups) && taxState.doc.groups.some((g) => g.categories.some((c) => c.name === name && c.active === false)));
 
 function renderTaxonomy() {
   if (!$("#taxonomyTree")) return;
@@ -588,22 +592,28 @@ function renderTaxonomy() {
           .join("");
         const noSub = inCat.filter((p) => !p.subcategory).length;
         const cAttr = `data-tax-cat="${esc(c)}"`;
-        return `<div class="tax-cat">
-          <div class="tax-cat-head"><b>${esc(c)}</b><span class="tax-count">${inCat.length} ${inCat.length === 1 ? "producto" : "productos"}</span>
-            <span class="tax-actions">${act(`data-tax-reorder="-1" ${cAttr} aria-label="Subir «${esc(c)}» en ${esc(group)}" ${ci === 0 ? "disabled" : ""}`, "↑")}${act(`data-tax-reorder="1" ${cAttr} aria-label="Bajar «${esc(c)}» en ${esc(group)}" ${ci === categories.length - 1 ? "disabled" : ""}`, "↓")}${act(`data-tax-action="renameCategory" ${cAttr}`, "Renombrar")}${act(`data-tax-action="setCategoryGroup" ${cAttr}`, "Cambiar grupo")}${act(`data-tax-action="deleteCategory" ${cAttr}`, "Eliminar", "tax-danger")}</span></div>
+        const catOff = taxCategoryInactive(c);
+        return `<div class="tax-cat${catOff ? " tax-off" : ""}">
+          <div class="tax-cat-head"><b>${esc(c)}</b>${catOff ? `<span class="pill pill-muted">Desactivada</span>` : ""}<span class="tax-count">${inCat.length} ${inCat.length === 1 ? "producto" : "productos"}</span>
+            <span class="tax-actions">${act(`data-tax-reorder="-1" ${cAttr} aria-label="Subir «${esc(c)}» en ${esc(group)}" ${ci === 0 ? "disabled" : ""}`, "↑")}${act(`data-tax-reorder="1" ${cAttr} aria-label="Bajar «${esc(c)}» en ${esc(group)}" ${ci === categories.length - 1 ? "disabled" : ""}`, "↓")}${act(`data-tax-action="renameCategory" ${cAttr}`, "Renombrar")}${act(`data-tax-action="setCategoryGroup" ${cAttr}`, "Cambiar grupo")}${act(`data-tax-toggle="category" ${cAttr} data-tax-active="${catOff ? "true" : "false"}"`, catOff ? "Activar" : "Desactivar")}${act(`data-tax-action="deleteCategory" ${cAttr}`, "Eliminar", "tax-danger")}</span></div>
           <div class="sub-chips">${subChips}${histChips}${noSub ? `<span class="sub-chip sub-none">Sin subcategoría<b>${noSub}</b></span>` : ""}${act(`data-tax-action="addSubcategory" ${cAttr}`, "+ Subcategoría", "tax-add")}</div>
           ${inCat.length ? `<div class="tax-products">${inCat.map(productLink).join("")}</div>` : ""}
         </div>`;
       })
       .join("");
-    return `<section class="tax-group"><div class="tax-group-head"><h2>${esc(group)}</h2><span class="tax-count">${inGroup.length} con clasificación VIBE</span>${act(`data-tax-action="addCategory" data-tax-group="${esc(group)}"`, "+ Categoría", "tax-add")}</div>${cats}</section>`;
+    const gi = VIBE_CATEGORY_GROUPS.findIndex((x) => x.group === group);
+    const gOff = taxGroupInactive(group);
+    const gAttr = `data-tax-group="${esc(group)}"`;
+    const groupActs = `${act(`data-tax-group-reorder="-1" ${gAttr} aria-label="Subir el grupo «${esc(group)}»" ${gi === 0 ? "disabled" : ""}`, "↑")}${act(`data-tax-group-reorder="1" ${gAttr} aria-label="Bajar el grupo «${esc(group)}»" ${gi === VIBE_CATEGORY_GROUPS.length - 1 ? "disabled" : ""}`, "↓")}${act(`data-tax-action="renameGroup" ${gAttr}`, "Renombrar")}${act(`data-tax-toggle="group" ${gAttr} data-tax-active="${gOff ? "true" : "false"}"`, gOff ? "Activar" : "Desactivar")}${categories.length ? "" : act(`data-tax-action="deleteGroup" ${gAttr}`, "Eliminar", "tax-danger")}`;
+    return `<section class="tax-group${gOff ? " tax-off" : ""}"><div class="tax-group-head"><h2>${esc(group)}</h2>${gOff ? `<span class="pill pill-muted">Desactivado (no se muestra en la tienda)</span>` : ""}<span class="tax-count">${inGroup.length} con clasificación VIBE${categories.length ? "" : " · sin categorías: no se muestra en la tienda"}</span><span class="tax-actions">${groupActs}</span>${act(`data-tax-action="addCategory" data-tax-group="${esc(group)}"`, "+ Categoría", "tax-add")}</div>${cats}</section>`;
   }).join("");
+  const newGroup = editable ? `<p class="tax-new-group">${act(`data-tax-action="addGroup"`, "+ Nuevo grupo", "tax-add")} Grupos, categorías y subcategorías se ordenan, activan y desactivan aquí. Desactivar oculta de la navegación de la tienda, pero sus productos siguen visibles en «Todos» y en la búsqueda. Un grupo solo se elimina vacío y una categoría en uso pide a qué categoría pasan sus productos: ningún producto queda sin clasificación.</p>` : "";
   const unclassifiedPublished = state.products.filter((p) => p.published && !p.editorialCategory);
   const legend = `<p class="tax-legend"><span class="sub-chip sub-hist">Revisión pendiente<b>n</b></span> subcategoría guardada que no está en la lista controlada: se conserva hasta que la revises desde el editor del producto (con una sugerencia editable).${editable ? " Toca una subcategoría para renombrarla, moverla o eliminarla." : " La edición de la clasificación no está disponible en este momento (no se pudo cargar del servidor)."}</p>`;
   const unclassified = unclassifiedPublished.length
     ? `<section class="tax-group tax-note"><div class="tax-group-head"><h2>Publicados sin categoría VIBE</h2><span class="tax-count">aparecen por su categoría POS</span></div><div class="tax-products">${unclassifiedPublished.map((p) => `${productLink(p)}<span class="tax-muted">${esc(placementText(p) || "Solo «Todos»")}</span>`).join("")}</div></section>`
     : "";
-  $("#taxonomyTree").innerHTML = legend + groups + unclassified;
+  $("#taxonomyTree").innerHTML = legend + newGroup + groups + unclassified;
 
   const byPos = {};
   for (const p of state.products) {
@@ -704,6 +714,20 @@ function openTaxAction(action, el) {
   const cat = el.dataset.taxCat;
   const nameInput = (label, value = "") => `<label>${label}<input id="taxName" maxlength="60" value="${esc(value)}" autocomplete="off"></label>`;
   const val = (id) => ($(`#${id}`) ? $(`#${id}`).value.trim() : "");
+  if (action === "addGroup") {
+    return openTaxDialog({ title: "Nuevo grupo", body: nameInput("Nombre del grupo") + `<p class="tax-note-text">Nace vacío y no se muestra en la tienda hasta que tenga categorías con productos.</p>`, confirm: "Crear grupo", done: "Grupo creado.",
+      collect: () => (val("taxName") ? { action, name: val("taxName") } : { error: "Escribe un nombre." }) });
+  }
+  if (action === "renameGroup") {
+    const group = el.dataset.taxGroup;
+    return openTaxDialog({ title: `Renombrar el grupo «${group}»`, body: nameInput("Nuevo nombre", group) + `<p class="tax-note-text">Solo cambia el nombre visible en la navegación; ningún producto cambia.</p>`, confirm: "Renombrar", done: "Grupo renombrado.",
+      collect: () => (val("taxName") ? { action, group, newName: val("taxName") } : { error: "Escribe un nombre." }) });
+  }
+  if (action === "deleteGroup") {
+    const group = el.dataset.taxGroup;
+    return openTaxDialog({ title: `Eliminar el grupo «${group}»`, body: `<p class="tax-note-text">El grupo está vacío (sin categorías): eliminarlo no afecta ningún producto.</p>`, confirm: "Eliminar grupo", danger: true, done: "Grupo eliminado.",
+      collect: () => ({ action, group }) });
+  }
   if (action === "addCategory") {
     const group = el.dataset.taxGroup;
     return openTaxDialog({ title: `Nueva categoría en ${group}`, body: nameInput("Nombre de la categoría"), confirm: "Crear categoría", done: "Categoría creada.",
@@ -804,7 +828,26 @@ async function reorderCategory(btn) {
   }
 }
 
+async function taxQuickAction(btn, payload, okText) {
+  btn.disabled = true;
+  const result = await taxPost(payload);
+  if (result.ok) showTaxNotice(okText);
+  else {
+    btn.disabled = false;
+    showTaxNotice((result.data && result.data.error) || "No se pudo guardar. No se cambió nada.");
+  }
+}
+
 $("#taxonomyTree").addEventListener("click", (e) => {
+  const gr = e.target.closest("[data-tax-group-reorder]");
+  if (gr) return taxQuickAction(gr, { action: "reorderGroup", group: gr.dataset.taxGroup, direction: Number(gr.dataset.taxGroupReorder) }, "Orden de grupos actualizado.");
+  const tg = e.target.closest("[data-tax-toggle]");
+  if (tg) {
+    const active = tg.dataset.taxActive === "true";
+    return tg.dataset.taxToggle === "group"
+      ? taxQuickAction(tg, { action: "setGroupActive", group: tg.dataset.taxGroup, active }, active ? "Grupo activado." : "Grupo desactivado: ya no aparece en la navegación de la tienda.")
+      : taxQuickAction(tg, { action: "setCategoryActive", name: tg.dataset.taxCat, active }, active ? "Categoría activada." : "Categoría desactivada: ya no aparece en la navegación de la tienda.");
+  }
   const r = e.target.closest("[data-tax-reorder]");
   if (r) return reorderCategory(r);
   const a = e.target.closest("[data-tax-action]");
@@ -1720,7 +1763,7 @@ async function openEdit(productId) {
 let heroState = { slides: [], loaded: false };
 
 // Fase 52 — cinco áreas de trabajo (barra lateral / navegación inferior).
-const ADMIN_VIEWS = ["home", "products", "taxonomy", "hero", "orders"];
+const ADMIN_VIEWS = ["home", "products", "taxonomy", "merch", "hero", "orders"];
 function switchAdminView(view) {
   if (!ADMIN_VIEWS.includes(view)) view = "home";
   document.querySelectorAll("[data-view-panel]").forEach((el) => el.classList.toggle("hidden", el.dataset.viewPanel !== view));
@@ -1735,6 +1778,7 @@ function switchAdminView(view) {
   if ((view === "orders" || view === "home") && !ordersState.loaded) loadOrders().then(renderHome);
   if (view === "home") renderHome();
   if (view === "taxonomy") renderTaxonomy();
+  if (view === "merch") loadMerch();
 }
 
 // Fase 52 — reparte las secciones del editor en pestañas. Solo MUEVE los
@@ -2770,3 +2814,341 @@ $("#editDialog").addEventListener("close", () => {
     showLogin();
   }
 })();
+
+// ==========================================================================
+// Organización comercial — vitrinas, colecciones, etiquetas y asignación.
+// Edita un borrador local del documento config/merchandising.json y lo
+// guarda completo con «Guardar cambios» (el servidor sanea todo y rechaza
+// si otra sesión guardó antes). Nada cambia en la tienda hasta guardar.
+// ==========================================================================
+
+const MERCH_SECTIONS = {
+  hero: { label: "Banner principal", fixed: true },
+  novedades: { label: "Novedades", title: true, limit: true },
+  masElegidos: { label: "Más elegidos", title: true, limit: true },
+  catalogo: { label: "Explora por categoría (catálogo)", fixed: true },
+  colecciones: { label: "Colecciones VIBE", title: true },
+  ofertas: { label: "Ofertas", title: true },
+  descubre: { label: "Descubre tu VIBE", title: true },
+};
+let merchState = { loaded: false, doc: null, newArrivals: [], pending: [], ranking: null, dirty: false, filter: "all", selected: new Set() };
+
+const merchProduct = (id) => state.products.find((p) => Number(p.id) === Number(id));
+const merchName = (id) => { const p = merchProduct(id); return p ? `#${p.id} ${p.name}` : `#${id} (no está en el listado)`; };
+const merchUid = (name, list) => {
+  const base = String(name).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "item";
+  let id = base, n = 2;
+  while (list.some((x) => x.id === id)) id = `${base}-${n++}`;
+  return id;
+};
+function merchDirty(text) {
+  merchState.dirty = true;
+  $("#merchSave").disabled = false;
+  $("#merchStatus").textContent = text || "Cambios sin guardar.";
+}
+
+async function loadMerch(force) {
+  if (merchState.loaded && !force) return renderMerch();
+  $("#merchRoot").innerHTML = `<p class="section-hint">Cargando…</p>`;
+  try {
+    if (!state.products.length) await loadProducts();
+    const [res, best] = await Promise.all([
+      adminFetch("/api/admin/products?resource=merchandising"),
+      adminFetch("/api/admin/products?resource=bestsellers"),
+    ]);
+    if (res.status === 401 || best.status === 401) { clearToken(); showLogin("Token incorrecto o vencido."); return; }
+    if (!res.ok) throw new Error("merch");
+    const data = await res.json();
+    merchState = { ...merchState, loaded: true, doc: data.merchandising, newArrivals: data.newArrivals || [], pending: data.pending || [], dirty: false, selected: new Set() };
+    merchState.ranking = best.ok ? await best.json() : null;
+    $("#merchSave").disabled = true;
+    $("#merchStatus").textContent = "";
+    renderMerch();
+  } catch {
+    $("#merchRoot").innerHTML = `<p class="field-error">No se pudo cargar la organización comercial. Intenta de nuevo en unos segundos.</p>`;
+  }
+}
+
+function productOptions(exclude = []) {
+  const skip = new Set(exclude.map(Number));
+  return state.products
+    .filter((p) => p.hasMetadata && !skip.has(Number(p.id)))
+    .sort((a, b) => a.name.localeCompare(b.name, "es"))
+    .map((p) => `<option value="${p.id}">${esc(p.name)} (#${p.id})${p.published ? "" : " — no publicado"}</option>`)
+    .join("");
+}
+
+function renderMerch() {
+  const d = merchState.doc;
+  if (!d) return;
+  const sc = d.showcases;
+  const sectionRows = sc.order.map((key, i) => {
+    const meta = MERCH_SECTIONS[key];
+    const cfg = sc[key] || {};
+    return `<tr>
+      <td class="merch-order"><button type="button" class="tax-act" data-merch-move="${key}" data-dir="-1" ${i === 0 ? "disabled" : ""} aria-label="Subir ${esc(meta.label)}">↑</button><button type="button" class="tax-act" data-merch-move="${key}" data-dir="1" ${i === sc.order.length - 1 ? "disabled" : ""} aria-label="Bajar ${esc(meta.label)}">↓</button></td>
+      <td><b>${esc(meta.label)}</b>${meta.fixed ? `<span class="section-hint"> · siempre visible</span>` : ""}</td>
+      <td>${meta.fixed ? "—" : `<label class="checkbox-field"><input type="checkbox" data-merch-active="${key}" ${cfg.active !== false ? "checked" : ""}> Visible</label>`}</td>
+      <td>${meta.title ? `<input class="merch-input" data-merch-title="${key}" value="${esc(cfg.title || "")}" maxlength="60" aria-label="Título de ${esc(meta.label)}">` : "—"}</td>
+      <td>${meta.limit ? `<input class="merch-input merch-num" type="number" min="1" max="40" data-merch-limit="${key}" value="${cfg.limit}" aria-label="Cantidad de productos de ${esc(meta.label)}">` : "—"}</td>
+    </tr>`;
+  }).join("");
+
+  const nov = sc.novedades;
+  const novPinned = nov.pinned.map((id) => `<li>${esc(merchName(id))} <button type="button" class="tax-act tax-danger" data-merch-remove="novedades.pinned" data-id="${id}">Quitar</button></li>`).join("") || `<li class="section-hint">Ninguno.</li>`;
+  const novExcluded = nov.excluded.map((id) => `<li>${esc(merchName(id))} <button type="button" class="tax-act" data-merch-remove="novedades.excluded" data-id="${id}">Quitar exclusión</button></li>`).join("") || `<li class="section-hint">Ninguno.</li>`;
+
+  const mas = sc.masElegidos;
+  const masPinned = [...mas.pinned].sort((a, b) => a.position - b.position).map((p) => `<li>Posición <input class="merch-input merch-num" type="number" min="1" max="40" data-merch-pin-pos="${p.productId}" value="${p.position}" aria-label="Posición de ${esc(merchName(p.productId))}"> ${esc(merchName(p.productId))} <button type="button" class="tax-act tax-danger" data-merch-remove="masElegidos.pinned" data-id="${p.productId}">Quitar fijación</button></li>`).join("") || `<li class="section-hint">Ninguno.</li>`;
+  const masExcluded = mas.excluded.map((id) => `<li>${esc(merchName(id))} <button type="button" class="tax-act" data-merch-remove="masElegidos.excluded" data-id="${id}">Quitar exclusión</button></li>`).join("") || `<li class="section-hint">Ninguno.</li>`;
+  const r = merchState.ranking;
+  const rankRows = r && r.ranking && r.ranking.length
+    ? r.ranking.map((x, i) => { const p = merchProduct(x.productId); const st = mas.excluded.includes(x.productId) ? "Excluido" : mas.pinned.some((q) => q.productId === x.productId) ? "Fijado" : p && !p.published ? "No publicado (no se muestra)" : ""; return `<tr><td>${i + 1}</td><td>${esc(merchName(x.productId))}</td><td>${x.units}</td><td>${st}</td></tr>`; }).join("")
+    : `<tr><td colspan="4" class="section-hint">Sin ventas confirmadas en el período.</td></tr>`;
+
+  const colRows = d.collections.map((c, i) => `<tr>
+      <td class="merch-order"><button type="button" class="tax-act" data-merch-col-move="${i}" data-dir="-1" ${i === 0 ? "disabled" : ""} aria-label="Subir colección">↑</button><button type="button" class="tax-act" data-merch-col-move="${i}" data-dir="1" ${i === d.collections.length - 1 ? "disabled" : ""} aria-label="Bajar colección">↓</button></td>
+      <td><input class="merch-input" data-merch-col="${i}" data-field="name" value="${esc(c.name)}" maxlength="60" aria-label="Nombre de la colección"></td>
+      <td><input class="merch-input" data-merch-col="${i}" data-field="description" value="${esc(c.description || "")}" maxlength="240" aria-label="Descripción de la colección"></td>
+      <td><input class="merch-input" type="date" data-merch-col="${i}" data-field="startsAt" value="${c.startsAt || ""}" aria-label="Desde"><input class="merch-input" type="date" data-merch-col="${i}" data-field="endsAt" value="${c.endsAt || ""}" aria-label="Hasta"></td>
+      <td><label class="checkbox-field"><input type="checkbox" data-merch-col="${i}" data-field="active" ${c.active ? "checked" : ""}> Activa</label></td>
+      <td>${Object.values(d.assignments).filter((a) => a.collections.includes(c.id)).length}</td>
+      <td><button type="button" class="tax-act tax-danger" data-merch-col-delete="${i}">Eliminar</button></td>
+    </tr>`).join("") || `<tr><td colspan="7" class="section-hint">Todavía no hay colecciones.</td></tr>`;
+  const tagRows = d.tags.map((t, i) => `<tr>
+      <td><input class="merch-input" data-merch-tag="${i}" data-field="name" value="${esc(t.name)}" maxlength="60" aria-label="Nombre de la etiqueta"></td>
+      <td><label class="checkbox-field"><input type="checkbox" data-merch-tag="${i}" data-field="active" ${t.active ? "checked" : ""}> Activa</label></td>
+      <td>${Object.values(d.assignments).filter((a) => a.tags.includes(t.id)).length}</td>
+      <td><button type="button" class="tax-act tax-danger" data-merch-tag-delete="${i}">Eliminar</button></td>
+    </tr>`).join("") || `<tr><td colspan="4" class="section-hint">Todavía no hay etiquetas.</td></tr>`;
+
+  const pendingSet = new Set(merchState.pending);
+  const filt = merchState.filter;
+  const assignOf = (id) => d.assignments[id] || { collections: [], tags: [] };
+  const listed = state.products.filter((p) => p.hasMetadata).filter((p) => {
+    if (filt === "pending") return pendingSet.has(Number(p.id));
+    if (filt.startsWith("col:")) return assignOf(p.id).collections.includes(filt.slice(4));
+    if (filt.startsWith("tag:")) return assignOf(p.id).tags.includes(filt.slice(4));
+    if (filt === "none") return !assignOf(p.id).collections.length && !assignOf(p.id).tags.length;
+    return true;
+  }).sort((a, b) => a.name.localeCompare(b.name, "es"));
+  const colName = (id) => (d.collections.find((c) => c.id === id) || {}).name || id;
+  const tagName = (id) => (d.tags.find((t) => t.id === id) || {}).name || id;
+  const prodRows = listed.map((p) => {
+    const a = assignOf(p.id);
+    return `<tr>
+      <td><input type="checkbox" data-merch-select="${p.id}" ${merchState.selected.has(Number(p.id)) ? "checked" : ""} aria-label="Seleccionar ${esc(p.name)}"></td>
+      <td>${esc(p.name)} <span class="section-hint">#${p.id}${p.published ? "" : " · no publicado"}</span></td>
+      <td>${pendingSet.has(Number(p.id)) ? `<span class="pill pill-review">Pendiente de clasificación</span>` : esc(p.editorialCategory || "—")}</td>
+      <td>${a.collections.map((c) => `<span class="sub-chip">${esc(colName(c))}</span>`).join("") || `<span class="section-hint">—</span>`}</td>
+      <td>${a.tags.map((t) => `<span class="sub-chip">${esc(tagName(t))}</span>`).join("") || `<span class="section-hint">—</span>`}</td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="5" class="section-hint">No hay productos con este filtro.</td></tr>`;
+  const assignTargets = `<option value="">Elige colección o etiqueta…</option>${d.collections.length ? `<optgroup label="Colecciones">${d.collections.map((c) => `<option value="col:${esc(c.id)}">${esc(c.name)}</option>`).join("")}</optgroup>` : ""}${d.tags.length ? `<optgroup label="Etiquetas">${d.tags.map((t) => `<option value="tag:${esc(t.id)}">${esc(t.name)}</option>`).join("")}</optgroup>` : ""}`;
+  const filterOptions = `<option value="all">Todos los productos con ficha</option><option value="pending">Pendientes de clasificación (${merchState.pending.length})</option><option value="none">Sin colección ni etiqueta</option>${d.collections.map((c) => `<option value="col:${esc(c.id)}">Colección: ${esc(c.name)}</option>`).join("")}${d.tags.map((t) => `<option value="tag:${esc(t.id)}">Etiqueta: ${esc(t.name)}</option>`).join("")}`;
+
+  const picks = sc.descubre.picks.map((p, i) => {
+    const label = p.type === "category" ? `Categoría: ${p.value}` : p.type === "collection" ? `Colección: ${colName(p.value)}` : `Etiqueta: ${tagName(p.value)}`;
+    return `<li>${esc(label)} · título <input class="merch-input" data-merch-pick-title="${i}" value="${esc(p.title || "")}" maxlength="60" placeholder="(su nombre)" aria-label="Título de la tarjeta"> <button type="button" class="tax-act" data-merch-pick-move="${i}" data-dir="-1" ${i === 0 ? "disabled" : ""} aria-label="Subir">↑</button><button type="button" class="tax-act" data-merch-pick-move="${i}" data-dir="1" ${i === sc.descubre.picks.length - 1 ? "disabled" : ""} aria-label="Bajar">↓</button><button type="button" class="tax-act tax-danger" data-merch-pick-delete="${i}">Quitar</button></li>`;
+  }).join("") || `<li class="section-hint">Sin selecciones: la sección muestra las tarjetas de categoría de siempre.</li>`;
+  const pickTargets = `${VIBE_CATEGORY_GROUPS.map((g) => g.categories.length ? `<optgroup label="Categorías · ${esc(g.group)}">${g.categories.map((c) => `<option value="category:${esc(c)}">${esc(c)}</option>`).join("")}</optgroup>` : "").join("")}${d.collections.length ? `<optgroup label="Colecciones">${d.collections.map((c) => `<option value="collection:${esc(c.id)}">${esc(c.name)}</option>`).join("")}</optgroup>` : ""}${d.tags.length ? `<optgroup label="Etiquetas">${d.tags.map((t) => `<option value="tag:${esc(t.id)}">${esc(t.name)}</option>`).join("")}</optgroup>` : ""}`;
+
+  $("#merchRoot").innerHTML = `
+    <section class="home-panel"><div class="panel-head"><h2>Secciones de la tienda</h2></div>
+      <p class="section-hint">Orden de arriba hacia abajo. Una vitrina sin productos nunca se muestra, aunque esté visible.</p>
+      <div class="table-scroll"><table class="merch-table"><thead><tr><th>Orden</th><th>Sección</th><th>Estado</th><th>Título</th><th>Cantidad</th></tr></thead><tbody>${sectionRows}</tbody></table></div>
+    </section>
+
+    <section class="home-panel" id="merchNovedades"><div class="panel-head"><h2>Novedades</h2></div>
+      <p class="section-hint"><b>Lanzamiento oficial:</b> ${nov.launchDate ? `desde el <b>${esc(nov.launchDate)}</b>` : "<b>sin configurar</b> — la carga inicial de productos no cuenta como novedad; mientras no lo actives, solo aparecen los productos que fijes aquí"}. Con la fecha configurada, entran solos los productos que lleguen al catálogo desde ese día, durante los días de permanencia.</p>
+      <div class="merch-row">
+        <label>Fecha de lanzamiento oficial <input type="date" class="merch-input" id="merchLaunch" value="${nov.launchDate || ""}"></label>
+        <label>Permanencia (días) <input type="number" min="1" max="365" class="merch-input merch-num" id="merchWindow" value="${nov.windowDays}"></label>
+        <span class="section-hint">Con la configuración guardada hoy entran solos: <b>${merchState.newArrivals.length}</b>.</span>
+      </div>
+      <div class="merch-row"><label>Fijar producto <select id="merchNovPin">${productOptions(nov.pinned)}</select></label><button type="button" class="tax-act tax-add" data-merch-add="novedades.pinned" data-from="merchNovPin">Fijar</button>
+        <label>Excluir producto <select id="merchNovEx">${productOptions(nov.excluded)}</select></label><button type="button" class="tax-act" data-merch-add="novedades.excluded" data-from="merchNovEx">Excluir</button></div>
+      <div class="merch-cols"><div><h3>Fijados (primero, en este orden)</h3><ul class="merch-list">${novPinned}</ul></div><div><h3>Excluidos</h3><ul class="merch-list">${novExcluded}</ul></div></div>
+    </section>
+
+    <section class="home-panel" id="merchMasElegidos"><div class="panel-head"><h2>Más elegidos</h2></div>
+      <p class="section-hint">Por <b>unidades vendidas</b> en ventas confirmadas del POS (pagadas y no anuladas), solo lectura. Se actualiza solo cada 24 horas. Los fijados van primero en su posición; los excluidos nunca aparecen.</p>
+      <div class="merch-row"><label>Período (días) <input type="number" min="1" max="365" class="merch-input merch-num" id="merchPeriod" value="${mas.periodDays}"></label></div>
+      <div class="merch-row"><label>Fijar producto <select id="merchMasPin">${productOptions(mas.pinned.map((p) => p.productId))}</select></label><button type="button" class="tax-act tax-add" data-merch-add="masElegidos.pinned" data-from="merchMasPin">Fijar</button>
+        <label>Excluir producto <select id="merchMasEx">${productOptions(mas.excluded)}</select></label><button type="button" class="tax-act" data-merch-add="masElegidos.excluded" data-from="merchMasEx">Excluir</button></div>
+      <div class="merch-cols"><div><h3>Fijados</h3><ul class="merch-list">${masPinned}</ul></div><div><h3>Excluidos</h3><ul class="merch-list">${masExcluded}</ul></div></div>
+      <h3>Ranking automático (últimos ${r ? r.periodDays : mas.periodDays} días${r ? ` · ${r.salesCounted} ventas confirmadas` : ""})</h3>
+      <div class="table-scroll"><table class="merch-table" id="merchRanking"><thead><tr><th>#</th><th>Producto</th><th>Unidades</th><th>Estado</th></tr></thead><tbody>${rankRows}</tbody></table></div>
+    </section>
+
+    <section class="home-panel" id="merchColecciones"><div class="panel-head"><h2>Colecciones</h2></div>
+      <p class="section-hint">Independientes de las categorías: un producto puede estar en varias. Las fechas son opcionales (programación de campaña). Solo se muestran colecciones activas, vigentes y con productos.</p>
+      <div class="merch-row"><label>Nueva colección <input class="merch-input" id="merchNewCol" maxlength="60" placeholder="Ej. Navidad 2026"></label><button type="button" class="tax-act tax-add" id="merchAddCol">Crear</button></div>
+      <div class="table-scroll"><table class="merch-table"><thead><tr><th>Orden</th><th>Nombre</th><th>Descripción</th><th>Desde / hasta</th><th>Estado</th><th>Productos</th><th></th></tr></thead><tbody>${colRows}</tbody></table></div>
+    </section>
+
+    <section class="home-panel" id="merchEtiquetas"><div class="panel-head"><h2>Etiquetas comerciales</h2></div>
+      <div class="merch-row"><label>Nueva etiqueta <input class="merch-input" id="merchNewTag" maxlength="60" placeholder="Ej. Bestseller"></label><button type="button" class="tax-act tax-add" id="merchAddTag">Crear</button></div>
+      <div class="table-scroll"><table class="merch-table"><thead><tr><th>Nombre</th><th>Estado</th><th>Productos</th><th></th></tr></thead><tbody>${tagRows}</tbody></table></div>
+    </section>
+
+    <section class="home-panel" id="merchAsignacion"><div class="panel-head"><h2>Asignación de productos</h2></div>
+      <p class="section-hint">Marca productos y agrégalos o quítalos de una colección o etiqueta (uno o varios a la vez). La clasificación principal (grupo › categoría) se edita en «Clasificación» o en la ficha; los pendientes siguen visibles en la tienda.</p>
+      <div class="merch-row"><label>Ver <select id="merchFilter">${filterOptions}</select></label>
+        <label>Acción <select id="merchAssignTarget">${assignTargets}</select></label>
+        <button type="button" class="tax-act tax-add" id="merchAssignAdd">Agregar a seleccionados</button><button type="button" class="tax-act" id="merchAssignRemove">Quitar de seleccionados</button>
+        <span class="section-hint" id="merchSelCount">${merchState.selected.size} seleccionados</span></div>
+      <div class="table-scroll"><table class="merch-table" id="merchProducts"><thead><tr><th><input type="checkbox" id="merchSelectAll" aria-label="Seleccionar todos los listados"></th><th>Producto</th><th>Clasificación principal</th><th>Colecciones</th><th>Etiquetas</th></tr></thead><tbody>${prodRows}</tbody></table></div>
+    </section>
+
+    <section class="home-panel" id="merchDescubre"><div class="panel-head"><h2>Descubre tu VIBE</h2></div>
+      <p class="section-hint">Selecciones comerciales por categoría, colección o etiqueta. Solo se muestran las que tienen productos.</p>
+      <div class="merch-row"><label>Agregar <select id="merchPickTarget">${pickTargets}</select></label><button type="button" class="tax-act tax-add" id="merchAddPick">Agregar</button></div>
+      <ul class="merch-list">${picks}</ul>
+    </section>`;
+  $("#merchFilter").value = merchState.filter;
+}
+
+function merchMove(list, i, dir) {
+  const j = i + dir;
+  if (j < 0 || j >= list.length) return;
+  [list[i], list[j]] = [list[j], list[i]];
+}
+
+$("#merchRoot").addEventListener("input", (e) => {
+  const t = e.target;
+  const d = merchState.doc;
+  if (!d) return;
+  const sc = d.showcases;
+  if (t.dataset.merchTitle) { sc[t.dataset.merchTitle].title = t.value; return merchDirty(); }
+  if (t.dataset.merchLimit) { sc[t.dataset.merchLimit].limit = Number(t.value); return merchDirty(); }
+  if (t.id === "merchWindow") { sc.novedades.windowDays = Number(t.value); return merchDirty(); }
+  if (t.id === "merchPeriod") { sc.masElegidos.periodDays = Number(t.value); return merchDirty("Cambios sin guardar. El ranking se recalcula con el período nuevo al guardar."); }
+  if (t.dataset.merchPinPos) { const p = sc.masElegidos.pinned.find((x) => x.productId === Number(t.dataset.merchPinPos)); if (p) p.position = Number(t.value); return merchDirty(); }
+  if (t.dataset.merchCol !== undefined && t.type !== "checkbox") { d.collections[Number(t.dataset.merchCol)][t.dataset.field] = t.value || (t.type === "date" ? null : ""); return merchDirty(); }
+  if (t.dataset.merchTag !== undefined && t.type !== "checkbox") { d.tags[Number(t.dataset.merchTag)][t.dataset.field] = t.value; return merchDirty(); }
+  if (t.dataset.merchPickTitle !== undefined) { sc.descubre.picks[Number(t.dataset.merchPickTitle)].title = t.value; return merchDirty(); }
+});
+
+$("#merchRoot").addEventListener("change", (e) => {
+  const t = e.target;
+  const d = merchState.doc;
+  if (!d) return;
+  const sc = d.showcases;
+  if (t.dataset.merchActive) { sc[t.dataset.merchActive].active = t.checked; return merchDirty(); }
+  if (t.id === "merchLaunch") { sc.novedades.launchDate = t.value || null; merchDirty(t.value ? "Cambios sin guardar. Al guardar, el lanzamiento oficial de Novedades queda activo desde esa fecha." : "Cambios sin guardar. Novedades vuelve a «sin lanzamiento oficial»."); return renderMerch(); }
+  if (t.dataset.merchCol !== undefined && t.type === "checkbox") { d.collections[Number(t.dataset.merchCol)].active = t.checked; return merchDirty(); }
+  if (t.dataset.merchTag !== undefined && t.type === "checkbox") { d.tags[Number(t.dataset.merchTag)].active = t.checked; return merchDirty(); }
+  if (t.id === "merchFilter") { merchState.filter = t.value; return renderMerch(); }
+  if (t.dataset.merchSelect) {
+    const id = Number(t.dataset.merchSelect);
+    if (t.checked) merchState.selected.add(id); else merchState.selected.delete(id);
+    $("#merchSelCount").textContent = `${merchState.selected.size} seleccionados`;
+    return;
+  }
+  if (t.id === "merchSelectAll") {
+    document.querySelectorAll("[data-merch-select]").forEach((cb) => { cb.checked = t.checked; const id = Number(cb.dataset.merchSelect); if (t.checked) merchState.selected.add(id); else merchState.selected.delete(id); });
+    $("#merchSelCount").textContent = `${merchState.selected.size} seleccionados`;
+  }
+});
+
+$("#merchRoot").addEventListener("click", (e) => {
+  const d = merchState.doc;
+  if (!d) return;
+  const sc = d.showcases;
+  const b = e.target.closest("button");
+  if (!b) return;
+  const done = (text) => { merchDirty(text); renderMerch(); };
+  if (b.dataset.merchMove) { merchMove(sc.order, sc.order.indexOf(b.dataset.merchMove), Number(b.dataset.dir)); return done(); }
+  if (b.dataset.merchAdd) {
+    const id = Number($("#" + b.dataset.from).value);
+    if (!id) return;
+    const [show, list] = b.dataset.merchAdd.split(".");
+    if (show === "masElegidos" && list === "pinned") {
+      if (!sc.masElegidos.pinned.some((p) => p.productId === id)) sc.masElegidos.pinned.push({ productId: id, position: sc.masElegidos.pinned.length + 1 });
+      sc.masElegidos.excluded = sc.masElegidos.excluded.filter((x) => x !== id);
+    } else {
+      if (!sc[show][list].includes(id)) sc[show][list].push(id);
+      const other = list === "pinned" ? "excluded" : "pinned";
+      if (show === "masElegidos" && other === "pinned") sc.masElegidos.pinned = sc.masElegidos.pinned.filter((p) => p.productId !== id);
+      else sc[show][other] = sc[show][other].filter((x) => x !== id);
+    }
+    return done();
+  }
+  if (b.dataset.merchRemove) {
+    const id = Number(b.dataset.id);
+    const [show, list] = b.dataset.merchRemove.split(".");
+    if (show === "masElegidos" && list === "pinned") sc.masElegidos.pinned = sc.masElegidos.pinned.filter((p) => p.productId !== id);
+    else sc[show][list] = sc[show][list].filter((x) => x !== id);
+    return done();
+  }
+  if (b.id === "merchAddCol" || b.id === "merchAddTag") {
+    const isCol = b.id === "merchAddCol";
+    const input = $(isCol ? "#merchNewCol" : "#merchNewTag");
+    const name = input.value.replace(/\s+/g, " ").trim();
+    const list = isCol ? d.collections : d.tags;
+    if (!name) return;
+    if (list.some((x) => x.name.toLowerCase() === name.toLowerCase())) { $("#merchStatus").textContent = `Ya existe «${name}».`; return; }
+    list.push(isCol ? { id: merchUid(name, list), name, description: "", active: true, startsAt: null, endsAt: null } : { id: merchUid(name, list), name, active: true });
+    return done();
+  }
+  if (b.dataset.merchColMove !== undefined) { merchMove(d.collections, Number(b.dataset.merchColMove), Number(b.dataset.dir)); return done(); }
+  if (b.dataset.merchColDelete !== undefined || b.dataset.merchTagDelete !== undefined) {
+    const isCol = b.dataset.merchColDelete !== undefined;
+    const list = isCol ? d.collections : d.tags;
+    const item = list[Number(isCol ? b.dataset.merchColDelete : b.dataset.merchTagDelete)];
+    const used = Object.values(d.assignments).filter((a) => (isCol ? a.collections : a.tags).includes(item.id)).length;
+    if (!confirm(`¿Eliminar ${isCol ? "la colección" : "la etiqueta"} «${item.name}»?${used ? ` Se quitará de ${used} producto(s); los productos no cambian.` : ""}`)) return;
+    list.splice(list.indexOf(item), 1);
+    for (const a of Object.values(d.assignments)) { if (isCol) a.collections = a.collections.filter((x) => x !== item.id); else a.tags = a.tags.filter((x) => x !== item.id); }
+    sc.descubre.picks = sc.descubre.picks.filter((p) => !(p.type === (isCol ? "collection" : "tag") && p.value === item.id));
+    return done();
+  }
+  if (b.id === "merchAssignAdd" || b.id === "merchAssignRemove") {
+    const target = $("#merchAssignTarget").value;
+    if (!target || !merchState.selected.size) { $("#merchStatus").textContent = "Elige una colección o etiqueta y marca al menos un producto."; return; }
+    const [kind, id] = [target.slice(0, 3), target.slice(4)];
+    const field = kind === "col" ? "collections" : "tags";
+    for (const pid of merchState.selected) {
+      const a = d.assignments[pid] || (d.assignments[pid] = { collections: [], tags: [] });
+      if (b.id === "merchAssignAdd") { if (!a[field].includes(id)) a[field].push(id); }
+      else a[field] = a[field].filter((x) => x !== id);
+      if (!a.collections.length && !a.tags.length) delete d.assignments[pid];
+    }
+    return done(`Cambios sin guardar (${merchState.selected.size} producto(s)).`);
+  }
+  if (b.id === "merchAddPick") {
+    const v = $("#merchPickTarget").value;
+    if (!v) return;
+    const i = v.indexOf(":");
+    const pick = { type: v.slice(0, i), value: v.slice(i + 1), title: "" };
+    if (!sc.descubre.picks.some((p) => p.type === pick.type && p.value === pick.value)) sc.descubre.picks.push(pick);
+    return done();
+  }
+  if (b.dataset.merchPickMove !== undefined) { merchMove(sc.descubre.picks, Number(b.dataset.merchPickMove), Number(b.dataset.dir)); return done(); }
+  if (b.dataset.merchPickDelete !== undefined) { sc.descubre.picks.splice(Number(b.dataset.merchPickDelete), 1); return done(); }
+});
+
+$("#merchSave").addEventListener("click", async () => {
+  const btn = $("#merchSave");
+  btn.disabled = true;
+  $("#merchStatus").textContent = "Guardando…";
+  let res;
+  try {
+    res = await adminFetch("/api/admin/products?resource=merchandising", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ doc: merchState.doc, expectedRevision: merchState.doc.revision }) });
+  } catch {
+    btn.disabled = false;
+    $("#merchStatus").textContent = "Sin conexión. No se guardó nada.";
+    return;
+  }
+  if (res.status === 401) { clearToken(); showLogin("Token incorrecto o vencido."); return; }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    btn.disabled = false;
+    $("#merchStatus").textContent = (data && data.error) || "No se pudo guardar. No se cambió nada.";
+    return;
+  }
+  merchState.loaded = false;
+  await loadMerch(true);
+  $("#merchStatus").textContent = "Guardado. La tienda lo muestra en menos de un minuto.";
+});

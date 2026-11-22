@@ -109,7 +109,9 @@ async function main() {
   const server = require("../api/_lib/subcategories");
   await test("DEFAULT_GROUPS coincide exactamente con VIBE_CATEGORY_GROUPS + SUBCATEGORIES_BY_CATEGORY", () => {
     const pub = T.publicTaxonomy(T.defaultTaxonomy());
-    assert.deepEqual(pub.groups, tjs.VIBE_CATEGORY_GROUPS.map((g) => ({ group: g.group, categories: g.categories })));
+    // Organización comercial: los 6 grupos iniciales, activos, en el mismo orden en servidor y tienda.
+    assert.deepEqual(pub.groups.map((g) => ({ group: g.group, categories: g.categories })), tjs.VIBE_CATEGORY_GROUPS.map((g) => ({ group: g.group, categories: g.categories })));
+    assert.ok(pub.groups.every((g) => g.active === true && Array.isArray(g.inactiveCategories) && !g.inactiveCategories.length));
     assert.deepEqual(pub.subcategories, tjs.SUBCATEGORIES_BY_CATEGORY);
     assert.deepEqual(pub.subcategories, server.SUBCATEGORIES_BY_CATEGORY);
   });
@@ -287,7 +289,9 @@ async function main() {
     assert.ok(cur.body.taxonomy.groups[0].categories.includes("Uñas"));
     const bad = await run({ groups: "x" });
     assert.deepEqual(bad.body.taxonomy.subcategories, tjs.SUBCATEGORIES_BY_CATEGORY);
-    assert.deepEqual(Object.keys(cur.body.taxonomy).sort(), ["groups", "revision", "subcategories"]);
+    // Solo nombres y estado de la taxonomía (más los alias de grupo): nada de productos ni datos internos.
+    assert.deepEqual(Object.keys(cur.body.taxonomy).sort(), ["groupAliases", "groups", "revision", "subcategories"]);
+    assert.deepEqual(Object.keys(cur.body.taxonomy.groups[0]).sort(), ["active", "categories", "group", "inactiveCategories"]);
   });
   await test("el editor acepta una categoría creada en el Admin y rechaza una eliminada (salvo que sea el valor guardado)", async () => {
     const withUnas = base();

@@ -14,15 +14,29 @@ const collator = (a, b) => a.localeCompare(b, "es");
 // solo en admin/admin.js (opciones del selector de categoría); ahora es
 // la única fuente para Admin y catálogo público, así ambos clasifican
 // igual. Admin la importa desde aquí.
+// Organización comercial (2026-11-22): 6 grupos iniciales, administrables
+// desde el Admin (orden, nombre, activo). «Accesorios» pasa a llamarse
+// «Accesorios beauty» (mismo grupo). Los grupos sin productos no se
+// muestran en la tienda.
 export const VIBE_CATEGORY_GROUPS = [
   { group: "Maquillaje", categories: ["Rostro", "Ojos", "Labios"] },
   { group: "Skincare", categories: ["Limpieza", "Tratamiento"] },
-  { group: "Accesorios", categories: ["Herramientas de aplicación", "Complementos de belleza"] },
+  { group: "Sets y regalos", categories: [] },
+  { group: "Accesorios beauty", categories: ["Herramientas de aplicación", "Complementos de belleza"] },
+  { group: "Cuidado personal", categories: [] },
+  { group: "Fragancias y bienestar", categories: [] },
 ];
 const EDITORIAL_GROUP_BY_CATEGORY = Object.fromEntries(
   VIBE_CATEGORY_GROUPS.flatMap(({ group, categories }) => categories.map((c) => [c, group]))
 );
 export const EDITORIAL_GROUPS = VIBE_CATEGORY_GROUPS.map((g) => g.group);
+// Nombres anteriores de un grupo (enlaces viejos, grupo derivado del POS).
+export const GROUP_ALIASES = { Accesorios: "Accesorios beauty" };
+export const canonicalGroup = (g) => GROUP_ALIASES[g] || g;
+// Grupos y categorías desactivados en el Admin: no aparecen en la
+// navegación pública, pero sus productos siguen visibles (Todos, búsqueda).
+export const INACTIVE_GROUPS = new Set();
+export const INACTIVE_CATEGORIES = new Set();
 
 // Grupo que el servidor asigna a la categoría POS "Otro" y a cualquier
 // categoría POS sin mapear (api/catalog/_lib/categoryGroups.js,
@@ -48,7 +62,7 @@ function groupOf(p) {
   if (editorialGroup) return editorialGroup;
   const posGroup = p.categoryGroup || p.category || null;
   const isCatchAll = posGroup === POS_CATCH_ALL_GROUP && p.category !== POS_CATCH_ALL_GROUP;
-  return isCatchAll ? null : posGroup;
+  return isCatchAll ? null : posGroup ? canonicalGroup(posGroup) : null;
 }
 
 // Fase 51 — subcategorías aprobadas por categoría editorial (Fase 20.2,
@@ -77,16 +91,30 @@ export const SUBCATEGORIES_BY_CATEGORY = {
 // el mapa categoría → grupo, así navegación, filtros y selectores del
 // Admin usan la vigente sin cambiar nada más. Recibe la forma pública
 // { groups: [{ group, categories: [nombre] }], subcategories: { cat: [..] } }.
-// Una forma inválida se ignora (se conserva la taxonomía de código). Los
-// grupos son fijos: solo se aceptan los existentes.
+// Una forma inválida se ignora (se conserva la taxonomía de código).
+// Organización comercial: los grupos son administrables (orden, nombre,
+// activo), así que se aceptan los que envíe el servidor, en su orden; una
+// forma sin ninguna categoría se considera inválida.
 export function applyTaxonomy(tax) {
   if (!tax || !Array.isArray(tax.groups) || !tax.subcategories || typeof tax.subcategories !== "object") return false;
-  const known = new Set(EDITORIAL_GROUPS);
+  const seen = new Set();
   const groups = tax.groups
-    .filter((g) => g && known.has(g.group) && Array.isArray(g.categories))
-    .map((g) => ({ group: g.group, categories: g.categories.filter((c) => typeof c === "string" && c.trim()) }));
-  if (groups.length !== EDITORIAL_GROUPS.length) return false;
-  VIBE_CATEGORY_GROUPS.splice(0, VIBE_CATEGORY_GROUPS.length, ...EDITORIAL_GROUPS.map((name) => groups.find((g) => g.group === name)));
+    .filter((g) => g && typeof g.group === "string" && g.group.trim() && Array.isArray(g.categories) && !seen.has(g.group) && seen.add(g.group))
+    .map((g) => ({
+      group: canonicalGroup(g.group),
+      active: g.active !== false,
+      categories: g.categories.filter((c) => typeof c === "string" && c.trim()),
+      inactiveCategories: Array.isArray(g.inactiveCategories) ? g.inactiveCategories.filter((c) => typeof c === "string") : [],
+    }));
+  if (!groups.length || !groups.some((g) => g.categories.length)) return false;
+  VIBE_CATEGORY_GROUPS.splice(0, VIBE_CATEGORY_GROUPS.length, ...groups.map(({ group, categories }) => ({ group, categories })));
+  EDITORIAL_GROUPS.splice(0, EDITORIAL_GROUPS.length, ...groups.map((g) => g.group));
+  INACTIVE_GROUPS.clear();
+  INACTIVE_CATEGORIES.clear();
+  for (const g of groups) {
+    if (!g.active) INACTIVE_GROUPS.add(g.group);
+    for (const c of g.inactiveCategories) INACTIVE_CATEGORIES.add(c);
+  }
   for (const k of Object.keys(EDITORIAL_GROUP_BY_CATEGORY)) delete EDITORIAL_GROUP_BY_CATEGORY[k];
   for (const k of Object.keys(SUBCATEGORIES_BY_CATEGORY)) delete SUBCATEGORIES_BY_CATEGORY[k];
   for (const { group, categories } of VIBE_CATEGORY_GROUPS) {
@@ -169,18 +197,21 @@ function categoryOf(p) {
   return p.editorialCategory || p.category;
 }
 
+// Organización comercial: grupos en el orden definido en el Admin (los que
+// no están en la taxonomía, al final y alfabéticos) y sin los desactivados.
+const groupRank = (g) => { const i = EDITORIAL_GROUPS.indexOf(g); return i === -1 ? Infinity : i; };
 export function getGroups(products) {
-  return [...new Set(products.map(groupOf).filter(Boolean))].sort(collator);
+  return [...new Set(products.map(groupOf).filter((g) => g && !INACTIVE_GROUPS.has(g)))].sort((a, b) => groupRank(a) - groupRank(b) || collator(a, b));
 }
 
 export function getCategoriesInGroup(products, group) {
-  const scoped = group && group !== "Todos" ? products.filter((p) => groupOf(p) === group) : products;
-  return [...new Set(scoped.map(categoryOf))].sort(collator);
+  const scoped = group && group !== "Todos" ? products.filter((p) => groupOf(p) === canonicalGroup(group)) : products;
+  return [...new Set(scoped.map(categoryOf).filter((c) => c && !INACTIVE_CATEGORIES.has(c)))].sort(collator);
 }
 
 export function getSubcategories(products, group, category) {
   let scoped = products;
-  if (group && group !== "Todos") scoped = scoped.filter((p) => groupOf(p) === group);
+  if (group && group !== "Todos") scoped = scoped.filter((p) => groupOf(p) === canonicalGroup(group));
   if (category && category !== "Todos") scoped = scoped.filter((p) => categoryOf(p) === category);
   return [...new Set(scoped.map((p) => p.subcategory).filter(Boolean))].sort(collator);
 }
@@ -194,10 +225,13 @@ export function getSubcategories(products, group, category) {
 // encuentra «Acné Patch».
 const searchFold = (s) => String(s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ");
 
-export function filterProducts(products, { group, category, subcategory, search, available, promo, featuredOnly, newOnly, brand } = {}) {
+export function filterProducts(products, { group, category, subcategory, search, available, promo, featuredOnly, newOnly, brand, collection, tag } = {}) {
   const q = searchFold(search || "").trim();
   return products.filter((p) => {
-    if (group && group !== "Todos" && groupOf(p) !== group) return false;
+    // Organización comercial: colección y etiqueta (asignadas en el Admin).
+    if (collection && !(Array.isArray(p.collections) && p.collections.includes(collection))) return false;
+    if (tag && !(Array.isArray(p.tags) && p.tags.includes(tag))) return false;
+    if (group && group !== "Todos" && groupOf(p) !== canonicalGroup(group)) return false;
     if (category && category !== "Todos" && categoryOf(p) !== category) return false;
     if (subcategory && subcategory !== "Todos" && p.subcategory !== subcategory) return false;
     if (available === true && p.available === false) return false;
@@ -378,7 +412,9 @@ export function emptyStateCopy(state = {}) {
 // - subcategoría: debe existir en ese grupo/categoría.
 export function normalizeSelection(products, { group = "Todos", category = "Todos", subcategory = "Todos" } = {}) {
   const groups = getGroups(products);
-  const g = group === "Todos" || EDITORIAL_GROUPS.includes(group) || groups.includes(group) ? group : "Todos";
+  // Enlaces con el nombre anterior de un grupo («Accesorios») siguen funcionando.
+  group = canonicalGroup(group);
+  const g = group === "Todos" || (EDITORIAL_GROUPS.includes(group) && !INACTIVE_GROUPS.has(group)) || groups.includes(group) ? group : "Todos";
   const c = category === "Todos" || getCategoriesInGroup(products, g).includes(category) ? category : "Todos";
   const s = subcategory === "Todos" || getSubcategories(products, g, c).includes(subcategory) ? subcategory : "Todos";
   return { group: g, category: c, subcategory: s };
@@ -397,6 +433,9 @@ export function activeFilterChips(state = {}) {
   if (state.featuredOnly) chips.push({ key: "featuredOnly", label: "Más elegidos" });
   if (state.newOnly) chips.push({ key: "newOnly", label: "Novedades" });
   if (state.brand) chips.push({ key: "brand", label: state.brand });
+  // Organización comercial: colección/etiqueta (la app pasa su nombre visible).
+  if (state.collection) chips.push({ key: "collection", label: state.collectionLabel || "Colección" });
+  if (state.tag) chips.push({ key: "tag", label: state.tagLabel || "Etiqueta" });
   if (state.search) chips.push({ key: "search", label: `"${state.search}"` });
   return chips;
 }

@@ -23,8 +23,11 @@ import {
   selectRelated,
   clampQuantity,
   applyTaxonomy,
+  publicPlacement,
 } from "./taxonomy.js";
 import { readStateFromSearch, buildUrl } from "./url-state.js";
+import { getMerchandising, getBestSellers } from "./data-source.js";
+import { selectNovedades, selectBestSellers, collectionsWithProducts, descubrePicks, attachMerchandising } from "./showcases.js";
 import { computeOrderSummary, validateCheckoutForm } from "./checkout.js";
 import { bindCartSwipe } from "./cart-swipe.js";
 import { hasOptions, resolveVariant, selectionStatus, autoShadeId, autoPresentationId, lineOptionProblem, optionPriceInfo, priceRange, priceOf, ownPriceWithPromo } from "./variants.js";
@@ -42,7 +45,14 @@ const DEFAULT_FILTERS = {
   newOnly: false,
   brand: null,
   sort: "relevance",
+  // Organización comercial: colección / etiqueta (ids del Admin).
+  collection: null,
+  tag: null,
 };
+// Organización comercial: configuración pública (null hasta cargarla o si
+// no está disponible) y orden de «Más elegidos».
+let merch = null;
+let bestSellerIds = [];
 // Fase 57 — shadeId/presentationId: opciones elegidas en la ficha abierta
 // (dos dimensiones independientes, ver js/variants.js).
 const state = { ...DEFAULT_FILTERS, product: null, variant: null, shadeId: null, presentationId: null, products: [], page: 1 };
@@ -286,7 +296,8 @@ function renderCatalogHeading() {
 }
 
 function renderActiveFilters() {
-  const chips = activeFilterChips(state);
+  const nameOf = (list, id) => (id && merch && Array.isArray(merch[list]) ? (merch[list].find((x) => x.id === id) || {}).name : null);
+  const chips = activeFilterChips({ ...state, collectionLabel: nameOf("collections", state.collection), tagLabel: nameOf("tags", state.tag) });
   const el = $("#activeFilters");
   if (!chips.length) {
     el.classList.add("hidden");
@@ -433,6 +444,8 @@ function removeFilter(key) {
     $("#searchInput").value = "";
   } else if (key === "brand") {
     state.brand = null;
+  } else if (key === "collection" || key === "tag") {
+    state[key] = null;
   } else {
     state[key] = false; // available / promo / featuredOnly / newOnly
   }
@@ -456,6 +469,107 @@ function renderOfertasPage() {
   $("#ofertasEmpty").classList.toggle("hidden", hasPromotions);
   if (hasPromotions) $("#ofertasGrid").innerHTML = list.map(productCard).join("");
 }
+
+// ── Organización comercial: vitrinas ──────────────────────────────────
+// Secciones de la Home que el Admin puede ordenar (y, salvo banner y
+// catálogo, ocultar). Una vitrina sin contenido real nunca se muestra.
+const SECTION_IDS = { hero: "inicio", novedades: "novedades", masElegidos: "masElegidos", catalogo: "catalogo", colecciones: "colecciones", ofertas: "ofertas", descubre: "discoverVibe" };
+const SECTION_NAV_LINKS = { novedades: ["#navNovedades", "#mobileNavNovedades"], masElegidos: ["#navElegidos", "#mobileNavElegidos"], ofertas: ["#navOfertas", "#mobileNavOfertas", 'footer a[href="#ofertas"]'], descubre: ["#navDescubre", "#mobileNavDescubre"] };
+const sectionVisible = {};
+
+function renderShowcaseGrid(sectionId, titleId, gridId, cfg, items) {
+  const show = Boolean(cfg && cfg.active !== false && items.length);
+  $("#" + sectionId).classList.toggle("hidden", !show);
+  if (!show) {
+    $("#" + gridId).innerHTML = "";
+    return false;
+  }
+  $("#" + titleId).textContent = cfg.title;
+  $("#" + gridId).innerHTML = items.map(productCard).join("");
+  return true;
+}
+
+function renderCollections() {
+  const cfg = merch && merch.showcases ? merch.showcases.colecciones : null;
+  const list = cfg && cfg.active !== false ? collectionsWithProducts(state.products, merch) : [];
+  $("#colecciones").classList.toggle("hidden", !list.length);
+  if (!list.length) return false;
+  $("#coleccionesTitle").textContent = cfg.title;
+  $("#coleccionesGrid").innerHTML = list.map((c) => `<button type="button" class="collection-card" data-collection="${esc(c.id)}">
+      <span class="collection-card-media">${c.image ? `<img src="${esc(c.image)}"${optimizedAttrs(c.coverProduct, c.image, SIZES_CARD)} alt="" loading="lazy" decoding="async">` : `<span class="card-img-empty">VIBE</span>`}</span>
+      <span class="collection-card-body">
+        <span class="collection-card-name">${esc(c.name)}</span>
+        ${c.description ? `<span class="collection-card-text">${esc(c.description)}</span>` : ""}
+        <span class="collection-card-cta">${c.count === 1 ? "1 producto" : `${c.count} productos`} · Ver colección →</span>
+      </span>
+    </button>`).join("");
+  return true;
+}
+
+function renderShowcases() {
+  const sc = merch && merch.showcases ? merch.showcases : null;
+  sectionVisible.novedades = sc ? renderShowcaseGrid("novedades", "novedadesTitle", "novedadesGrid", sc.novedades, selectNovedades(state.products, sc.novedades, sc.novedades.autoProductIds || [])) : renderShowcaseGrid("novedades", "novedadesTitle", "novedadesGrid", null, []);
+  sectionVisible.masElegidos = sc ? renderShowcaseGrid("masElegidos", "masElegidosTitle", "masElegidosGrid", sc.masElegidos, selectBestSellers(state.products, sc.masElegidos, bestSellerIds)) : renderShowcaseGrid("masElegidos", "masElegidosTitle", "masElegidosGrid", null, []);
+  sectionVisible.colecciones = renderCollections();
+  applySectionLayout();
+}
+
+// Orden y visibilidad de las secciones según el Admin. Sin configuración
+// (o si no se pudo leer), la Home queda exactamente como antes.
+function applySectionLayout() {
+  const sc = merch && merch.showcases ? merch.showcases : null;
+  const ofertasCfg = sc ? sc.ofertas : null;
+  sectionVisible.ofertas = !ofertasCfg || (ofertasCfg.active !== false && selectPromotions(state.products).length > 0) || !sc;
+  const descubreCfg = sc ? sc.descubre : null;
+  sectionVisible.descubre = !descubreCfg || descubreCfg.active !== false;
+  $("#ofertas").classList.toggle("hidden", !sectionVisible.ofertas);
+  $("#discoverVibe").classList.toggle("hidden", !sectionVisible.descubre);
+  for (const [section, links] of Object.entries(SECTION_NAV_LINKS)) {
+    if (section === "novedades" || section === "masElegidos") continue; // estos enlaces tienen alternativa (ver más abajo)
+    for (const sel of links) document.querySelectorAll(sel).forEach((a) => a.classList.toggle("hidden", !sectionVisible[section]));
+  }
+  if (!sc || !Array.isArray(sc.order)) return;
+  const anchor = document.getElementById("instagram");
+  for (const key of sc.order) {
+    const el = document.getElementById(SECTION_IDS[key]);
+    if (el && anchor && el.parentNode === anchor.parentNode) anchor.parentNode.insertBefore(el, anchor);
+  }
+}
+
+// Descubre tu VIBE: con selecciones configuradas en el Admin (categorías,
+// colecciones o etiquetas con productos) se muestran esas tarjetas; sin
+// ellas, las tarjetas de categoría de siempre.
+function renderDescubrePicks() {
+  const sc = merch && merch.showcases ? merch.showcases.descubre : null;
+  // El título aprobado («Descubre tu VIBE», con VIBE en color) solo se
+  // reemplaza si el Admin define otro.
+  if (sc && sc.title && sc.title !== "Descubre tu VIBE") $("#discoverVibe h2").textContent = sc.title;
+  const tiles = merch ? descubrePicks(state.products, merch, { groupOfCategory: (c) => publicPlacement({ editorialCategory: c }).group || null }) : null;
+  if (!tiles || !tiles.length) return false;
+  $("#discoverVibeGrid").innerHTML = tiles.map((t) => {
+    const target = t.type === "category" ? ` data-group="${esc(t.group || "Todos")}" data-category="${esc(t.value)}"` : t.type === "collection" ? ` data-collection="${esc(t.value)}"` : ` data-tag="${esc(t.value)}"`;
+    const imageHtml = t.image ? `<img class="discover-tile-photo" src="${esc(t.image)}"${optimizedAttrs(t.coverProduct, t.image, "(max-width: 900px) 265px, 25vw")} alt="${esc(t.label)}" loading="lazy" decoding="async">` : `<span class="card-img-empty">VIBE</span>`;
+    return `<button class="discover-tile"${target}>
+      ${imageHtml}
+      <span class="discover-tile-scrim"></span>
+      <span class="discover-tile-body">
+        <span class="discover-tile-label">${esc(t.label)}</span>
+        <span class="discover-tile-cta">Explorar →</span>
+      </span>
+    </button>`;
+  }).join("");
+  window.dispatchEvent(new Event("resize"));
+  return true;
+}
+
+// Lleva al catálogo filtrado por una colección o etiqueta.
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-collection], [data-tag]");
+  if (!b || !b.closest("#coleccionesGrid, #discoverVibeGrid")) return;
+  e.preventDefault();
+  e.stopPropagation();
+  goToFilter(b.dataset.collection ? { collection: b.dataset.collection } : { tag: b.dataset.tag });
+}, true);
 
 // Punto de entrada compartido por Shop by World, los enlaces de mundo del
 // header, y los enlaces de Novedades/Promociones del header: reinicia
@@ -520,6 +634,7 @@ const DISCOVER_VIBE_TILES = [
 ];
 
 function renderDiscoverVibe() {
+  if (renderDescubrePicks()) return;
   $("#discoverVibeGrid").innerHTML = DISCOVER_VIBE_TILES.map(({ label, group, category, image }) => {
     const slugClass = `discover-tile-${label.toLowerCase()}`;
     const base = `assets/discover/${image}`;
@@ -1265,6 +1380,9 @@ bindDiscoverArrows();
 document.querySelectorAll("#navNovedades, #mobileNavNovedades").forEach((el) => {
   el.addEventListener("click", (e) => {
     e.preventDefault();
+    // Organización comercial: si la vitrina Novedades está visible, el
+    // enlace lleva a ella; si no, al filtro de siempre.
+    if (sectionVisible.novedades) { $("#novedades").scrollIntoView({ behavior: "smooth" }); return; }
     goToFilter({ newOnly: true });
   });
 });
@@ -1275,6 +1393,7 @@ document.querySelectorAll("#navNovedades, #mobileNavNovedades").forEach((el) => 
 document.querySelectorAll("#navElegidos, #mobileNavElegidos").forEach((el) => {
   el.addEventListener("click", (e) => {
     e.preventDefault();
+    if (sectionVisible.masElegidos) { $("#masElegidos").scrollIntoView({ behavior: "smooth" }); return; }
     goToFilter({ featuredOnly: true });
   });
 });
@@ -1364,6 +1483,8 @@ $("#catalogPagination").addEventListener("click", (e) => {
   count.focus({ preventScroll: true });
 });
 bindProductGrid("#ofertasGrid");
+bindProductGrid("#novedadesGrid");
+bindProductGrid("#masElegidosGrid");
 
 $("#cartButton").onclick = openCart;
 $("#closeCart").onclick = closeCart;
@@ -1671,6 +1792,7 @@ async function refreshAvailability() {
     // y disponibilidad), no solo "available"; un producto que ya no viene
     // en el catálogo queda fuera (su línea se marca no disponible).
     state.products = fresh;
+    attachMerchandising(state.products, merch); // colecciones/etiquetas siguen asignadas
     pendingPriceNotice = syncCartWithCatalog();
     renderCart();
     return true;
@@ -2009,6 +2131,8 @@ function applyUrlToFilterState(urlState) {
   state.featuredOnly = urlState.featuredOnly;
   state.newOnly = urlState.newOnly;
   state.sort = urlState.sort;
+  state.collection = urlState.collection || null;
+  state.tag = urlState.tag || null;
   $("#searchInput").value = state.search;
 }
 
@@ -2075,6 +2199,10 @@ async function loadCatalog() {
   // Fase 56 — la taxonomía editable se pide en paralelo; si falla, se
   // sigue con la de código (nunca bloquea el catálogo).
   const taxonomyPromise = getTaxonomy().catch(() => null);
+  // Organización comercial: vitrinas, colecciones, etiquetas y orden de
+  // «Más elegidos», en paralelo; si fallan, la Home queda como antes.
+  const merchPromise = getMerchandising().catch(() => null);
+  const bestPromise = getBestSellers().catch(() => []);
   try {
     state.products = await getProducts();
   } catch (e) {
@@ -2087,6 +2215,9 @@ async function loadCatalog() {
   }
   const taxonomy = await taxonomyPromise;
   if (taxonomy) applyTaxonomy(taxonomy);
+  merch = await merchPromise;
+  bestSellerIds = await bestPromise;
+  attachMerchandising(state.products, merch);
   // Fase 56 — el carrito guardado se alinea con los precios vigentes.
   pendingPriceNotice = syncCartWithCatalog();
   renderCart();
@@ -2095,6 +2226,7 @@ async function loadCatalog() {
   renderProducts();
   renderOfertasPage();
   renderDiscoverVibe();
+  renderShowcases();
 
   // Fase 28 — link compartido de un producto (?product=<id>): la URL ya
   // es la correcta en este punto, así que no se empuja una entrada nueva
