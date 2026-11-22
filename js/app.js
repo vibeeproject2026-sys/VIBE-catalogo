@@ -630,6 +630,8 @@ function renderCart() {
   $("#checkoutButton").disabled = !items.length;
   $("#checkoutButton").style.opacity = items.length ? "1" : ".45";
   $("#cartItems").innerHTML = items.length ? priceChangesNotice(pendingPriceNotice) + items.map(cartItemHtml).join("") : cartEmptyHtml();
+  // «Continuar comprando» solo con productos (vacío ya ofrece «Ver catálogo»).
+  $("#continueShopping").closest(".cart-continue-row").classList.toggle("hidden", !items.length);
 }
 
 function openCart() {
@@ -1365,6 +1367,10 @@ bindProductGrid("#ofertasGrid");
 
 $("#cartButton").onclick = openCart;
 $("#closeCart").onclick = closeCart;
+// «Continuar comprando»: solo cierra el carrito y devuelve al catálogo donde
+// estaba la clienta; el carrito (productos, tonos, presentaciones,
+// cantidades y precios) queda intacto en localStorage.
+$("#continueShopping").onclick = closeCart;
 $("#overlay").onclick = closeCart;
 $("#closeProduct").onclick = () => $("#productDialog").close();
 $("#checkoutButton").onclick = () => {

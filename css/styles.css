@@ -439,7 +439,20 @@ header.scrolled .logo-image{width:128px}
    por el gesto); el contenido real vive en .cart-item-inner, opaco, que
    es lo que se desplaza. */
 .cart-item{position:relative;overflow:hidden;margin-bottom:18px;border-bottom:1px solid #292929;touch-action:pan-y}
-.cart-item-inner{position:relative;z-index:1;display:grid;grid-template-columns:64px 1fr auto;gap:13px;padding-bottom:18px;background:#0b0b0b;transition:transform .2s ease}
+.cart-item-inner{position:relative;z-index:1;display:grid;grid-template-columns:64px minmax(0,1fr) auto;gap:13px;padding-bottom:18px;background:#0b0b0b;transition:transform .2s ease}
+/* Carrito: la columna central nunca se ensancha por su contenido (antes
+   «1fr» tomaba el ancho de una descripción larga y empujaba precio y
+   «Eliminar» fuera del artículo, que los recortaba). El texto se ajusta en
+   varias líneas. */
+.cart-item-inner>div:nth-child(2){min-width:0}
+.cart-item .meta{overflow-wrap:anywhere;line-height:1.45}
+/* «Continuar comprando»: acción secundaria (el fucsia queda para «Continuar pedido»). */
+.cart-continue-row{padding:14px 25px 0}
+.cart-continue{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 16px;border:1px solid #3a3a3a;border-radius:999px;background:transparent;color:#fff;font:inherit;font-size:13px;font-weight:700;cursor:pointer;transition:border-color .2s ease,background .2s ease}
+.cart-continue:hover{border-color:#fff;background:#ffffff12}
+.cart-continue:focus{outline:none}
+.cart-continue:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
+@media(prefers-reduced-motion:reduce){.cart-continue{transition:none}}
 .thumb{width:64px;aspect-ratio:1;border-radius:12px;background:#171717;display:grid;place-items:center;font-size:9px;color:var(--pink);overflow:hidden}
 .thumb img{width:100%;height:100%;object-fit:cover;display:block}
 .cart-item h3{font-size:14px;margin:0 0 4px}
@@ -1056,10 +1069,13 @@ footer .wrap.footer-grid{display:grid;grid-template-columns:1.1fr 1fr 1.3fr;gap:
   .catalog-brand{padding-left:14px}
   .catalog-brand-title{font-size:15px;margin-bottom:4px}
   .catalog-brand-text{font-size:14px}
-  /* En mobile el gesto es el atajo principal: el botón queda como icono
-     compacto (sigue visible y accesible por su aria-label). */
-  .cart-item .remove{padding:0 10px}
-  .cart-item .remove span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  /* Móvil: precio y «Eliminar» (con su texto, área táctil cómoda) en una
+     fila propia bajo la información, para que nada quede fuera del ancho.
+     Deslizar sigue disponible como atajo, nunca en lugar del botón. */
+  .cart-item-inner{grid-template-columns:64px minmax(0,1fr)}
+  .cart-item-side{grid-column:2;flex-direction:row;align-items:center;justify-content:space-between}
+  .cart-item .remove{min-height:40px;padding:0 14px}
+  .cart-continue-row{padding:12px 20px 0}
 }
 @media(max-width:900px){
   .heading-catalog{align-items:flex-start;gap:16px}
@@ -1140,7 +1156,7 @@ footer .wrap.footer-grid{display:grid;grid-template-columns:1.1fr 1fr 1.3fr;gap:
    la elegida en rosa, la inactiva tachada y sin interacción. */
 .shade-single .cart-shade,.presentation-single .cart-shade{width:16px;height:16px;margin-right:8px;box-shadow:0 0 0 1px #ffffff55}
 .presentation-picker{margin:14px 0 6px}
-.opt-part{white-space:nowrap}
+.opt-part{white-space:normal;overflow-wrap:anywhere}
 .presentation-options{display:flex;flex-wrap:wrap;gap:8px}
 .presentation-option{min-height:40px;border:1px solid #444;background:transparent;color:#fff;border-radius:999px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer}
 .presentation-option .option-price{margin-left:8px;font-weight:800;opacity:.8}

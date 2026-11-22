@@ -1700,6 +1700,41 @@ Resultados: ver Historial.
   - cambio de ancho 1440 ↔ 768.
 - **Regresión:** precios por variante y promociones, checkout y navegación: ALL OK.
 
+## 28. Carrito: eliminar, descripciones completas y «Continuar comprando» (2026-11-21)
+
+| ID | Qué | Estado |
+|---|---|---|
+| CART-01 | Botón «Eliminar» completo y visible en todo artículo, en escritorio y móvil; deslizar como atajo | CORREGIDO; ver Historial |
+| CART-02 | Descripciones del artículo completas, en varias líneas, sin desborde | CORREGIDO; ver Historial |
+| CART-03 | Botón secundario «Continuar comprando» que cierra el carrito sin perder nada | IMPLEMENTADO; ver Historial |
+
+**Causa raíz (reproducida con productos reales, p. ej. «Bye Bye Oil» y «Cactus Lip Balm»):**
+- **Texto de la línea:** muestra tono, presentación o, en productos sin opciones, la presentación general del producto. Cada parte tenía `white-space:nowrap`, así que una presentación larga («Estuche compacto rosado con espejo abatible, hojas absorbentes…») no podía partirse.
+- **Columna central:** la cuadrícula del artículo era `64px 1fr auto`, y `1fr` toma como mínimo el ancho de su contenido. La línea larga ensanchaba la columna central y empujaba precio y «Eliminar» fuera del artículo, que los recorta (`overflow:hidden`, necesario para el gesto de deslizar).
+- **Por eso fallaba solo en algunos productos y peor en pantallas angostas:** 274 px de desborde a 1440 y 354 px a 320 con «Bye Bye Oil»; «Eliminar» cortado u oculto. A 320 px también fallaba con «Presentación: 36 Árbol de té».
+- **En móvil:** el botón se reducía a solo un icono.
+
+**Solución (`css/styles.css`, `index.html`, `js/app.js`; sin tocar la lógica del carrito ni del checkout):**
+- **Texto:** las partes de la línea se ajustan en varias líneas (`white-space:normal`, `overflow-wrap:anywhere`), sin recortes ni puntos suspensivos.
+- **Columna central:** `minmax(0,1fr)` y `min-width:0`, para que nunca empuje la zona de precio y «Eliminar».
+- **Móvil (≤ 640 px):** precio y «Eliminar», con su texto y un área táctil de 40 px, van en una fila propia bajo la información.
+- **Deslizar a la izquierda:** sigue como atajo y nunca reemplaza al botón. Con el desborde corregido, la acción revelada se ve y elimina; un gesto vertical no la abre.
+- **«Continuar comprando»:** botón secundario con borde, sobre los artículos y solo cuando el carrito tiene productos. Cierra el carrito y conserva productos, tonos, presentaciones, cantidades, precios y contador. «Continuar pedido» sigue siendo la acción principal, en fucsia.
+
+**Pruebas:**
+- **Navegador real con el catálogo real**, a 1440, 1024, 768, 390 y 320 px; pedidos interceptados:
+  - carrito con tono (Candy Case, Heart Flush), presentación con precio propio (Acne Patch) y descripciones largas (Bye Bye Oil, Cactus Lip Balm);
+  - «Eliminar» completo y con texto; descripciones completas, sin desborde;
+  - cambiar cantidad recalcula el subtotal;
+  - eliminar el primero y el último deja los demás, con subtotal y contador correctos;
+  - deslizar (toques reales) muestra la acción y elimina; el gesto vertical no abre nada;
+  - «Continuar comprando» cierra, se agrega otro producto y siguen los anteriores;
+  - el checkout recibe lo que quedó; sin errores de consola.
+- **Producción antes del cambio:** fallos reproducidos en las cinco medidas.
+- **Suite completa:** 52 scripts, 1054 aprobadas y 0 fallidas, incluido el nuevo `scripts/test-cart-layout.mjs`.
+- **Regresión en navegador:** precios por variante y promociones, checkout y navegación: ALL OK.
+- **Capturas:** `Catalogo VIBE/entregables-carrito/` (antes y después).
+
 ## Historial
 
 - **2026-10-28 (Fase 57):**
