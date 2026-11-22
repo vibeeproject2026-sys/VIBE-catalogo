@@ -625,7 +625,30 @@ dialog::backdrop{background:#000d}
    (no la de la foto) hasta la altura disponible; el video se ve completo
    (contain) y el espacio sobrante, si lo hay, queda en negro discreto. */
 .detail-img.pdp-has-video{aspect-ratio:auto;height:auto}
-.pdp-gallery.pdp-has-video .pdp-gallery-main{aspect-ratio:var(--pdp-video-ratio,9/16);flex:none;max-height:calc(100dvh - 170px);background:#000}
+/* El área del video tiene EXACTAMENTE la proporción del contenido: ocupa todo
+   el ancho de la columna salvo que eso exceda la altura disponible; en ese
+   caso se angosta (centrada) para que el video entre completo. */
+.pdp-gallery.pdp-has-video .pdp-gallery-main{aspect-ratio:var(--pdp-video-ratio,0.5625);flex:none;width:min(100%, calc((100dvh - 170px) * var(--pdp-video-ratio,0.5625)));max-height:none;margin-inline:auto;background:#000}
+/* Solo con franjas negras incorporadas en el archivo: al tener el área la
+   proporción del contenido, cover descarta únicamente esas franjas. */
+.pdp-video.pdp-video-trim{object-fit:cover}
+.pdp-video{cursor:pointer}
+/* Controles del video VIBE */
+.pdp-vc{position:absolute;inset:0;z-index:3;pointer-events:none}
+.pdp-vc-big{pointer-events:auto;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:68px;height:68px;border-radius:50%;border:0;background:var(--pink);color:#fff;display:grid;place-items:center;box-shadow:0 10px 30px #ff007a66;cursor:pointer;transition:opacity .2s ease,transform .2s ease}
+.pdp-vc-big svg{width:30px;height:30px;margin-left:3px}
+.pdp-vc.is-playing .pdp-vc-big{opacity:0;pointer-events:none;transform:translate(-50%,-50%) scale(.9)}
+.pdp-vc-bar{pointer-events:auto;position:absolute;left:10px;right:10px;bottom:10px;display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:999px;background:#000000a6;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:#fff}
+.pdp-vc-btn{flex:none;width:36px;height:36px;border:0;border-radius:50%;background:transparent;color:#fff;display:grid;place-items:center;cursor:pointer}
+.pdp-vc-btn svg{width:20px;height:20px}
+.pdp-vc-btn:hover,.pdp-vc-big:hover{filter:brightness(1.1)}
+.pdp-vc-btn:focus-visible,.pdp-vc-big:focus-visible,.pdp-vc-seek:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.pdp-vc-seek{flex:1;min-width:0;height:4px;margin:0 4px;-webkit-appearance:none;appearance:none;border-radius:999px;background:linear-gradient(to right,var(--pink) var(--vc-pos,0%),#ffffff4d var(--vc-pos,0%));cursor:pointer}
+.pdp-vc-seek::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:#fff;border:0}
+.pdp-vc-seek::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:#fff;border:0}
+.pdp-vc-time{flex:none;font-size:12px;font-variant-numeric:tabular-nums;color:#eee;min-width:72px;text-align:center}
+@media(max-width:420px){.pdp-vc-time{display:none}}
+@media(prefers-reduced-motion:reduce){.pdp-vc-big{transition:none}}
 #pdpMainImage[hidden]{display:none}
 
 .pdp-breadcrumb{margin-bottom:16px;white-space:normal;overflow:visible;text-overflow:clip}

@@ -1174,10 +1174,116 @@ function stopPdpVideo() {
   if (!v) return;
   try { v.pause(); v.removeAttribute("src"); v.load(); } catch {}
   v.remove();
+  const vc = document.getElementById("pdpVideoControls");
+  if (vc) vc.remove();
   const img = document.getElementById("pdpMainImage");
   if (img) img.hidden = false;
   const gal = document.querySelector("#productDetail [data-gallery]");
   if (gal) gal.classList.remove("pdp-has-video");
+}
+
+// Franjas negras INCORPORADAS en el archivo (p. ej., un video vertical
+// exportado dentro de un cuadro horizontal): se detectan en la miniatura
+// WebP (pocos KB, ya cargada) y el reproductor toma la proporción del
+// contenido real. Solo se descartan franjas negras simétricas; nunca
+// contenido. Si no se puede analizar, se usa la proporción del archivo.
+const pdpVideoContent = new Map();
+function videoContentRatio(video) {
+  const key = video.poster;
+  if (pdpVideoContent.has(key)) return pdpVideoContent.get(key);
+  const job = new Promise((resolve) => {
+    const im = new Image();
+    im.crossOrigin = "anonymous";
+    im.onerror = () => resolve(null);
+    im.onload = () => {
+      try {
+        const W = 160, H = Math.max(1, Math.round((W * im.naturalHeight) / im.naturalWidth));
+        const c = document.createElement("canvas");
+        c.width = W; c.height = H;
+        const g = c.getContext("2d", { willReadFrequently: true });
+        g.drawImage(im, 0, 0, W, H);
+        const d = g.getImageData(0, 0, W, H).data;
+        let minX = W, maxX = -1, minY = H, maxY = -1;
+        for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+          const i = (y * W + x) * 4;
+          if (d[i] + d[i + 1] + d[i + 2] > 48) { if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y; }
+        }
+        if (maxX < 0) return resolve(null);
+        const left = minX / W, right = (W - 1 - maxX) / W, top = minY / H, bottom = (H - 1 - maxY) / H;
+        const fileRatio = video.width && video.height ? video.width / video.height : im.naturalWidth / im.naturalHeight;
+        const cw = (maxX - minX + 1) / W, ch = (maxY - minY + 1) / H;
+        const pillar = left > 0.06 && right > 0.06 && Math.abs(left - right) < 0.04;
+        const letter = top > 0.06 && bottom > 0.06 && Math.abs(top - bottom) < 0.04;
+        if (!pillar && !letter) return resolve(null);
+        resolve(fileRatio * (pillar ? cw : 1) / (letter ? ch : 1));
+      } catch { resolve(null); }
+    };
+    im.src = key;
+  });
+  pdpVideoContent.set(key, job);
+  return job;
+}
+
+// Controles propios VIBE (sin dependencias): reproducir/pausar, progreso,
+// tiempo, sonido y pantalla completa. Accesibles con teclado y táctiles.
+const VC_ICON = {
+  play: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg>',
+  pause: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" fill="currentColor"/></svg>',
+  sound: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path d="M15 9a4 4 0 0 1 0 6M17.5 6.5a7.5 7.5 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  muted: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path d="M15.5 9.5l5 5M20.5 9.5l-5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  full: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+};
+const vcTime = (t) => { t = Math.max(0, Math.floor(Number.isFinite(t) ? t : 0)); return Math.floor(t / 60) + ":" + String(t % 60).padStart(2, "0"); };
+function mountVideoControls(v, main, knownDuration) {
+  const vc = document.createElement("div");
+  vc.id = "pdpVideoControls";
+  vc.className = "pdp-vc";
+  vc.innerHTML = '<button type="button" class="pdp-vc-big" data-vc="toggle" aria-label="Reproducir video">' + VC_ICON.play + '</button>'
+    + '<div class="pdp-vc-bar">'
+    + '<button type="button" class="pdp-vc-btn" data-vc="toggle" aria-label="Reproducir">' + VC_ICON.play + '</button>'
+    + '<input type="range" class="pdp-vc-seek" min="0" max="1000" step="1" value="0" data-vc="seek" aria-label="Progreso del video">'
+    + '<span class="pdp-vc-time">0:00 / ' + vcTime(knownDuration) + '</span>'
+    + '<button type="button" class="pdp-vc-btn" data-vc="mute" aria-label="Silenciar">' + VC_ICON.sound + '</button>'
+    + '<button type="button" class="pdp-vc-btn" data-vc="full" aria-label="Pantalla completa">' + VC_ICON.full + '</button>'
+    + '</div>';
+  main.appendChild(vc);
+  const seek = vc.querySelector(".pdp-vc-seek");
+  const time = vc.querySelector(".pdp-vc-time");
+  const dur = () => (Number.isFinite(v.duration) && v.duration > 0 ? v.duration : knownDuration || 0);
+  const sync = () => {
+    const playing = !v.paused && !v.ended;
+    vc.classList.toggle("is-playing", playing);
+    vc.querySelectorAll('[data-vc="toggle"]').forEach((b) => { b.setAttribute("aria-label", playing ? "Pausar" : "Reproducir video"); if (b.classList.contains("pdp-vc-btn")) b.innerHTML = playing ? VC_ICON.pause : VC_ICON.play; });
+    const m = vc.querySelector('[data-vc="mute"]');
+    m.innerHTML = v.muted ? VC_ICON.muted : VC_ICON.sound;
+    m.setAttribute("aria-label", v.muted ? "Activar sonido" : "Silenciar");
+  };
+  const tick = () => {
+    const d = dur();
+    if (!seek.matches(":active")) seek.value = d ? Math.round((v.currentTime / d) * 1000) : 0;
+    seek.style.setProperty("--vc-pos", (seek.value / 10) + "%");
+    time.textContent = vcTime(v.currentTime) + " / " + vcTime(d);
+  };
+  const toggle = () => { if (v.paused || v.ended) v.play().catch(() => {}); else v.pause(); };
+  vc.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-vc]");
+    if (!b) return;
+    e.stopPropagation();
+    if (b.dataset.vc === "toggle") toggle();
+    else if (b.dataset.vc === "mute") v.muted = !v.muted;
+    else if (b.dataset.vc === "full") {
+      if (v.requestFullscreen) v.requestFullscreen().catch(() => {});
+      else if (v.webkitEnterFullscreen) v.webkitEnterFullscreen();
+    }
+  });
+  seek.addEventListener("input", () => { const d = dur(); if (d) v.currentTime = (seek.value / 1000) * d; tick(); });
+  v.addEventListener("click", toggle);
+  for (const ev of ["play", "pause", "ended", "volumechange"]) v.addEventListener(ev, sync);
+  for (const ev of ["timeupdate", "loadedmetadata", "seeked"]) v.addEventListener(ev, tick);
+  // En pantalla completa se usan los controles del sistema; al salir, los de VIBE.
+  v.addEventListener("fullscreenchange", () => { v.controls = document.fullscreenElement === v; });
+  sync();
+  tick();
 }
 function showPdpVideo(thumb) {
   const p = state.product;
@@ -1188,7 +1294,7 @@ function showPdpVideo(thumb) {
   const v = document.createElement("video");
   v.id = "pdpVideo";
   v.className = "detail-photo pdp-video";
-  v.controls = true;
+  v.controls = false; // controles propios VIBE (ver mountVideoControls)
   v.playsInline = true;
   v.preload = "none";
   v.poster = p.video.poster;
@@ -1197,11 +1303,19 @@ function showPdpVideo(thumb) {
   if (img) { img.hidden = true; main.insertBefore(v, img); } else main.prepend(v);
   // El área toma la proporción del VIDEO (no la de la foto), limitada a la
   // altura disponible: verticales, cuadrados y horizontales se ven grandes.
+  // Si el archivo trae franjas negras incorporadas, se usa la proporción
+  // del contenido real y se descartan solo esas franjas (pdp-video-trim).
   const gal = main.closest("[data-gallery]");
   if (gal) {
-    if (p.video.width && p.video.height) gal.style.setProperty("--pdp-video-ratio", `${p.video.width} / ${p.video.height}`);
+    if (p.video.width && p.video.height) gal.style.setProperty("--pdp-video-ratio", String(p.video.width / p.video.height));
     gal.classList.add("pdp-has-video");
+    videoContentRatio(p.video).then((ratio) => {
+      if (!ratio || document.getElementById("pdpVideo") !== v) return;
+      gal.style.setProperty("--pdp-video-ratio", String(ratio));
+      v.classList.add("pdp-video-trim");
+    });
   }
+  mountVideoControls(v, main, p.video.duration);
   document.querySelectorAll(".pdp-thumb").forEach((t) => t.classList.toggle("active", t === thumb));
 }
 
@@ -1703,7 +1817,7 @@ $("#productDialog").addEventListener(
     if (e.touches.length > 1) pdpMultiTouch = true;
     if (!e.target.closest("[data-gallery]")) return;
     if (e.touches.length > 1) return;
-    if (e.target.closest("video")) return; // los controles del video (barra de tiempo) no cambian de imagen
+    if (e.target.closest("video, .pdp-vc")) return; // el video y sus controles (barra de tiempo) no cambian de imagen
     const t = e.touches[0];
     pdpTouchStartX = t.clientX;
     pdpTouchStartY = t.clientY;
