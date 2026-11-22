@@ -1176,6 +1176,8 @@ function stopPdpVideo() {
   v.remove();
   const img = document.getElementById("pdpMainImage");
   if (img) img.hidden = false;
+  const gal = document.querySelector("#productDetail [data-gallery]");
+  if (gal) gal.classList.remove("pdp-has-video");
 }
 function showPdpVideo(thumb) {
   const p = state.product;
@@ -1193,6 +1195,13 @@ function showPdpVideo(thumb) {
   v.src = p.video.url;
   v.setAttribute("aria-label", `Video de ${p.name}`);
   if (img) { img.hidden = true; main.insertBefore(v, img); } else main.prepend(v);
+  // El área toma la proporción del VIDEO (no la de la foto), limitada a la
+  // altura disponible: verticales, cuadrados y horizontales se ven grandes.
+  const gal = main.closest("[data-gallery]");
+  if (gal) {
+    if (p.video.width && p.video.height) gal.style.setProperty("--pdp-video-ratio", `${p.video.width} / ${p.video.height}`);
+    gal.classList.add("pdp-has-video");
+  }
   document.querySelectorAll(".pdp-thumb").forEach((t) => t.classList.toggle("active", t === thumb));
 }
 
