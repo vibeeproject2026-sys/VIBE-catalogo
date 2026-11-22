@@ -19,13 +19,9 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const details = require("../api/_lib/editorialDetails");
 const server = require("../api/_lib/variants");
 const guard = require("../api/orders/_lib/guard");
-const { lineLabel } = (() => {
-  // email.js no exporta su helper; se reproduce su regla para el pedido
-  // histórico (variantName «Único» o ausente → solo el nombre).
-  const src = fs.readFileSync(path.join(root, "api/orders/_lib/email.js"), "utf8");
-  assert.match(src, /const hasRealVariant = l\.variantName && l\.variantName !== "Único" && l\.variantName !== "Default";/);
-  return { lineLabel: (l) => (l.variantName && l.variantName !== "Único" && l.variantName !== "Default" ? `${l.name} — ${l.variantName}` : l.name) };
-})();
+// Regla real del correo y del aviso de WhatsApp: variante elegida desde los
+// campos estructurados (api/orders/_lib/lineOptions.js).
+const { lineLabel } = require("../api/orders/_lib/lineOptions");
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "vibe-f57-"));
 fs.writeFileSync(path.join(tmp, "package.json"), JSON.stringify({ type: "module" }));
@@ -342,12 +338,12 @@ await test("notificación interna y correo a la clienta muestran la combinación
   const db = makeDb([BOTH]);
   await create(db, [{ productId: 1, quantity: 1, shadeId: "rojo", presentationId: "30ml" }]);
   assert.equal(db.emails.length, 2);
-  for (const e of db.emails) assert.ok(e.html.includes("Producto 1 — Rojo pasión · 30 ml"), "falta la combinación en el correo");
+  for (const e of db.emails) assert.ok(e.html.includes("Producto 1") && e.html.includes("Tono: Rojo pasión · Presentación: 30 ml"), "falta la combinación en el correo");
 });
 await test("pedidos históricos sin variantes (variantName «Único»/ausente, sin ids de opciones) se siguen mostrando igual", () => {
   assert.equal(lineLabel({ name: "Set de brochas", variantName: "Único" }), "Set de brochas");
   assert.equal(lineLabel({ name: "Set de brochas" }), "Set de brochas");
-  assert.equal(lineLabel({ name: "Base", variantName: "Nude · 30 ml" }), "Base — Nude · 30 ml");
+  assert.equal(lineLabel({ name: "Base", variantName: "Nude · 30 ml" }), "Base — Opción: Nude · 30 ml");
 });
 await test("nunca se escribe en products ni en catalog_metadata al crear un pedido con opciones", async () => {
   const db = makeDb([BOTH]);

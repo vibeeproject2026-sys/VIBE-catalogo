@@ -43,10 +43,8 @@ function money(n) {
   return new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(n);
 }
 
-function lineLabel(l) {
-  const hasRealVariant = l.variantName && l.variantName !== "Único" && l.variantName !== "Default";
-  return hasRealVariant ? `${l.name} — ${l.variantName}` : l.name;
-}
+// Variante elegida (Tono / Presentación) desde los campos estructurados.
+const { lineLabel, variantText } = require("./lineOptions");
 
 function formatOrderDate(createdAt) {
   return new Intl.DateTimeFormat("es-CO", { dateStyle: "long", timeStyle: "short", timeZone: "America/Bogota" }).format(new Date(createdAt));
@@ -273,13 +271,14 @@ function buildInternalOrderEmail(order) {
   const notes = String(order.customer_notes || "").trim();
 
   const rowsText = items
-    .map((l) => `• ${lineLabel(l)}${l.brand ? ` (${l.brand})` : ""} × ${l.quantity} — ${money(l.lineSubtotal)} (unit. ${money(l.price)})`)
+    .map((l) => `• ${l.name}${l.brand ? ` (${l.brand})` : ""} — ${variantText(l) || "Sin variante"} — Cantidad: ${l.quantity} — ${money(l.lineSubtotal)} (unit. ${money(l.price)})`)
     .join("\n");
 
   const rowsHtml = items
     .map(
       (l) => `<tr>
-        <td style="padding:6px 8px;border-bottom:1px solid #333333;font-size:13px;color:#ffffff;">${escapeHtml(lineLabel(l))}${l.brand ? ` <span style="color:#999999;">(${escapeHtml(l.brand)})</span>` : ""}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #333333;font-size:13px;color:#ffffff;">${escapeHtml(l.name)}${l.brand ? ` <span style="color:#999999;">(${escapeHtml(l.brand)})</span>` : ""}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #333333;font-size:13px;color:${variantText(l) ? "#ffffff;font-weight:700" : "#777777"};">${escapeHtml(variantText(l) || "Sin variante")}</td>
         <td style="padding:6px 8px;border-bottom:1px solid #333333;font-size:13px;color:#cccccc;text-align:center;">${l.quantity}</td>
         <td style="padding:6px 8px;border-bottom:1px solid #333333;font-size:13px;color:#cccccc;text-align:right;">${money(l.price)}</td>
         <td style="padding:6px 8px;border-bottom:1px solid #333333;font-size:13px;color:#ffffff;text-align:right;font-weight:700;">${money(l.lineSubtotal)}</td>
@@ -342,7 +341,7 @@ function buildInternalOrderEmail(order) {
       </tr>
       <tr>
         <td style="padding:12px 24px 0;">
-          <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rowsHtml}</table>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><th align="left" style="padding:6px 8px;font-size:11px;color:#999999;">Producto</th><th align="left" style="padding:6px 8px;font-size:11px;color:#999999;">Variante seleccionada</th><th style="padding:6px 8px;font-size:11px;color:#999999;">Cant.</th><th align="right" style="padding:6px 8px;font-size:11px;color:#999999;">Unit.</th><th align="right" style="padding:6px 8px;font-size:11px;color:#999999;">Subtotal</th></tr>${rowsHtml}</table>
         </td>
       </tr>
       <tr>

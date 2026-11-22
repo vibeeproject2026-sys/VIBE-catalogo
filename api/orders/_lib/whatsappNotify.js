@@ -29,10 +29,8 @@ function money(n) {
   return new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(n);
 }
 
-function lineLabel(l) {
-  const hasRealVariant = l.variantName && l.variantName !== "Único" && l.variantName !== "Default";
-  return hasRealVariant ? `${l.name} — ${l.variantName}` : l.name;
-}
+// Variante elegida (Tono / Presentación) desde los campos estructurados.
+const { lineLabel } = require("./lineOptions");
 
 function buildOrderNotificationMessage(order) {
   const items = Array.isArray(order.items) ? order.items : [];

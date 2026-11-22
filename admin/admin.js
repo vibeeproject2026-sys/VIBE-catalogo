@@ -2464,7 +2464,16 @@ function orderLinesHtml(o) {
   if (!items.length) return "";
   const lines = items
     .map((l) => {
-      const variant = l.variantName && l.variantName !== "Único" && l.variantName !== "Default" ? ` — ${esc(l.variantName)}` : "";
+      // Variante ELEGIDA desde los campos estructurados (misma regla que
+      // api/orders/_lib/lineOptions.js): Tono / Presentación; nunca el texto
+      // descriptivo de la ficha.
+      const opts = [];
+      if (l.shadeId && l.shadeName) opts.push(`Tono: ${l.shadeName}`);
+      if (l.presentationId && l.presentationName) opts.push(`Presentación: ${l.presentationName}`);
+      let classic = false;
+      if (!opts.length && !l.shadeId && !l.presentationId && l.variantId !== "default" && l.variantName && l.variantName !== "Único" && l.variantName !== "Default") { opts.push(`Opción: ${l.variantName}`); classic = true; }
+      if (!classic && !l.presentationId && l.presentationName) opts.push(`Presentación única: ${l.presentationName}`);
+      const variant = opts.length ? ` — ${esc(opts.join(" · "))}` : "";
       const qtyLine = `${esc(l.quantity)} × ${money(Number(l.price))} = <b>${money(Number(l.lineSubtotal))}</b>`;
       if (l.basePrice == null) {
         const own = l.priceSource === "variant" ? ` <span class="pill pill-pink">precio de la variante</span>` : "";
