@@ -178,6 +178,9 @@ function reportRequests(range) {
     { dateRanges: [cur], dimensions: d("newVsReturning"), metrics: m("activeUsers") },
     { dateRanges: [cur], dimensions: d("country", "city"), metrics: m("activeUsers"), orderBys: desc("activeUsers"), limit: 15 },
     { dateRanges: [cur], dimensions: d("contentType", "contentId"), metrics: m("eventCount"), dimensionFilter: { filter: { fieldName: "eventName", stringFilter: { matchType: "EXACT", value: "select_content" } } }, orderBys: desc("eventCount"), limit: 50 },
+    // ¿La propiedad tiene algún dato PROCESADO (de cualquier fecha)? Distingue
+    // «informes aún en procesamiento» de «período sin actividad».
+    { dateRanges: [{ startDate: "2020-01-01", endDate: "today", name: "historico" }], metrics: m("eventCount") },
   ];
   return { traffic, commerce, audience };
 }
@@ -285,7 +288,17 @@ function shapeGa4({ traffic, commerce, audience }, catalog, salesUnits = {}) {
   const geo = G.rowsOf(audience[1]).map((r) => ({ country: r.country, city: isNotSet(r.city) ? null : r.city, activeUsers: r.activeUsers }));
   const categoryClicks = G.rowsOf(audience[2]).filter((r) => r.contentType === "categoria" && !isNotSet(r.contentId)).map((r) => ({ path: r.contentId, clicks: r.eventCount }));
 
-  return { totals, categoryClicks, eventsPrevious, series, devices, channels: Object.values(channels).sort((a, b) => b.sessions - a.sessions), sources, products, groupsCurrent, categoriesCurrent, subcategoriesCurrent, categoriesAtEvent, showcases, funnel, events, searches, newVsReturning, geo, excludedItemRows: excludedRows };
+  // Estado: una respuesta HTTP 200 sin filas NO es una desconexión.
+  //  - "processed": hay datos procesados en el período;
+  //  - "empty_period": la propiedad tiene datos procesados, pero no en este período;
+  //  - "processing": GA4 todavía no tiene ningún informe procesado (propiedad
+  //    nueva): los ceros no significan cero actividad.
+  const hasCurrent = totalsRows.some((r) => (r.dateRange || "actual") === "actual" && METRICS_TOTAL.some((k) => r[k] > 0));
+  const lifetime = G.rowsOf(audience[3]);
+  const hasAny = hasCurrent || lifetime.some((r) => r.eventCount > 0);
+  const status = hasCurrent ? "processed" : hasAny ? "empty_period" : "processing";
+
+  return { status, processed: status !== "processing", totals, categoryClicks, eventsPrevious, series, devices, channels: Object.values(channels).sort((a, b) => b.sessions - a.sessions), sources, products, groupsCurrent, categoriesCurrent, subcategoriesCurrent, categoriesAtEvent, showcases, funnel, events, searches, newVsReturning, geo, excludedItemRows: excludedRows };
 }
 
 // ── Manejador ───────────────────────────────────────────────────────────
@@ -294,6 +307,21 @@ const cache = new Map(); // `${start}|${end}` → { at, payload }
 // Solicitudes de pedido del catálogo: solo id, fecha, estado y total (nunca
 // datos de la clienta). Lectura directa, como api/admin/orders.js: `orders`
 // queda fuera de la lista de tablas del lector público a propósito.
+// GA4 Tiempo real (últimos 30 minutos): prueba de que la medición llega,
+// independiente de los informes procesados. Nunca se suma a sus métricas.
+async function realtimeSummary(cfg, fetchImpl) {
+  try {
+    const token = await G.accessToken(cfg.key, { fetchImpl });
+    const r = await fetchImpl(`https://analyticsdata.googleapis.com/v1beta/properties/${cfg.propertyId}:runRealtimeReport`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ metrics: [{ name: "eventCount" }, { name: "activeUsers" }] }) });
+    const b = await r.json().catch(() => null);
+    if (!r.ok) return { ok: false, code: r.status === 403 ? "FORBIDDEN" : r.status === 401 ? "AUTH" : "API", status: r.status };
+    const row = b && b.rows && b.rows[0] ? b.rows[0].metricValues : null;
+    return { ok: true, events: row ? Number(row[0].value) || 0 : 0, activeUsers: row ? Number(row[1].value) || 0 : 0, asOf: new Date().toISOString() };
+  } catch (e) {
+    return { ok: false, code: e instanceof G.Ga4Error ? e.code : "NETWORK" };
+  }
+}
+
 async function readOrders(env, since) {
   const params = new URLSearchParams();
   params.set("select", "id,created_at,status,total");
@@ -351,6 +379,7 @@ async function handleAnalytics(req, res, env, { fetchImpl = fetch, now = new Dat
         G.batchRunReports(cfg, reqs.audience, { fetchImpl }),
       ]);
       ga4 = shapeGa4({ traffic, commerce, audience }, sources.catalog, sales.unitsByProduct || {});
+      ga4.realtime = await realtimeSummary(cfg, fetchImpl);
     } catch (e) {
       const code = e instanceof G.Ga4Error ? e.code : "API";
       console.error(`[admin/analytics] GA4 ${code}${e && e.status ? " HTTP " + e.status : ""}`);
@@ -375,4 +404,4 @@ async function handleAnalytics(req, res, env, { fetchImpl = fetch, now = new Dat
 
 function clearAnalyticsCache() { cache.clear(); }
 
-module.exports = { handleAnalytics, resolveRange, summarizeSales, summarizeOrders, publishedCatalog, reportRequests, shapeGa4, saleDay, clearAnalyticsCache, SHOWCASES, FUNNEL_EVENTS };
+module.exports = { handleAnalytics, realtimeSummary, resolveRange, summarizeSales, summarizeOrders, publishedCatalog, reportRequests, shapeGa4, saleDay, clearAnalyticsCache, SHOWCASES, FUNNEL_EVENTS };

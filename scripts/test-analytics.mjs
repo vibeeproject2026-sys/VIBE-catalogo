@@ -270,7 +270,7 @@ function envFor(extra = {}) {
   for (const k of ["GA4_MEASUREMENT_ID", "GA4_PROPERTY_ID", "GA4_SERVICE_ACCOUNT_KEY"]) if (!(k in extra)) delete process.env[k];
   return () => { for (const k of Object.keys(process.env)) if (!(k in saved)) delete process.env[k]; Object.assign(process.env, saved); };
 }
-function fakeFetch({ gaStatus = 200, calls }) {
+function fakeFetch({ gaStatus = 200, calls, empty = false, lifetime = false, realtime = { events: 7, users: 2 }, tokenStatus = 200, network = false }) {
   const rows = {
     products: [{ id: 10, name: "Gloss", category: "Labios" }, { id: 11, name: "Parche", category: "Otro" }, { id: 12, name: "Oculto", category: "Labios" }],
     catalog_metadata: [{ product_id: 10, published: true, category: "Labios", subcategory: "Gloss y oils" }, { product_id: 11, published: true, category: "Tratamiento" }, { product_id: 12, published: false, category: "Labios" }],
@@ -280,8 +280,19 @@ function fakeFetch({ gaStatus = 200, calls }) {
   const f = fakeReports();
   return async (url, opts = {}) => {
     calls.push({ url, method: opts.method || "GET" });
-    if (url.startsWith("https://oauth2.googleapis.com/")) return { ok: true, status: 200, json: async () => ({ access_token: "tok-prueba", expires_in: 3600 }) };
+    if (url.startsWith("https://oauth2.googleapis.com/")) return tokenStatus === 200 ? { ok: true, status: 200, json: async () => ({ access_token: "tok-prueba", expires_in: 3600 }) } : { ok: false, status: tokenStatus, json: async () => ({ error: "invalid_grant" }) };
+    if (network && url.startsWith("https://analyticsdata.googleapis.com/")) throw new Error("ECONNRESET");
+    if (url.includes(":runRealtimeReport")) {
+      if (realtime === "error") return { ok: false, status: 403, json: async () => ({ error: {} }) };
+      return { ok: true, status: 200, json: async () => ({ rows: realtime.events ? [{ metricValues: [{ value: String(realtime.events) }, { value: String(realtime.users) }] }] : [] }) };
+    }
     if (url.startsWith("https://analyticsdata.googleapis.com/")) {
+      if (empty) {
+        const reqs = JSON.parse(opts.body).requests;
+        // Respuesta HTTP 200 válida sin filas; «histórico» con filas si lifetime.
+        const reports = reqs.map((q) => ({ dimensionHeaders: (q.dimensions || []).map((x) => ({ name: x.name })), metricHeaders: q.metrics.map((x) => ({ name: x.name })), rows: lifetime && q.dateRanges[0].name === "historico" ? [{ dimensionValues: [], metricValues: [{ value: "120" }] }] : [] }));
+        return { ok: true, status: 200, json: async () => ({ reports }) };
+      }
       const n = JSON.parse(opts.body).requests.length;
       const group = n === 5 && JSON.parse(opts.body).requests[0].metrics.some((m) => m.name === "itemsViewed") ? f.commerce : n === 5 ? f.traffic : f.audience;
       return { ok: gaStatus === 200, status: gaStatus, json: async () => (gaStatus === 200 ? { reports: group } : { error: { message: "x" } }) };
@@ -339,9 +350,11 @@ await test("con GA4: informe completo, caché de 10 min, y ningún secreto en la
     const text = JSON.stringify(res.body);
     for (const secret of ["BEGIN PRIVATE KEY", "lector@proyecto-prueba", "tok-prueba", "service-test-key", "123456789", "admin-test-token"]) assert.ok(!text.includes(secret), "se filtró: " + secret);
     const gaCalls = calls.filter((c) => c.url.includes("analyticsdata")).length;
-    assert.equal(gaCalls, 3);
+    assert.equal(gaCalls, 4, "3 lotes de informes + 1 consulta de Tiempo real");
+    assert.equal(res.body.ga4.status, "processed");
+    assert.deepEqual([res.body.ga4.realtime.ok, res.body.ga4.realtime.events], [true, 7]);
     assert.equal((await call({ range: "30d" })).body.cached, true);
-    assert.equal(calls.filter((c) => c.url.includes("analyticsdata")).length, 3, "la segunda consulta sale de la caché");
+    assert.equal(calls.filter((c) => c.url.includes("analyticsdata")).length, 4, "la segunda consulta sale de la caché");
   } finally { global.fetch = orig; restore(); }
 });
 await test("error de GA4 (sin acceso): mensaje claro, ventas del POS igual disponibles, no se guarda en caché", async () => {
@@ -357,6 +370,82 @@ await test("error de GA4 (sin acceso): mensaje claro, ventas del POS igual dispo
     assert.equal((await call({ range: "7d" })).body.cached, false);
     assert.ok(logged.every((l) => !l.includes("PRIVATE KEY") && !l.includes("tok-prueba")), "los registros no llevan secretos");
   } finally { global.fetch = orig; console.error = origErr; restore(); G.resetTokenCache(); }
+});
+
+console.log("Estados: procesado, en procesamiento, período vacío y errores");
+const withGa = async (opts, fn) => {
+  const restore = envFor({ GA4_MEASUREMENT_ID: "G-TEST1234", GA4_PROPERTY_ID: "123456789", GA4_SERVICE_ACCOUNT_KEY: KEY_JSON });
+  AA.clearAnalyticsCache(); G.resetTokenCache();
+  const calls = []; const orig = global.fetch; global.fetch = fakeFetch({ calls, ...opts });
+  const oe = console.error; console.error = () => {};
+  try { return await fn(calls); } finally { global.fetch = orig; console.error = oe; restore(); G.resetTokenCache(); }
+};
+await test("GA4 conectado, respuesta vacía (HTTP 200 sin filas) y eventos en Tiempo real → «processing», no desconexión", async () => {
+  await withGa({ empty: true, realtime: { events: 25, users: 3 } }, async () => {
+    const res = await call({ range: "7d" });
+    const g = res.body.ga4;
+    assert.equal(res.statusCode, 200);
+    assert.ok(!g.error, "no es un error");
+    assert.deepEqual([g.status, g.processed], ["processing", false]);
+    assert.deepEqual([g.realtime.ok, g.realtime.events, g.realtime.activeUsers], [true, 25, 3]);
+    assert.equal(g.totals.actual.totalUsers, 0, "los informes no se rellenan con Tiempo real");
+  });
+});
+await test("GA4 conectado sin eventos en Tiempo real → «processing» con 0 eventos (respuesta válida)", async () => {
+  await withGa({ empty: true, realtime: { events: 0, users: 0 } }, async () => {
+    const g = (await call({ range: "7d" })).body.ga4;
+    assert.equal(g.status, "processing");
+    assert.deepEqual([g.realtime.ok, g.realtime.events], [true, 0]);
+  });
+});
+await test("propiedad con datos procesados pero período sin actividad → «empty_period» (cero legítimo)", async () => {
+  await withGa({ empty: true, lifetime: true }, async () => {
+    const g = (await call({ range: "today" })).body.ga4;
+    assert.deepEqual([g.status, g.processed], ["empty_period", true]);
+  });
+});
+await test("informes históricos disponibles → «processed» con sus métricas; Tiempo real no se suma", async () => {
+  await withGa({ realtime: { events: 999, users: 50 } }, async () => {
+    const g = (await call({ range: "30d" })).body.ga4;
+    assert.equal(g.status, "processed");
+    assert.equal(g.totals.actual.activeUsers, 40);
+    assert.equal(g.events.view_item.count, 30);
+  });
+});
+await test("error de autenticación (Google rechaza la cuenta) → error AUTH, no ceros", async () => {
+  await withGa({ tokenStatus: 400 }, async () => {
+    const g = (await call({ range: "7d" })).body.ga4;
+    assert.equal(g.error.code, "AUTH");
+    assert.ok(!("totals" in g));
+  });
+});
+await test("error de conexión con la Data API → error NETWORK, no ceros", async () => {
+  await withGa({ network: true }, async () => {
+    const g = (await call({ range: "7d" })).body.ga4;
+    assert.equal(g.error.code, "NETWORK");
+  });
+});
+await test("si Tiempo real falla, los informes procesados se muestran igual", async () => {
+  await withGa({ realtime: "error" }, async () => {
+    const g = (await call({ range: "30d" })).body.ga4;
+    assert.equal(g.status, "processed");
+    assert.deepEqual([g.realtime.ok, g.realtime.code], [false, "FORBIDDEN"]);
+  });
+});
+await test("ventas del POS disponibles mientras GA4 procesa (independientes)", async () => {
+  await withGa({ empty: true }, async () => {
+    const b = (await call({ range: "7d" })).body;
+    assert.equal(b.ga4.status, "processing");
+    assert.equal(b.sales.current.units, 2);
+    assert.equal(b.sales.current.sales, 1);
+  });
+});
+await test("el panel nunca muestra «procesando» como cero: indicadores de navegación «—»", () => {
+  const view = fs.readFileSync(new URL("../admin/analytics-view.js", import.meta.url), "utf8");
+  assert.match(view, /const ready = g && !g\.error && g\.status !== "processing";/);
+  assert.match(view, /overviewSection\(ready \? g : null, d, processing\)/);
+  assert.match(view, /GA4 está recibiendo actividad de tu tienda/);
+  assert.match(view, /Los informes históricos están en procesamiento y estarán disponibles una vez Google complete su consolidación\./);
 });
 
 console.log("Endpoint público y Admin");

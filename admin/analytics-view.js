@@ -140,12 +140,31 @@ function configSection(d) {
   </section>`;
 }
 
+// GA4 conectado y recibiendo eventos, sin informes procesados todavía: nunca
+// se presenta como cero actividad.
+function processingSection(g) {
+  const rt = g.realtime || {};
+  const live = rt.ok
+    ? (rt.events > 0 ? `<b>${n(rt.events)}</b> eventos recibidos en los últimos 30 minutos (${n(rt.activeUsers)} usuario${rt.activeUsers === 1 ? "" : "s"} activo${rt.activeUsers === 1 ? "" : "s"}).` : "Sin eventos en los últimos 30 minutos (puede no haber visitas en este momento).")
+    : `No se pudo consultar Tiempo real (${esc(rt.code || "error")}).`;
+  return `<section class="an-card an-wide an-processing" role="status">
+    <header class="an-card-head"><h2>GA4 está recibiendo actividad de tu tienda</h2>
+    <p>Los informes históricos están en procesamiento y estarán disponibles una vez Google complete su consolidación.</p></header>
+    <ul class="an-setup-list">
+      <li><b>Estado de conexión:</b> conectado. La propiedad responde a las consultas.</li>
+      <li><b>Tiempo real:</b> ${live}</li>
+      <li><b>Procesamiento:</b> Google consolida los informes históricos unas horas después de recibir los eventos; en una propiedad nueva, la primera vez puede tardar entre 24 y 48 horas. Mientras tanto, los indicadores de navegación muestran «—» (no cero).</li>
+      <li><b>Ventas del POS:</b> no dependen de GA4 y se muestran abajo con datos reales.</li>
+    </ul>
+  </section>`;
+}
+
 function ga4ErrorSection(err) {
   return `<section class="an-card an-wide an-error" role="alert"><header class="an-card-head"><h2>No se pudo consultar Google Analytics</h2><p>${esc(err.message)}</p></header>
     <button type="button" class="button" data-an-refresh>Reintentar</button><p class="an-note">Las ventas confirmadas del POS (abajo) no dependen de GA4.</p></section>`;
 }
 
-function overviewSection(g, d) {
+function overviewSection(g, d, processingNow = false) {
   const t = g ? g.totals.actual : null, p = g ? g.totals.anterior : null;
   const ev = (k) => (g ? g.events[k].count : null), evp = (k) => (g ? g.eventsPrevious[k].count : null);
   const nvr = g ? Object.fromEntries(g.newVsReturning.map((x) => [x.type, x.activeUsers])) : {};
@@ -160,7 +179,7 @@ function overviewSection(g, d) {
       ${kpi("Solicitudes de pedido", ev("generate_lead"), "Pedidos enviados desde el catálogo. No son ventas.", ev("generate_lead"), evp("generate_lead"))}
       ${kpi("Clics en WhatsApp", ev("contact_whatsapp"), "Contactos iniciados. No son ventas.", ev("contact_whatsapp"), evp("contact_whatsapp"))}
       ${kpi("Unidades vendidas (POS)", s ? s.current.units : null, "Ventas confirmadas del POS, todos los canales. Fuente independiente de GA4.", s && s.current.units, s && s.previous.units)}
-    </div>${g ? "" : `<p class="an-note">Los indicadores de navegación mostrarán datos cuando GA4 esté conectado; las unidades vendidas ya provienen del POS.</p>`}`, { id: "anA", wide: true, sub: `Comparado con los ${esc(String(d.range.days))} días anteriores.` });
+    </div>${g ? "" : `<p class="an-note">${processingNow ? "Indicadores de navegación: «—» mientras GA4 consolida sus informes (no significa cero actividad). Las unidades vendidas provienen del POS." : "Los indicadores de navegación mostrarán datos cuando GA4 esté conectado; las unidades vendidas ya provienen del POS."}</p>`}`, { id: "anA", wide: true, sub: `Comparado con los ${esc(String(d.range.days))} días anteriores.` });
 }
 
 function trafficSection(g, d) {
@@ -348,10 +367,14 @@ function render() {
     const g = d.ga4;
     if (!d.configured.reporting) html += configSection(d);
     else if (g && g.error) html += ga4ErrorSection(g.error);
-    const ready = g && !g.error;
+    const ready = g && !g.error && g.status !== "processing";
+    const processing = g && !g.error && g.status === "processing";
+    if (processing) html += processingSection(g);
+    else if (ready && g.status === "empty_period") html += `<p class="an-note an-state">GA4 conectado y con informes procesados, pero sin actividad registrada en este período. Prueba con un período más amplio.</p>`;
     html += `<nav class="an-nav" aria-label="Áreas de Analítica">${[["anA", "Resumen"], ["anB", "Tráfico"], ["anC", "Productos"], ["anD", "Embudo"], ["anE", "Vitrinas"], ["anF", "Ventas POS"]].map(([id, l]) => `<a href="#${id}" data-an-goto="${id}">${l}</a>`).join("")}</nav>`;
-    html += overviewSection(ready ? g : null, d);
+    html += overviewSection(ready ? g : null, d, processing);
     if (ready) html += trafficSection(g, d) + productsSection(g, d) + funnelSection(g, d) + showcasesSection(g);
+    else if (processing) html += ["B. Tráfico y visitantes", "C. Productos y categorías", "D. Embudo de compra", "E. Vitrinas comerciales"].map((t, i) => card(t, empty("Informes históricos en procesamiento. Se mostrarán aquí cuando Google complete su consolidación."), { id: ["anB", "anC", "anD", "anE"][i], wide: true })).join("");
     else if (d.configured.reporting) html += "";
     else html += ["B. Tráfico y visitantes", "C. Productos y categorías", "D. Embudo de compra", "E. Vitrinas comerciales"].map((t, i) => card(t, empty("Disponible cuando GA4 esté conectado. No hay datos de navegación todavía."), { id: ["anB", "anC", "anD", "anE"][i], wide: true })).join("");
     if (d.configured.reporting && !d.configured.measurement) html += `<p class="an-note an-warn">Falta <code>GA4_MEASUREMENT_ID</code>: la tienda no está enviando visitas a GA4, así que los informes no recibirán datos nuevos.</p>`;
