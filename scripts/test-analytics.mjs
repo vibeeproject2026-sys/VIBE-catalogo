@@ -91,7 +91,9 @@ await test("la tienda nunca manda datos de la clienta a GA4 (revisión del códi
   const calls = [...app.matchAll(/track(?:Once)?\(([^;]*?)\);/g)].map((m) => m[1]);
   assert.ok(calls.length >= 10, "no se encontraron las llamadas de medición");
   for (const c of calls) assert.doesNotMatch(c, /data\.(name|phone|email|city|address|notes)|customer|payload\.id|order\.id/, c);
-  assert.match(app, /if \(res\.status === 201\) track\("generate_lead"/, "la solicitud de pedido se cuenta una vez (no en reintentos)");
+  // Fase B: generate_lead solo con 201 (no en reintentos) y con order_id = número que devolvió el servidor.
+  assert.match(app, /if \(res\.status === 201\) \{\s*const lead = \{ currency: CURRENCY, value: expectedTotal, lead_source: "pedido_catalogo" \};\s*if \(payload && payload\.id != null\) lead\.order_id = String\(payload\.id\);\s*track\("generate_lead", lead\);/, "la solicitud de pedido se cuenta una vez (no en reintentos), con order_id");
+  assert.doesNotMatch(app.replace(/\/\/.*$/gm, ""), /transaction_id/, "transaction_id queda reservado para purchase (Fase C)");
   assert.doesNotMatch(app, /track\("purchase"/, "nunca se registra una «compra» desde la tienda");
 });
 await test("una sola etiqueta: no agrega otra si ya existe gtag/googletagmanager", () => {

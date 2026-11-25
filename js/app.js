@@ -31,7 +31,7 @@ import { selectNovedades, selectBestSellers, collectionsWithProducts, descubrePi
 import { computeOrderSummary, validateCheckoutForm } from "./checkout.js";
 import { bindCartSwipe } from "./cart-swipe.js";
 import { hasOptions, resolveVariant, selectionStatus, autoShadeId, autoPresentationId, lineOptionProblem, optionPriceInfo, priceRange, priceOf, ownPriceWithPromo } from "./variants.js";
-import { initAnalytics, track, trackOnce, whenVisible, gaItem, promoItem, sanitizeSearchTerm, LIST_NAMES, CURRENCY } from "./analytics.js";
+import { initAnalytics, track, trackOnce, whenVisible, gaItem, promoItem, sanitizeSearchTerm, orderAttribution, LIST_NAMES, CURRENCY } from "./analytics.js";
 
 // Analítica comercial (GA4): solo con consentimiento y en producción (ver
 // js/analytics.js). Estas llamadas solo MIDEN: no cambian nada de lo que
@@ -2372,6 +2372,9 @@ $("#checkoutDialog").addEventListener("submit", async (e) => {
   checkoutSubmitting = true;
 
   try {
+    // Fase B — origen de la visita e ids de GA4: solo con consentimiento
+    // analítico ({} sin él). Nunca bloquea ni impide el pedido.
+    const attribution = await orderAttribution().catch(() => ({}));
     const res = await fetch("/api/orders/create", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -2387,6 +2390,7 @@ $("#checkoutDialog").addEventListener("submit", async (e) => {
         expectedTotal,
         idempotencyKey: checkoutIdempotencyKey(),
         website: data.website || "",
+        ...attribution,
       }),
     });
     const payload = await res.json().catch(() => null);
@@ -2412,10 +2416,16 @@ $("#checkoutDialog").addEventListener("submit", async (e) => {
     // 201 = pedido nuevo; 200 + replayed = este mismo intento ya estaba
     // registrado (p. ej. tras un corte de red): se confirma ese pedido.
     // Analítica: solicitud de pedido registrada (NO es una venta: la venta
-    // se confirma después con la clienta). Solo el total y la moneda: nunca
-    // datos de la clienta ni el número de pedido. Un reintento del mismo
-    // intento (200 + replayed) no se cuenta dos veces.
-    if (res.status === 201) track("generate_lead", { currency: CURRENCY, value: expectedTotal, lead_source: "pedido_catalogo" });
+    // se confirma después con la clienta). Total, moneda y order_id (el
+    // número de pedido que devolvió el servidor, para enlazarlo con la
+    // venta; transaction_id queda reservado para purchase). Nunca datos de
+    // la clienta. Un reintento del mismo intento (200 + replayed) no se
+    // cuenta dos veces.
+    if (res.status === 201) {
+      const lead = { currency: CURRENCY, value: expectedTotal, lead_source: "pedido_catalogo" };
+      if (payload && payload.id != null) lead.order_id = String(payload.id);
+      track("generate_lead", lead);
+    }
     clearCheckoutAttempt();
     clearCart();
     renderCart();

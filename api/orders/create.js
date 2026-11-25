@@ -23,6 +23,7 @@ const { applyCors } = require("../catalog/_lib/cors");
 const { sendJson, sendError, methodNotAllowed } = require("../catalog/_lib/http");
 const { validateOrderPayload } = require("./_lib/validate");
 const { insertOrder, markOrderNotifications, internalFromResult, findOrderByIdempotencyKey, countRecentOrdersByPhone } = require("./_lib/store");
+const { sanitizeOrderAnalytics, analyticsColumns } = require("./_lib/attribution");
 const { parseDetails } = require("../_lib/editorialDetails");
 const { productOptions, resolveSelection, linePrice } = require("../_lib/variants");
 const { isHoneypotFilled, ipRateLimited, parseIdempotencyKey, PHONE_WINDOW_MS, PHONE_MAX_ORDERS } = require("./_lib/guard");
@@ -273,9 +274,24 @@ module.exports = async function handler(req, res) {
     contact_consent: true,
   };
 
+  // Fase B — atribución de la visita (solo llega con consentimiento
+  // analítico). Saneada con lista blanca; sin datos, no se envía ninguna
+  // columna nueva y el pedido queda exactamente como antes.
+  const analytics = analyticsColumns(sanitizeOrderAnalytics(body));
+  const hasAnalytics = Object.keys(analytics).length > 0;
+
+  const withIdem = (o) => (idemColumn ? { ...o, idempotency_key: idem.key } : o);
   let order;
   try {
-    order = await insertOrder({ order: idemColumn ? { ...orderPayload, idempotency_key: idem.key } : orderPayload, env });
+    try {
+      order = await insertOrder({ order: withIdem({ ...orderPayload, ...analytics }), env });
+    } catch (ea) {
+      // Columnas de atribución ausentes (migración 14 sin aplicar): se
+      // registra el pedido sin ellas, conservando la clave de idempotencia.
+      if (!(ea && ea.code === "MISSING_COLUMN" && hasAnalytics)) throw ea;
+      console.error("[orders/create] columnas de atribución no disponibles; pedido registrado sin atribución.");
+      order = await insertOrder({ order: withIdem(orderPayload), env });
+    }
   } catch (e) {
     if (e && e.code === "DUPLICATE_IDEMPOTENCY_KEY") {
       // Otro intento simultáneo del mismo pedido ya lo registró: se

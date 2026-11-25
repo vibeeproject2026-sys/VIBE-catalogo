@@ -224,12 +224,121 @@ export function setConsent(value) {
   consent = value === "granted" ? "granted" : "denied";
   writeConsent(consent);
   hideBanner();
-  if (consent === "granted" && measurementId) loadTag(measurementId);
+  if (consent === "granted" && measurementId) { loadTag(measurementId); captureAttribution(); }
   if (consent === "denied") {
     queue = [];
     if (tagReady) stopTag();
     tagReady = false;
+    clearAttribution();
   }
+}
+
+// ── Atribución del pedido (Fase B) ──────────────────────────────────────
+// Origen de la visita que termina en un pedido: UTM, ids de clic, página de
+// entrada y sitio de procedencia, más los ids de GA4 (cliente y sesión).
+// SOLO con consentimiento analítico: antes no se lee ni se guarda nada, y al
+// rechazar se borra. Nunca datos personales: valores con «@» o con aspecto
+// de teléfono se descartan; la página de entrada y el sitio de procedencia
+// van sin parámetros ajenos a la campaña. Modelo «último origen no directo»:
+// una visita directa o una navegación interna nunca reemplaza un origen
+// guardado; uno nuevo (campaña o sitio externo) sí. Vence a los 30 días.
+export const ATTRIBUTION_KEY = "vibe_attribution_v1";
+const ATTRIBUTION_TTL_MS = 30 * 864e5;
+const UTM_KEYS = ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term"];
+const CLICK_KEYS = ["gclid", "fbclid", "ttclid"];
+const bareHost = (h) => String(h || "").toLowerCase().replace(/^www\./, "");
+
+export function cleanCampaignValue(raw) {
+  if (raw == null) return null;
+  const s = String(raw).replace(/[\u0000-\u001f\u007f<>]/g, "").replace(/\s+/g, " ").trim().slice(0, 200);
+  if (!s || s.includes("@")) return null;
+  if (/^\d{7,13}$/.test(s.replace(/[\s+\-().]/g, ""))) return null;
+  return s;
+}
+
+// Visita → { kind: "campaign" | "direct" | "internal", data }.
+export function attributionFromVisit(href, referrer, now = Date.now()) {
+  let u;
+  try { u = new URL(href); } catch { return { kind: "internal", data: null }; }
+  const data = {};
+  for (const k of UTM_KEYS) { const v = cleanCampaignValue(u.searchParams.get(k)); if (v) data[k] = v; }
+  for (const k of CLICK_KEYS) { const v = u.searchParams.get(k); if (v && /^[A-Za-z0-9._-]{8,200}$/.test(v)) data[k] = v; }
+  let internal = false;
+  if (referrer) {
+    try {
+      const r = new URL(referrer);
+      if (bareHost(r.hostname) === bareHost(u.hostname)) internal = true;
+      else if (r.protocol === "https:" || r.protocol === "http:") data.referrer = `${r.origin}${r.pathname}`.slice(0, 200);
+    } catch {}
+  }
+  const hasSource = Object.keys(data).length > 0;
+  if (!hasSource && internal) return { kind: "internal", data: null };
+  const loc = cleanPageLocation(href);
+  if (loc) data.landing = loc.slice(loc.indexOf("/", 8)).slice(0, 200);
+  data.captured_at = new Date(now).toISOString();
+  return { kind: hasSource ? "campaign" : "direct", data };
+}
+
+// Combina lo guardado con la visita actual sin perder un origen válido.
+export function mergeAttribution(stored, visit, now = Date.now()) {
+  const valid = stored && typeof stored === "object" && Date.parse(stored.captured_at) > now - ATTRIBUTION_TTL_MS ? stored : null;
+  if (visit.kind === "campaign") return visit.data;
+  if (visit.kind === "direct" && !valid) return visit.data;
+  return valid;
+}
+
+function readAttribution() {
+  try { return JSON.parse(window.localStorage.getItem(ATTRIBUTION_KEY) || "null"); } catch { return null; }
+}
+export function captureAttribution() {
+  if (typeof window === "undefined" || consent !== "granted") return null;
+  const next = mergeAttribution(readAttribution(), attributionFromVisit(window.location.href, document.referrer));
+  try {
+    if (next) window.localStorage.setItem(ATTRIBUTION_KEY, JSON.stringify(next));
+    else window.localStorage.removeItem(ATTRIBUTION_KEY);
+  } catch {}
+  return next;
+}
+function clearAttribution() {
+  try { window.localStorage.removeItem(ATTRIBUTION_KEY); } catch {}
+}
+
+// Ids de GA4 desde las cookies propias de la etiqueta (_ga y _ga_<id>).
+export function parseGaCookies(cookieStr, id) {
+  const jar = {};
+  for (const c of String(cookieStr || "").split(";")) { const i = c.indexOf("="); if (i > 0) jar[c.slice(0, i).trim()] = c.slice(i + 1).trim(); }
+  const out = {};
+  const ga = /^GA\d\.\d+\.(\d{1,12})\.(\d{1,12})$/.exec(jar._ga || "");
+  if (ga) out.clientId = `${ga[1]}.${ga[2]}`;
+  const sess = jar[`_ga_${String(id || "").replace(/^G-/, "")}`] || "";
+  const m = /^GS1\.\d+\.(\d{1,15})\./.exec(sess) || /^GS2\.\d+\.s(\d{1,15})/.exec(sess);
+  if (m) out.sessionId = m[1];
+  return out;
+}
+
+function gtagGet(field, timeoutMs) {
+  return new Promise((resolve) => {
+    const t = setTimeout(() => resolve(null), timeoutMs);
+    try { window.gtag("get", measurementId, field, (v) => { clearTimeout(t); resolve(v == null ? null : String(v)); }); }
+    catch { clearTimeout(t); resolve(null); }
+  });
+}
+
+// Datos para /api/orders/create: {} sin consentimiento (el pedido sale igual
+// que antes). Nunca incluye datos de la clienta.
+export async function orderAttribution({ timeoutMs = 600 } = {}) {
+  if (typeof window === "undefined" || consent !== "granted" || !measurementId) return {};
+  const out = {};
+  const stored = mergeAttribution(readAttribution(), { kind: "internal", data: null });
+  if (stored) out.attribution = stored;
+  let clientId = null, sessionId = null;
+  if (tagReady && typeof window.gtag === "function") [clientId, sessionId] = await Promise.all([gtagGet("client_id", timeoutMs), gtagGet("session_id", timeoutMs)]);
+  const fromCookies = parseGaCookies(document.cookie, measurementId);
+  clientId = clientId && /^\d{1,12}\.\d{1,12}$/.test(clientId) ? clientId : fromCookies.clientId;
+  sessionId = sessionId && /^\d{1,15}$/.test(sessionId) ? sessionId : fromCookies.sessionId;
+  if (clientId) out.gaClientId = clientId;
+  if (sessionId) out.gaSessionId = sessionId;
+  return out;
 }
 
 // ── Aviso de privacidad ─────────────────────────────────────────────────
@@ -293,7 +402,7 @@ export async function initAnalytics({ fetchImpl = typeof fetch !== "undefined" ?
   if (!id) { consent = "denied"; queue = []; return { enabled: false, reason: "not-configured" }; }
   measurementId = id;
   addPreferencesLink();
-  if (stored === "granted") loadTag(id);
+  if (stored === "granted") { loadTag(id); captureAttribution(); }
   else if (stored === null) showBanner();
   return { enabled: true, consent: stored };
 }
@@ -303,3 +412,4 @@ export function __resetForTests() {
   measurementId = null; tagReady = false; consent = null; queue = []; recent.clear(); sentOnce.clear();
 }
 export function __setConsentForTests(v) { consent = v; }
+export function __setMeasurementIdForTests(v) { measurementId = v; }
